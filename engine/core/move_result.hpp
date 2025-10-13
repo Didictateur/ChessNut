@@ -7,7 +7,13 @@
 
 namespace engine {
 
-enum class MoveStatus { Ok, Illegal, BlockedByCard, OutOfBounds, RequiresConfirmation };
+enum class MoveStatus {
+    Ok,
+    Illegal,
+    BlockedByCard,
+    OutOfBounds,
+    RequiresConfirmation
+};
 
 struct MoveResult {
     MoveStatus status = MoveStatus::Ok;

@@ -1,14 +1,14 @@
 #ifndef CELL_HPP
 #define CELL_HPP
 
+#include "piece.hpp"
 #include <optional>
+#include <memory>
 
 namespace engine {
 
-struct PieceId;
-
 struct Cell {
-    std::optional<PieceId> pieceId;
+    std::optional<std::shared_ptr<Piece>> pieceId;
 };
 
 } // namespace engine

@@ -17,6 +17,9 @@ public:
     int getWidth() const { return width; }
     int getHeight() const { return height; }
     Cell& getCell(int x, int y) { return grid[y][x]; }
+    void setPiece(int x, int y, const Piece& piece) {
+        grid[y][x].pieceId = std::make_shared<Piece>(piece);
+    }
 };
 
 } // namespace engine

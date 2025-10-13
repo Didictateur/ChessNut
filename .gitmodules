@@ -1,0 +1,3 @@
+[submodule "src/asset/chess-pieces"]
+	path = src/asset/chess-pieces
+	url = https://github.com/Kadagaden/chess-pieces?tab=readme-ov-file

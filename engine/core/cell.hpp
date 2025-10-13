@@ -8,7 +8,7 @@
 namespace engine {
 
 struct Cell {
-    std::optional<std::shared_ptr<Piece>> pieceId;
+    std::optional<std::shared_ptr<Piece>> piece;
 };
 
 } // namespace engine

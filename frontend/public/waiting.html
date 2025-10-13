@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ChessNut — Salle d'attente</title>
+  <link rel="stylesheet" href="src/styles.css">
+  <style>
+    .waiting-page{max-width:900px;margin:20px auto}
+  </style>
+</head>
+<body>
+  <div class="waiting-page">
+    <header><h1>Salle d'attente</h1></header>
+    <div class="card">
+      <div>Partie: <span id="wait-game-id"></span></div>
+      <div>Joueurs:</div>
+      <ul id="wait-players"></ul>
+      <div>
+        <div>Votre pseudo: <strong id="player-nick">-</strong></div>
+        <div>Couleur choisie: <strong id="player-color">-</strong></div>
+      </div>
+      <div>
+        <button id="start-btn">Commencer la partie</button>
+        <button id="leave-btn">Quitter</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+  <script src="src/waiting.js?v=2"></script>
+</body>
+</html>

@@ -2,7 +2,7 @@
 
 namespace engine {
 
-GameState::GameState() : board(8, 8) {
+GameState::GameState() : board(8, 8), whiteTeam(nullptr), blackTeam(nullptr), turn(0) {
 
     // white pieces
     board.setPiece(0, 0, Piece(PieceColor::WHITE, PieceType::ROOK));
@@ -30,6 +30,18 @@ GameState::GameState() : board(8, 8) {
 
     for (int x = 0; x < 8; ++x) {
         board.setPiece(x, 6, Piece(PieceColor::BLACK, PieceType::PAWN));
+    }
+
+    whiteTeam = Team{std::make_shared<Piece>(board.getCell(4, 0).piece -> get() -> getColor(), board.getCell(4, 0).piece -> get() -> getType())};
+    blackTeam = Team{std::make_shared<Piece>(board.getCell(4, 7).piece -> get() -> getColor(), board.getCell(4, 7).piece -> get() -> getType())};
+}
+GameState::~GameState() = default;
+
+bool GameState::hasHisKing(PieceColor color) {
+    if (color == PieceColor::WHITE) {
+        return whiteTeam.king != nullptr;
+    } else {
+        return blackTeam.king != nullptr;
     }
 }
 

@@ -1,0 +1,3 @@
+[submodule "frontend/public/assets/chess-pieces"]
+	path = frontend/public/assets/chess-pieces
+	url = git@github.com:Kadagaden/chess-pieces.git

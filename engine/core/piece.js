@@ -22,6 +22,8 @@ class Piece {
         this.color = color;
         /** @type {PieceType} */
         this.type = type;
+        /** @type {boolean} */
+        this.hasMoved = false;
     }
 
     /**

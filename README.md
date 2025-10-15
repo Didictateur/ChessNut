@@ -90,3 +90,5 @@ La position de toutes les pièces sont échangées aléatoirement.
 Une reine est dégradée en pion
 ### Tricherie
 Regarde les trois prochaines cartes de la pioche
+### Tout ou rien
+Une pièce choisie ne peut maintenant se déplacer que si elle capture

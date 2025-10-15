@@ -1,7 +1,13 @@
+import Board from './board.js';
+import Team from './team.js';
+import Stack from './stack.js';
+
 class GameState {
     constructor() {
         /** @type {Board} */
         this.board = new Board();
+        /** @type {Stack} */
+        this.stack = new Stack();
         /** @type {Team} */
         this.whiteTeam = new Team("white");
         /** @type {Team} */

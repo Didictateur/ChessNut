@@ -75,6 +75,16 @@ function renderGameList(){
     });
 }
 
+// Socket: listen for global games-list updates from backend to refresh lobby list live
+if(typeof io !== 'undefined'){
+  try{
+    const sock = io('http://localhost:4000', { transports: ['websocket', 'polling'] });
+    sock.on('connect', () => { console.log('lobby socket connected', sock.id); });
+    sock.on('games-list', (list) => { console.log('games-list event received', list); try { renderGameList(); } catch(e){} });
+    sock.on('connect_error', (e) => { console.warn('lobby socket connect error', e); });
+  }catch(e){ console.warn('failed to init lobby socket', e); }
+}
+
 function renderGameListItem(ul, g){
   const li = document.createElement('li');
   // display only human-friendly name; avoid showing internal ids
@@ -82,7 +92,18 @@ function renderGameListItem(ul, g){
 
   // detect if this client already joined this game (we store playerId in sessionStorage)
   const storedPlayerId = sessionStorage.getItem(`playerId:${g.id}`);
-  const alreadyJoined = storedPlayerId ? (g.players || []).some(p => p.id === storedPlayerId) : false;
+  // If we have a stored player id but the server-side game no longer contains that player,
+  // cleanup the sessionStorage entry (it means the player was removed / left).
+  let alreadyJoined = false;
+  if (storedPlayerId) {
+    const playerStillInGame = (g.players || []).some(p => p.id === storedPlayerId);
+    if (!playerStillInGame) {
+      // stale stored id: remove it
+      sessionStorage.removeItem(`playerId:${g.id}`);
+    } else {
+      alreadyJoined = true;
+    }
+  }
 
   if(alreadyJoined){
     const span = document.createElement('span');

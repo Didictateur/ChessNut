@@ -12,12 +12,22 @@ function renderBoardFromState(state) {
   const boardEl = document.createElement('div');
   boardEl.className = 'board';
 
+  // if no state provided, create an empty 8x8 board
+  if(!state || !state.board){
+    const w = 8, h = 8;
+    const board = Array.from({ length: h }, () => Array.from({ length: w }, () => null));
+    state = { board, width: w, height: h };
+  }
+
   const h = state.height || state.board.length;
   const w = state.width || (state.board[0] && state.board[0].length) || 8;
 
+  // Use CSS grid so cells distribute evenly and keep the board square via wrapper's aspect-ratio
+  boardEl.style.display = 'grid';
+  boardEl.style.gridTemplateColumns = `repeat(${w}, 1fr)`;
+  boardEl.style.gridTemplateRows = `repeat(${h}, 1fr)`;
+
   for (let r = 0; r < h; r++) {
-    const row = document.createElement('div');
-    row.className = 'row';
     for (let c = 0; c < w; c++) {
       const cell = document.createElement('div');
       cell.className = 'cell';
@@ -44,7 +54,7 @@ function renderBoardFromState(state) {
       }
 
       cell.appendChild(piece);
-      row.appendChild(cell);
+      boardEl.appendChild(cell);
       // click to select/move
       cell.addEventListener('click', () => {
         // if no game/socket, ignore
@@ -67,7 +77,6 @@ function renderBoardFromState(state) {
         }
       });
     }
-    boardEl.appendChild(row);
   }
   container.appendChild(boardEl);
 }

@@ -11,12 +11,15 @@
     #board-wrapper{width:100%;max-width:900px;margin:0 auto}
     .board{display:grid;border:2px solid #333;box-sizing:border-box}
     .row{display:contents}
-    .cell{position:relative;padding:0;overflow:hidden}
+  .cell{position:relative;padding:0;overflow:hidden;display:flex;align-items:center;justify-content:center}
     .cell .piece{width:100%;height:100%;object-fit:contain;display:block}
     .cell.selected{outline:3px solid rgba(0,128,255,0.6);}
     /* make board square and responsive: use a wrapper with aspect-ratio */
     #board-wrapper .board{width:100%;aspect-ratio:1/1}
     /* grid cells will be created dynamically via JS using grid-template */
+    /* checkerboard colors */
+    .board .cell:nth-child(odd){ background: #f0d9b5; }
+    .board .cell:nth-child(even){ background: #b58863; }
     #meta{margin-top:8px}
   </style>
 </head>

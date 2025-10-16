@@ -7,6 +7,12 @@ docker:
 	@echo "Frontend is running at http://localhost:3000"
 	@echo "Backend is running at http://localhost:4000"
 
+stop:
+	docker-compose -f deploy/docker-compose.dev.yml down
+	@echo "Stopped."
+
+restart: stop docker
+
 sync-frontend:
 	@echo "Syncing frontend source -> public for dev..."
 	@rsync -av --exclude node_modules --exclude .git --delete frontend/src/ frontend/public/src/

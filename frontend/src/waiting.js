@@ -31,8 +31,8 @@ let poll = null;
 function startPolling(id){
   if(poll) clearInterval(poll);
   poll = setInterval(()=>{
-    fetch(`/api/game/${id}`).then(r=>{ if(!r.ok) throw new Error('no api'); return r.json(); }).then(g=>{ renderWaitingPlayers(g.players||[]); if(g.started){ clearInterval(poll); window.location.href = `index.html?game=${g.id}`; } }).catch(()=>{
-      fetch(`http://localhost:4000/api/game/${id}`).then(r=>r.json()).then(g=>{ renderWaitingPlayers(g.players||[]); if(g.started){ clearInterval(poll); window.location.href = `index.html?game=${g.id}`; } }).catch(()=>{});
+    fetch(`/api/game/${id}`).then(r=>{ if(!r.ok) throw new Error('no api'); return r.json(); }).then(g=>{ renderWaitingPlayers(g.players||[]); if(g.started){ clearInterval(poll); window.location.href = `game.html?game=${g.id}`; } }).catch(()=>{
+        fetch(`http://localhost:4000/api/game/${id}`).then(r=>r.json()).then(g=>{ renderWaitingPlayers(g.players||[]); if(g.started){ clearInterval(poll); window.location.href = `game.html?game=${g.id}`; } }).catch(()=>{});
     });
   }, 1000);
 }
@@ -46,5 +46,11 @@ q('#join-btn')?.addEventListener('click', () => {
 
 q('#start-btn')?.addEventListener('click', () => {
   fetch('/api/start', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ id: gameId }) })
-    .then(r=>{ if(!r.ok) throw new Error('start failed'); return r.json(); }).then(()=>{ alert('Partie démarrée'); }).catch(()=>{ alert('Impossible de démarrer'); });
+    .then(r=>{ if(!r.ok) throw new Error('start failed'); return r.json(); }).then((res)=>{
+      // If backend confirms, go to game page
+      window.location.href = `game.html?game=${gameId}`;
+    }).catch(()=>{
+      // If backend absent, still attempt to open the game page — polling may still load state from localStorage/backends
+      window.location.href = `game.html?game=${gameId}`;
+    });
 });

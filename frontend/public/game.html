@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ChessNut 1 Partie</title>
+  <link rel="stylesheet" href="src/styles.css">
+  <style>
+    /* Minimal board CSS: grid that adapts to container size */
+    .game-page{max-width:1000px;margin:12px auto;padding:8px}
+    #board-wrapper{width:100%;max-width:900px;margin:0 auto}
+    .board{display:grid;border:2px solid #333;box-sizing:border-box}
+    .row{display:contents}
+    .cell{position:relative;padding:0;overflow:hidden}
+    .cell .piece{width:100%;height:100%;object-fit:contain;display:block}
+    .cell.selected{outline:3px solid rgba(0,128,255,0.6);}
+    /* make board square and responsive: use a wrapper with aspect-ratio */
+    #board-wrapper .board{width:100%;aspect-ratio:1/1}
+    /* grid cells will be created dynamically via JS using grid-template */
+    #meta{margin-top:8px}
+  </style>
+</head>
+<body>
+  <div class="game-page">
+    <header><h1>Partie</h1></header>
+    <div id="meta">Chargement...</div>
+    <div id="board-wrapper"><div id="board-container"></div></div>
+    <div style="margin-top:8px">
+      <button id="leave">Quitter</button>
+    </div>
+  </div>
+
+  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+  <script src="src/game.js?v=3"></script>
+  <script>
+    // small bootstrap: fetch initial game state and wire socket updates
+    (function(){
+      const qs = new URLSearchParams(window.location.search);
+      const gid = qs.get('game');
+      const meta = document.getElementById('meta');
+      if(!gid){ meta.textContent = 'Game ID manquant'; return; }
+      meta.textContent = 'Chargement de la partie ' + gid + '...';
+      // fetch initial state
+      fetch('/api/game/' + gid).then(r => r.ok ? r.json() : null).then(g => {
+        if(g && g.state && typeof renderBoardFromState === 'function') renderBoardFromState(g.state);
+        meta.textContent = 'Partie ' + (g && g.id ? g.id : gid);
+        // set globals expected by src/game.js so socket handlers attach correctly
+        try {
+          if(typeof currentGameId !== 'undefined') currentGameId = gid;
+          if(typeof myPlayerId !== 'undefined' && g && g.players && g.players[0]) myPlayerId = g.players[0].id;
+          if(typeof socket === 'undefined' || !socket){
+            socket = io();
+            socket.on('connect', () => { socket.emit('join-game', gid); socket.emit('identify', { gameId: gid, playerId: myPlayerId }); });
+            socket.on('game-state', (s) => { if(typeof renderBoardFromState === 'function') renderBoardFromState(s); if(typeof setMeta === 'function') setMeta('game-state updated'); });
+            socket.on('move', (m) => { if(typeof setMeta === 'function') setMeta('remote move ' + JSON.stringify(m)); });
+            socket.on('player-update', (g) => { if(typeof setMeta === 'function') setMeta('players updated'); });
+          }
+        } catch(e){ console.warn('socket init failed', e); }
+      }).catch(()=>{ meta.textContent = 'Impossible de charger la partie'; });
+
+      document.getElementById('leave').addEventListener('click', ()=>{ window.location.href = 'waiting.html?game=' + encodeURIComponent(gid); });
+    })();
+  </script>
+</body>
+</html>

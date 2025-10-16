@@ -6,6 +6,7 @@ function qsParam(name){
 }
 
 const gameId = qsParam('game');
+console.log('[waiting.js] loaded - build: v2 -', { gameId, url: window.location.href });
 if(!gameId){ document.body.innerHTML = '<p>Game ID missing in URL</p>'; }
 else {
   // Query explicit backend first to avoid interpreting same-origin static 404 as game-deleted
@@ -22,6 +23,8 @@ else {
   }).then(g => {
     q('#wait-game-id').textContent = g.name || '';
     renderWaitingPlayers(g.players||[]);
+    // if game already started, redirect immediately to the game page
+    if (g.started) { window.location.href = `game.html?game=${g.id}`; return; }
     // display current player nick and color if we have a playerId
     const stored = sessionStorage.getItem(`playerId:${gameId}`);
     if(stored){
@@ -31,7 +34,10 @@ else {
     // owner-only start button
     const ownerId = g.players && g.players[0] && g.players[0].id;
     if(ownerId && stored && ownerId === stored){ q('#start-btn')?.classList.remove('hidden'); } else { q('#start-btn')?.classList.add('hidden'); }
-    if(!g.started) startPolling(gameId);
+      // disable start button unless there are at least 2 players
+      const startBtn = q('#start-btn');
+      if(startBtn){ if((g.players||[]).length < 2){ startBtn.disabled = true; } else { startBtn.disabled = false; } }
+  if(!g.started) startPolling(gameId);
     // try to connect socket.io for instant updates and identification
     tryConnectSocket(gameId);
   }).catch(()=>{
@@ -43,10 +49,15 @@ else {
     }).then(g=>{
       q('#wait-game-id').textContent = g.name || '';
       renderWaitingPlayers(g.players||[]);
+      // if game already started, redirect immediately to the game page
+      if (g.started) { window.location.href = `game.html?game=${g.id}`; return; }
       const stored = sessionStorage.getItem(`playerId:${gameId}`);
       if(stored){ const me = (g.players||[]).find(p=>p.id===stored); if(me){ q('#player-nick').textContent = 'Vous'; q('#player-color').textContent = me.colorChoice || '-'; } }
       const ownerId = g.players && g.players[0] && g.players[0].id;
       if(ownerId && stored && ownerId === stored){ q('#start-btn')?.classList.remove('hidden'); } else { q('#start-btn')?.classList.add('hidden'); }
+        // disable start button unless there are at least 2 players
+        const startBtn = q('#start-btn');
+        if(startBtn){ if((g.players||[]).length < 2){ startBtn.disabled = true; } else { startBtn.disabled = false; } }
       if(!g.started) startPolling(gameId);
       tryConnectSocket(gameId);
     }).catch(()=>{
@@ -81,8 +92,8 @@ function tryConnectSocket(gameId){
   });
   sock.on('game-start', (g) => {
     if(!g) return;
-    // redirect to game view (index) when started
-    window.location.href = `index.html?game=${g.id}`;
+    // redirect to game view when started
+    window.location.href = `game.html?game=${g.id}`;
   });
   sock.on('connect_error', (err) => {
     console.warn('socket connect error', err);
@@ -100,8 +111,10 @@ let poll = null;
 function startPolling(id){
   if(poll) clearInterval(poll);
   poll = setInterval(()=>{
-    fetch(`/api/game/${id}`).then(r=>{ if(!r.ok) throw new Error('no api'); return r.json(); }).then(g=>{ renderWaitingPlayers(g.players||[]); if(g.started){ clearInterval(poll); window.location.href = `index.html?game=${g.id}`; } }).catch(()=>{
-      fetch(`http://localhost:4000/api/game/${id}`).then(r=>r.json()).then(g=>{ renderWaitingPlayers(g.players||[]); if(g.started){ clearInterval(poll); window.location.href = `index.html?game=${g.id}`; } }).catch(()=>{});
+    // Prefer explicit backend host to avoid same-origin 404 from static server
+    fetch(`http://localhost:4000/api/game/${id}`).then(r=>{ if(!r.ok) throw new Error('no api'); return r.json(); }).then(g=>{ renderWaitingPlayers(g.players||[]); if(g.started){ clearInterval(poll); window.location.href = `game.html?game=${g.id}`; } }).catch(()=>{
+      // fallback to same-origin if backend not reachable
+      fetch(`/api/game/${id}`).then(r=>{ if(!r.ok) throw new Error('no api'); return r.json(); }).then(g=>{ renderWaitingPlayers(g.players||[]); if(g.started){ clearInterval(poll); window.location.href = `game.html?game=${g.id}`; } }).catch(()=>{});
     });
   }, 1000);
 }
@@ -109,8 +122,16 @@ function startPolling(id){
 // Join handled from lobby; waiting room doesn't provide a join button
 
 q('#start-btn')?.addEventListener('click', () => {
-  fetch('/api/start', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ id: gameId }) })
-    .then(r=>{ if(!r.ok) throw new Error('start failed'); return r.json(); }).then(()=>{ alert('Partie démarrée'); }).catch(()=>{ alert('Impossible de démarrer'); });
+  // force explicit backend host (no fallback) so request always goes to :4000
+  console.log('[waiting] start click - POST to http://localhost:4000/api/start', { gameId });
+  fetch('http://localhost:4000/api/start', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ id: gameId }) })
+    .then(async (r) => {
+      const body = await r.json().catch(()=>({}));
+      if(!r.ok) throw body;
+      return body;
+    })
+    .then((resp)=>{ try { window.location.href = `game.html?game=${resp.game.id}`; } catch(e) { alert('Partie démarrée'); } })
+    .catch((err)=>{ const msg = (err && err.error) ? err.error : (typeof err === 'string' ? err : JSON.stringify(err)); alert('Impossible de démarrer: ' + msg); console.error('start error', err); });
 });
 
 q('#leave-btn')?.addEventListener('click', () => {

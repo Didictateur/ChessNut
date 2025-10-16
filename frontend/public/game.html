@@ -27,6 +27,7 @@
   <div class="game-page">
     <header><h1>Partie</h1></header>
     <div id="meta">Chargement...</div>
+  <div id="server-load-indicator" style="margin-top:6px;color:#666">Chargement de l'état du serveur...</div>
     <div id="board-wrapper"><div id="board-container"></div></div>
     <div style="margin-top:8px">
       <button id="leave">Quitter</button>
@@ -41,25 +42,42 @@
       const qs = new URLSearchParams(window.location.search);
       const gid = qs.get('game');
       const meta = document.getElementById('meta');
-      if(!gid){ meta.textContent = 'Game ID manquant'; return; }
-      meta.textContent = 'Chargement de la partie ' + gid + '...';
-      // fetch initial state
-      fetch('/api/game/' + gid).then(r => r.ok ? r.json() : null).then(g => {
-        if(g && g.state && typeof renderBoardFromState === 'function') renderBoardFromState(g.state);
-        meta.textContent = 'Partie ' + (g && g.id ? g.id : gid);
-        // set globals expected by src/game.js so socket handlers attach correctly
-        try {
-          if(typeof currentGameId !== 'undefined') currentGameId = gid;
-          if(typeof myPlayerId !== 'undefined' && g && g.players && g.players[0]) myPlayerId = g.players[0].id;
-          if(typeof socket === 'undefined' || !socket){
-            socket = io();
-            socket.on('connect', () => { socket.emit('join-game', gid); socket.emit('identify', { gameId: gid, playerId: myPlayerId }); });
-            socket.on('game-state', (s) => { if(typeof renderBoardFromState === 'function') renderBoardFromState(s); if(typeof setMeta === 'function') setMeta('game-state updated'); });
-            socket.on('move', (m) => { if(typeof setMeta === 'function') setMeta('remote move ' + JSON.stringify(m)); });
-            socket.on('player-update', (g) => { if(typeof setMeta === 'function') setMeta('players updated'); });
+  if(!gid){ meta.textContent = 'Game ID manquant'; return; }
+  meta.textContent = 'Affichage du plateau...';
+  // render an empty board immediately so user always sees a board even if backend is slow/unavailable
+  try { if(typeof renderBoardFromState === 'function') renderBoardFromState(null); } catch(e){ console.warn('initial empty board render failed', e); }
+      // fetch initial state: prefer explicit backend host then fallback to same-origin
+      (function(){
+        function handleGameObj(g){
+          // render board from state or empty board
+  if(g && g.state && typeof renderBoardFromState === 'function') renderBoardFromState(g.state);
+  else if(typeof renderBoardFromState === 'function') renderBoardFromState(null);
+  meta.textContent = 'Partie ' + (g && g.id ? g.id : gid);
+  const sli = document.getElementById('server-load-indicator'); if(sli) sli.style.display = 'none';
+          // set globals expected by src/game.js so socket handlers attach correctly
+          try {
+            currentGameId = gid;
+            if(g && g.players && g.players[0]) myPlayerId = g.players[0].id;
+            if(typeof socket === 'undefined' || !socket){
+              socket = io();
+              socket.on('connect', () => { socket.emit('join-game', gid); socket.emit('identify', { gameId: gid, playerId: myPlayerId }); });
+              socket.on('game-state', (s) => { if(typeof renderBoardFromState === 'function') renderBoardFromState(s); if(typeof setMeta === 'function') setMeta('game-state updated'); });
+              socket.on('move', (m) => { if(typeof setMeta === 'function') setMeta('remote move ' + JSON.stringify(m)); });
+              socket.on('player-update', (g) => { if(typeof setMeta === 'function') setMeta('players updated'); });
+            }
+          } catch(e){ console.warn('socket init failed', e); }
+        }
+
+        fetch('http://localhost:4000/api/game/' + gid).then(r => r.ok ? r.json() : null).then(g => {
+          if(g) { handleGameObj(g); }
+          else {
+            // try same-origin
+            fetch('/api/game/' + gid).then(r => r.ok ? r.json() : null).then(handleGameObj).catch(()=>{ handleGameObj(null); const sli = document.getElementById('server-load-indicator'); if(sli) sli.textContent = 'Serveur injoignable'; });
           }
-        } catch(e){ console.warn('socket init failed', e); }
-      }).catch(()=>{ meta.textContent = 'Impossible de charger la partie'; });
+        }).catch(()=>{
+          fetch('/api/game/' + gid).then(r => r.ok ? r.json() : null).then(handleGameObj).catch(()=>{ handleGameObj(null); const sli = document.getElementById('server-load-indicator'); if(sli) sli.textContent = 'Serveur injoignable'; });
+        });
+      })();
 
       document.getElementById('leave').addEventListener('click', ()=>{ window.location.href = 'waiting.html?game=' + encodeURIComponent(gid); });
     })();

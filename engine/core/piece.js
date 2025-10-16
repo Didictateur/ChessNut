@@ -16,14 +16,19 @@ class Piece {
     /**
      * @param {PieceColor} color
      * @param {PieceType} type
+     * @param {Array<import('./movement/index.js').default>} movements
      */
-    constructor(color, type) {
+    constructor(color, type, movements) {
         /** @type {PieceColor} */
         this.color = color;
         /** @type {PieceType} */
         this.type = type;
         /** @type {boolean} */
         this.hasMoved = false;
+        /** @type {Array<import('./movement/index.js').default>} */
+        this.movements = movements;
+        /** @type {Array<import('./movement/index.js').default>} */
+        this.priorityMovements = [];
     }
 
     /**

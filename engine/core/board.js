@@ -1,5 +1,19 @@
 import Cell from './cell.js';
+import * as Movement from './movement/index.js';
+import Piece, { PieceColor, PieceType } from './piece.js';
 
+export default  {
+    Cell,
+    Movement,
+    Piece,
+    PieceColor,
+    PieceType,
+    Board
+};
+
+/**
+ * Represents the game board.
+ */
 class Board {
     /**
      * @param {number} width
@@ -51,32 +65,32 @@ class Board {
     setupInitialPieces() {
         // Pawns
         for (let x = 0; x < this.width; x++) {
-            this.setPiece(x, 1, new Piece(PieceColor.WHITE, PieceType.PAWN));
-            this.setPiece(x, 6, new Piece(PieceColor.BLACK, PieceType.PAWN));
+            this.setPiece(x, 1, new Piece(PieceColor.WHITE, PieceType.PAWN, [Movement.PawnMove]));
+            this.setPiece(x, 6, new Piece(PieceColor.BLACK, PieceType.PAWN, [Movement.PawnMove]));
         }
 
         // Rooks
-        this.setPiece(0, 0, new Piece(PieceColor.WHITE, PieceType.ROOK));
-        this.setPiece(7, 0, new Piece(PieceColor.WHITE, PieceType.ROOK));
-        this.setPiece(0, 7, new Piece(PieceColor.BLACK, PieceType.ROOK));
-        this.setPiece(7, 7, new Piece(PieceColor.BLACK, PieceType.ROOK));
+        this.setPiece(0, 0, new Piece(PieceColor.WHITE, PieceType.ROOK, [Movement.RookMove]));
+        this.setPiece(7, 0, new Piece(PieceColor.WHITE, PieceType.ROOK, [Movement.RookMove]));
+        this.setPiece(0, 7, new Piece(PieceColor.BLACK, PieceType.ROOK, [Movement.RookMove]));
+        this.setPiece(7, 7, new Piece(PieceColor.BLACK, PieceType.ROOK, [Movement.RookMove]));
 
         // Knights
-        this.setPiece(1, 0, new Piece(PieceColor.WHITE, PieceType.KNIGHT));
-        this.setPiece(6, 0, new Piece(PieceColor.WHITE, PieceType.KNIGHT));
-        this.setPiece(1, 7, new Piece(PieceColor.BLACK, PieceType.KNIGHT));
-        this.setPiece(6, 7, new Piece(PieceColor.BLACK, PieceType.KNIGHT));
+        this.setPiece(1, 0, new Piece(PieceColor.WHITE, PieceType.KNIGHT, [Movement.KnightMove]));
+        this.setPiece(6, 0, new Piece(PieceColor.WHITE, PieceType.KNIGHT, [Movement.KnightMove]));
+        this.setPiece(1, 7, new Piece(PieceColor.BLACK, PieceType.KNIGHT, [Movement.KnightMove]));
+        this.setPiece(6, 7, new Piece(PieceColor.BLACK, PieceType.KNIGHT, [Movement.KnightMove]));
 
         // Bishops
-        this.setPiece(2, 0, new Piece(PieceColor.WHITE, PieceType.BISHOP));
-        this.setPiece(5, 0, new Piece(PieceColor.WHITE, PieceType.BISHOP));
-        this.setPiece(2, 7, new Piece(PieceColor.BLACK, PieceType.BISHOP));
-        this.setPiece(5, 7, new Piece(PieceColor.BLACK, PieceType.BISHOP));
+        this.setPiece(2, 0, new Piece(PieceColor.WHITE, PieceType.BISHOP, [Movement.BishopMove]));
+        this.setPiece(5, 0, new Piece(PieceColor.WHITE, PieceType.BISHOP, [Movement.BishopMove]));
+        this.setPiece(2, 7, new Piece(PieceColor.BLACK, PieceType.BISHOP, [Movement.BishopMove]));
+        this.setPiece(5, 7, new Piece(PieceColor.BLACK, PieceType.BISHOP, [Movement.BishopMove]));
 
         // Queens and Kings
-        this.setPiece(3, 0, new Piece(PieceColor.WHITE, PieceType.QUEEN));
-        this.setPiece(4, 0, new Piece(PieceColor.WHITE, PieceType.KING));
-        this.setPiece(3, 7, new Piece(PieceColor.BLACK, PieceType.QUEEN));
-        this.setPiece(4, 7, new Piece(PieceColor.BLACK, PieceType.KING));
+        this.setPiece(3, 0, new Piece(PieceColor.WHITE, PieceType.QUEEN, [Movement.QueenMove]));
+        this.setPiece(4, 0, new Piece(PieceColor.WHITE, PieceType.KING, [Movement.KingMove]));
+        this.setPiece(3, 7, new Piece(PieceColor.BLACK, PieceType.QUEEN, [Movement.QueenMove]));
+        this.setPiece(4, 7, new Piece(PieceColor.BLACK, PieceType.KING, [Movement.KingMove]));
     }
 }

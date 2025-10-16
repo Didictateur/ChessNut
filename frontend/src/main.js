@@ -11,7 +11,18 @@ function showBoard(gameId, role) {
   q('#board-section')?.classList?.remove('hidden');
   q('#game-id').textContent = gameId;
   q('#player-role').textContent = role;
-  renderBoard(role === 'white');
+
+  // Try to fetch the server-provided game.state. If present, render from state.board.
+  fetch(`/api/game/${gameId}`).then(r => { if(!r.ok) throw new Error('no api'); return r.json(); }).then(g => {
+    if (g && g.state && g.state.board) {
+      renderBoardFromState(g.state, role === 'white');
+    } else {
+      renderBoard(role === 'white');
+    }
+  }).catch(() => {
+    // fallback to static local render
+    renderBoard(role === 'white');
+  });
 }
 
 q('#create-btn').addEventListener('click', () => {
@@ -105,6 +116,7 @@ q('#leave-btn')?.addEventListener('click', () => showLobby());
 q('#flip-btn')?.addEventListener('click', () => { const board = q('#board-container'); board.classList.toggle('flipped'); });
 
 function renderBoard(asWhite=true) {
+  // legacy static render (used as fallback)
   const container = q('#board-container');
   if(!container) return;
   container.innerHTML = '';
@@ -132,8 +144,64 @@ function renderBoard(asWhite=true) {
   container.appendChild(board);
 }
 
+function renderBoardFromState(state, asWhite = true) {
+  const container = q('#board-container');
+  if(!container) return;
+  container.innerHTML = '';
+  const boardEl = document.createElement('div');
+  boardEl.className = 'board';
+  if (!asWhite) boardEl.classList.add('flipped');
+
+  const h = state.height || state.board.length;
+  const w = state.width || (state.board[0] && state.board[0].length) || 8;
+
+  for (let r = 0; r < h; r++) {
+    const row = document.createElement('div');
+    row.className = 'row';
+    for (let c = 0; c < w; c++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      const piece = document.createElement('img');
+      piece.className = 'piece';
+
+      const cellObj = state.board[r] && state.board[r][c];
+      if (cellObj) {
+        // map type/color to an asset - minimal mapping for common pieces
+        const t = cellObj.type || 'PAWN';
+        const color = (cellObj.color || 'white').toLowerCase();
+        const lookup = {
+          PAWN: `assets/chess-pieces/chess_maestro_bw/${color[0] === 'w' ? 'wP' : 'bP'}.svg`,
+          ROOK: `assets/chess-pieces/chess_maestro_bw/${color[0] === 'w' ? 'wR' : 'bR'}.svg`,
+          KNIGHT: `assets/chess-pieces/chess_maestro_bw/${color[0] === 'w' ? 'wN' : 'bN'}.svg`,
+          BISHOP: `assets/chess-pieces/chess_maestro_bw/${color[0] === 'w' ? 'wB' : 'bB'}.svg`,
+          QUEEN: `assets/chess-pieces/chess_maestro_bw/${color[0] === 'w' ? 'wQ' : 'bQ'}.svg`,
+          KING: `assets/chess-pieces/chess_maestro_bw/${color[0] === 'w' ? 'wK' : 'bK'}.svg`,
+        };
+        piece.src = lookup[t] || lookup.PAWN;
+      } else {
+        piece.style.display = 'none';
+      }
+
+      cell.appendChild(piece);
+      row.appendChild(cell);
+    }
+    boardEl.appendChild(row);
+  }
+
+  container.appendChild(boardEl);
+}
+
 // initial view
-showLobby();
+// initial view
+// If URL contains ?game=..., directly open the board view
+const params = new URLSearchParams(window.location.search);
+const initialGame = params.get('game');
+if (initialGame) {
+  // assign a default role (will be refreshed when fetching game state)
+  showBoard(initialGame, 'white');
+} else {
+  showLobby();
+}
 
 // waiting room helpers
 let pollInterval = null;

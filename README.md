@@ -89,6 +89,8 @@ La position de toutes les pièces sont échangées aléatoirement.
 ### La parrure
 Une reine est dégradée en pion
 ### Tricherie
-Regarde les trois prochaines cartes de la pioche
+Regarde les trois prochaines cartes de la pioche.
 ### Tout ou rien
-Une pièce choisie ne peut maintenant se déplacer que si elle capture
+Une pièce choisie ne peut maintenant se déplacer que si elle capture.
+### Tous les mêmes
+Au yeux de l'ennemie, toutes les pièces se ressemblent pendant 2 tours.

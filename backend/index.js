@@ -40,6 +40,10 @@ const PORT = process.env.PORT || 4000;
 const games = [];
 // map socket.id -> { gameId, playerId }
 const socketMap = new Map();
+// map `${gameId}:${playerId}` -> timeoutId for pending disconnects
+const pendingDisconnects = new Map();
+
+function pdKey(gameId, playerId){ return `${gameId}:${playerId}`; }
 
 app.post('/api/create', (req, res) => {
   console.log('[backend] POST /api/create received', req.body && { name: req.body.name, owner: req.body.ownerNickname });
@@ -171,6 +175,9 @@ app.post('/api/leave', (req, res) => {
   if (g.started) return res.status(403).json({ error: 'game in progress' });
   // remove player (allowed only if game not started)
   const leaving = g.players.splice(pIndex, 1)[0];
+  // clear any pending disconnect timer for this player
+  const key = pdKey(gameId, playerId);
+  if(pendingDisconnects.has(key)){ clearTimeout(pendingDisconnects.get(key)); pendingDisconnects.delete(key); }
   // if the leaving player was the owner, remove the entire game
   if(g.ownerId && leaving.id === g.ownerId){
     games.splice(gIndex, 1);
@@ -284,6 +291,18 @@ io.on('connection', (socket) => {
       if(gameId && playerId){
         socketMap.set(socket.id, { gameId, playerId });
         log('identify', { socketId: socket.id, gameId, playerId });
+        // if this player had a pending disconnect timer, cancel it and mark reconnected
+        const key = pdKey(gameId, playerId);
+        if(pendingDisconnects.has(key)){
+          clearTimeout(pendingDisconnects.get(key));
+          pendingDisconnects.delete(key);
+          // mark player as connected again and notify others
+          const g = games.find(x => x.id === gameId);
+          if(g){
+            const p = g.players.find(p => p.id === playerId);
+            if(p){ p.connected = true; io.to(gameId).emit('player-update', g); io.emit('games-list', games); }
+          }
+        }
       }
     }catch(e){ }
   });
@@ -348,33 +367,38 @@ io.on('connection', (socket) => {
     log('socket disconnect', { socketId: socket.id, reason, meta });
     if(!meta) return;
     const { gameId, playerId } = meta;
+    // remove mapping for this socket immediately
     socketMap.delete(socket.id);
-    const gIndex = games.findIndex(x => x.id === gameId);
-    if(gIndex === -1) return;
-    const g = games[gIndex];
-    const pIndex = g.players.findIndex(p => p.id === playerId);
-    if(pIndex === -1) return;
-    const player = g.players[pIndex];
-    // mark as disconnected instead of removing when game started
-    if (g.started) {
-      player.connected = false;
-      console.log(`socket ${socket.id} disconnected (${reason}), marked player ${player.id} disconnected in ${gameId}`);
+    // schedule a delayed removal: if the player doesn't reconnect within 3s, consider them left
+    const key = pdKey(gameId, playerId);
+    if(pendingDisconnects.has(key)){
+      clearTimeout(pendingDisconnects.get(key));
+      pendingDisconnects.delete(key);
+    }
+    const t = setTimeout(() => {
+      // perform removal after grace period
+      const gIndex = games.findIndex(x => x.id === gameId);
+      if(gIndex === -1){ pendingDisconnects.delete(key); return; }
+      const g = games[gIndex];
+      const pIndex = g.players.findIndex(p => p.id === playerId);
+      if(pIndex === -1){ pendingDisconnects.delete(key); return; }
+      const player = g.players[pIndex];
+      // remove player regardless of started state (user asked players away >3s are considered left)
+      const leaving = g.players.splice(pIndex, 1)[0];
+      log('delayed remove player', { gameId, playerId: leaving.id, owner: g.ownerId });
+      // if owner left, remove entire game immediately
+      if(g.ownerId && leaving.id === g.ownerId){
+        games.splice(gIndex, 1);
+        io.emit('games-list', games);
+        io.to(gameId).emit('game-deleted', { gameId });
+        pendingDisconnects.delete(key);
+        return;
+      }
       io.to(gameId).emit('player-update', g);
       io.emit('games-list', games);
-      return;
-    }
-    // if game not started, remove player as before
-    const leaving = g.players.splice(pIndex, 1)[0];
-    console.log(`socket ${socket.id} disconnected (${reason}), removed player ${leaving.id} from ${gameId}`);
-    // if owner left and game not started, delete the game
-    if(g.ownerId && leaving.id === g.ownerId){
-      games.splice(gIndex, 1);
-      io.emit('games-list', games);
-      io.to(gameId).emit('game-deleted', { gameId });
-      return;
-    }
-    io.to(gameId).emit('player-update', g);
-    io.emit('games-list', games);
+      pendingDisconnects.delete(key);
+    }, 3000);
+    pendingDisconnects.set(key, t);
   });
 });
 

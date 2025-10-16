@@ -79,6 +79,7 @@ function tryConnectSocket(gameId){
     const stored = sessionStorage.getItem(`playerId:${gameId}`) || (()=>{ const all = JSON.parse(localStorage.getItem('games') || '[]'); const g = all.find(x=>x.id===gameId); return g && g.players && g.players[0] && g.players[0].id; })();
     if(stored) sock.emit('identify', { gameId, playerId: stored });
   });
+  sock.on('reconnect', (attempt) => { console.log('waiting socket reconnected', attempt); });
   sock.on('game-deleted', (payload) => {
     if(payload && payload.gameId === gameId){
       sessionStorage.removeItem(`playerId:${gameId}`);
@@ -88,7 +89,10 @@ function tryConnectSocket(gameId){
   });
   sock.on('player-update', (g) => {
     if(!g) return;
+    console.log('[waiting.js] player-update received', g);
     renderWaitingPlayers(g.players||[]);
+    // update start button visibility/disabled state live
+    try { console.log('[waiting.js] updating start button'); updateStartButton(g); } catch(e){ console.error('updateStartButton error', e); }
   });
   sock.on('game-start', (g) => {
     if(!g) return;
@@ -99,6 +103,15 @@ function tryConnectSocket(gameId){
     console.warn('socket connect error', err);
     // leave polling as fallback
   });
+}
+
+function updateStartButton(g){
+  const stored = sessionStorage.getItem(`playerId:${gameId}`);
+  const ownerId = g.players && g.players[0] && g.players[0].id;
+  const startBtn = q('#start-btn');
+  console.log('[waiting.js] updateStartButton values', { ownerId, stored, playersLength: (g.players||[]).length, startBtnExists: !!startBtn });
+  if(ownerId && stored && ownerId === stored){ startBtn?.classList.remove('hidden'); } else { startBtn?.classList.add('hidden'); }
+  if(startBtn){ startBtn.disabled = ((g.players||[]).length < 2); }
 }
 
 function renderWaitingPlayers(players){

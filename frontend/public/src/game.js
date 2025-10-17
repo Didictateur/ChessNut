@@ -32,7 +32,10 @@ function renderBoardFromState(state) {
   for (let r = 0; r < h; r++) {
     for (let c = 0; c < w; c++) {
       const cell = document.createElement('div');
-      cell.className = 'cell';
+  cell.className = 'cell';
+  // alternate light/dark based on coordinates (classic checkerboard)
+  const isLight = ((r + c) % 2) === 0;
+  cell.classList.add(isLight ? 'light' : 'dark');
       cell.dataset.x = c;
       cell.dataset.y = r;
       const piece = document.createElement('img');

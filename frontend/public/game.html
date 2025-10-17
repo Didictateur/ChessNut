@@ -14,9 +14,7 @@
     .cell .piece{width:100%;height:100%;object-fit:contain;display:block}
     .cell.selected{outline:3px solid rgba(0,128,255,0.6);}    
     /* grid cells will be created dynamically via JS using grid-template */
-  /* checkerboard colors — keep these in case JS doesn't add classes */
-  .board .cell:nth-child(odd){ background: #f0d9b5; }
-  .board .cell:nth-child(even){ background: #b58863; }
+  /* checkerboard colors handled by .cell.light/.cell.dark in src/styles.css */
     #meta{margin-top:8px}
   </style>
 </head>
@@ -27,7 +25,6 @@
   <div id="server-load-indicator" style="margin-top:6px;color:#666">Chargement de l'état du serveur...</div>
     <div id="board-wrapper"><div id="board-container"></div></div>
     <div style="margin-top:8px">
-      <button id="leave">Quitter</button>
     </div>
   </div>
 

@@ -6,20 +6,17 @@
   <title>ChessNut 1 Partie</title>
   <link rel="stylesheet" href="src/styles.css">
   <style>
-    /* Minimal board CSS: grid that adapts to container size */
+    /* Minimal board CSS: keep responsive wrapper but delegate main layout to linked stylesheet */
     .game-page{max-width:1000px;margin:12px auto;padding:8px}
     #board-wrapper{width:100%;max-width:900px;margin:0 auto}
-    .board{display:grid;border:2px solid #333;box-sizing:border-box}
-    .row{display:contents}
-  .cell{position:relative;padding:0;overflow:hidden;display:flex;align-items:center;justify-content:center}
+    /* keep a wrapper that forces a square area; the actual .board/.cell layout lives in src/styles.css */
+    #board-wrapper .board{width:100%;aspect-ratio:1/1;box-sizing:border-box}
     .cell .piece{width:100%;height:100%;object-fit:contain;display:block}
-    .cell.selected{outline:3px solid rgba(0,128,255,0.6);}
-    /* make board square and responsive: use a wrapper with aspect-ratio */
-    #board-wrapper .board{width:100%;aspect-ratio:1/1}
+    .cell.selected{outline:3px solid rgba(0,128,255,0.6);}    
     /* grid cells will be created dynamically via JS using grid-template */
-    /* checkerboard colors */
-    .board .cell:nth-child(odd){ background: #f0d9b5; }
-    .board .cell:nth-child(even){ background: #b58863; }
+  /* checkerboard colors — keep these in case JS doesn't add classes */
+  .board .cell:nth-child(odd){ background: #f0d9b5; }
+  .board .cell:nth-child(even){ background: #b58863; }
     #meta{margin-top:8px}
   </style>
 </head>

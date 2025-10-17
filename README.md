@@ -94,3 +94,5 @@ Regarde les trois prochaines cartes de la pioche.
 Une pièce choisie ne peut maintenant se déplacer que si elle capture.
 ### Tous les mêmes
 Au yeux de l'ennemie, toutes les pièces se ressemblent pendant 2 tours.
+### Petit pion
+Le joueur choisit un pion. À partir du prochain tour, il est promu en reine dès qu'il capture un pièce non pion.

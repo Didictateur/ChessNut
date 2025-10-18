@@ -79,18 +79,12 @@ class Board {
         this.setPiece(5, 7, new Piece(PieceColor.BLACK, PieceType.BISHOP, [Movement.BishopMove]));
 
         // Queens and Kings
-        this.setPiece(3, 0, new Piece(PieceColor.WHITE, PieceType.QUEEN, [Movement.QueenMove]));
+        this.setPiece(3, 4, new Piece(PieceColor.WHITE, PieceType.QUEEN, [Movement.QueenMove]));
         this.setPiece(4, 0, new Piece(PieceColor.WHITE, PieceType.KING, [Movement.KingMove]));
         this.setPiece(3, 7, new Piece(PieceColor.BLACK, PieceType.QUEEN, [Movement.QueenMove]));
         this.setPiece(4, 7, new Piece(PieceColor.BLACK, PieceType.KING, [Movement.KingMove]));
     }
 }
 
-export default  {
-    Cell,
-    Movement,
-    Piece,
-    PieceColor,
-    PieceType,
-    Board
-};
+export { Cell, Movement, Piece, PieceColor, PieceType };
+export default Board;

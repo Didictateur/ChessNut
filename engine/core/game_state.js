@@ -5,7 +5,7 @@ import Stack from './stack.js';
 class GameState {
     constructor() {
         /** @type {Board} */
-        this.board = new Board();
+        this.board = new Board(8, 9);
         /** @type {Stack} */
         this.stack = new Stack();
         /** @type {Team} */

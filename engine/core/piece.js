@@ -47,3 +47,4 @@ class Piece {
 }
 
 export default Piece;
+export { PieceColor, PieceType };

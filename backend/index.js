@@ -9,6 +9,7 @@ app.use(cors());
 app.use(bodyParser.json());
 
 const fs = require('fs');
+const path = require('path');
 const LOGFILE = process.env.CHESSNUT_LOG || '/tmp/chessnut.log';
 function appendLogLine(line){
   try{ fs.appendFileSync(LOGFILE, line + '\n'); }catch(e){}
@@ -44,6 +45,64 @@ const socketMap = new Map();
 const pendingDisconnects = new Map();
 
 function pdKey(gameId, playerId){ return `${gameId}:${playerId}`; }
+
+// Diagnostic helper: attempt to dynamically import the engine GameState module
+async function tryImportEngine(){
+  const candidates = [];
+  // common possibilities inside container /app
+  candidates.push(path.join(__dirname, 'engine', 'core', 'game_state.js'));
+  candidates.push(path.resolve(__dirname, '../engine/core/game_state.js'));
+  candidates.push('/app/engine/core/game_state.js');
+  candidates.push('/engine/core/game_state.js');
+
+  const attemptErrors = {};
+  for (const candidate of candidates) {
+    try {
+      const urlStr = 'file://' + candidate;
+      const mod = await import(urlStr);
+      log('tryImportEngine: import OK', { tried: candidate, keys: Object.keys(mod) });
+      return { ok: true, mod, tried: candidate };
+    } catch (e) {
+      attemptErrors[candidate] = (e && e.stack) || String(e);
+    }
+  }
+
+  // if we get here, all attempts failed — gather snippets from likely engine dir(s)
+  const files = ['game_state.js','board.js','piece.js','cell.js'];
+  const snippets = {};
+  const probeDirs = [path.join(__dirname, 'engine', 'core'), path.resolve(__dirname, '../engine/core'), '/app/engine/core', '/engine/core'];
+  for (const d of probeDirs) {
+    for (const f of files) {
+      const p = path.join(d, f);
+      try { const txt = fs.readFileSync(p, 'utf8'); snippets[p] = txt.slice(0, 2000); } catch(err) { snippets[p] = `read-failed: ${err && err.message}`; }
+    }
+  }
+  log('tryImportEngine: all attempts failed', { attempts: Object.keys(attemptErrors).length, attemptErrors: Object.keys(attemptErrors).reduce((acc,k)=>{acc[k]=attemptErrors[k].split('\n')[0];return acc;},{}) });
+  try{ fs.writeFileSync('/tmp/chessnut-engine-import-error.log', JSON.stringify({ time: new Date().toISOString(), attemptErrors, snippets }, null, 2)); }catch(err){}
+  // try fallback by running engine-loader.mjs (ESM) via node
+  try{
+    const loaderRes = await runEngineLoader();
+    log('tryImportEngine: runEngineLoader result', { loaderRes });
+    if(loaderRes && loaderRes.ok) return { ok: true, loader: loaderRes };
+  }catch(e){ log('tryImportEngine: runEngineLoader failed', { err: e && e.stack || e }); }
+
+  return { ok: false, error: attemptErrors, snippets };
+}
+
+// Fallback: try to run engine-loader.mjs via node (spawn) to let node use ESM loader
+const { spawnSync } = require('child_process');
+
+async function runEngineLoader(){
+  try{
+    const loaderPath = path.join(__dirname, 'engine-loader.mjs');
+    const res = spawnSync('node', [loaderPath], { encoding: 'utf8', maxBuffer: 200000 });
+    if(res.error){ return { ok:false, error: res.error.message }; }
+    if(res.status !== 0){
+      return { ok:false, stdout: res.stdout, stderr: res.stderr, status: res.status };
+    }
+    try{ const j = JSON.parse(res.stdout || '{}'); return { ok:true, result: j, raw: res.stdout }; }catch(e){ return { ok:true, raw: res.stdout }; }
+  }catch(e){ return { ok:false, error: e && e.stack }; }
+}
 
 app.post('/api/create', (req, res) => {
   console.log('[backend] POST /api/create received', req.body && { name: req.body.name, owner: req.body.ownerNickname });
@@ -206,7 +265,7 @@ app.get('/api/game/:id', (req, res) => {
   res.json(g);
 });
 
-app.post('/api/start', (req, res) => {
+app.post('/api/start', async (req, res) => {
   const { id } = req.body || {};
   log('POST /api/start', { id, body: req.body });
   const g = games.find(x => x.id === id);
@@ -267,7 +326,45 @@ app.post('/api/start', (req, res) => {
 
   // only initialize if not already present
   if (!g.state) {
-    g.state = initialState();
+    // attempt to import engine GameState for richer state; on failure we log detailed diagnostics
+    const importResult = await tryImportEngine();
+    if (importResult.ok) {
+      try {
+        const GameState = importResult.mod && (importResult.mod.default || importResult.mod.GameState);
+        if (typeof GameState === 'function') {
+          const gs = new GameState();
+          g._engineState = gs;
+          // best-effort serialize
+          try{
+            const serialized = (typeof gs.getBoard === 'function') ? (function(){
+              // serialize Board -> plain structure { board: [rows], width, height }
+              const boardObj = gs.getBoard();
+              const w = (typeof boardObj.getWidth === 'function') ? boardObj.getWidth() : (boardObj.width || 8);
+              const h = (typeof boardObj.getHeight === 'function') ? boardObj.getHeight() : (boardObj.height || 8);
+              const board = Array.from({ length: h }, (v, y) => Array.from({ length: w }, (v2, x) => {
+                try {
+                  const cell = (typeof boardObj.getCell === 'function') ? boardObj.getCell(x, y) : (boardObj.grid && boardObj.grid[y] && boardObj.grid[y][x]);
+                  if (!cell || !cell.piece) return null;
+                  const p = cell.piece;
+                  const color = (typeof p.getColor === 'function' ? p.getColor() : p.color) || p.color;
+                  const type = (typeof p.getType === 'function' ? p.getType() : p.type) || p.type;
+                  return { color: String(color).toLowerCase(), type: String(type).toUpperCase() };
+                } catch (e) { return null; }
+              }));
+              return { board, width: w, height: h };
+            })() : null;
+            g.state = serialized || initialState();
+          }catch(e){ log('engine serialization failed, falling back', { err: e && e.stack }); g.state = initialState(); }
+        } else {
+          log('imported engine module does not expose GameState constructor, falling back to plain state');
+          g.state = initialState();
+        }
+      } catch(e){ log('failed to instantiate GameState, falling back', { err: e && e.stack }); g.state = initialState(); }
+    } else {
+      // import failed: return 500 with short message, detailed info written to logs/file by tryImportEngine
+      log('api/start aborting due to engine import failure', { gameId: g.id });
+      return res.status(500).json({ error: 'engine import failed - see server logs' });
+    }
   }
   // set initial turn: white starts
   g.turn = 'white';

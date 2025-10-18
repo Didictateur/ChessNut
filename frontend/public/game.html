@@ -73,7 +73,10 @@
         });
       })();
 
-      document.getElementById('leave').addEventListener('click', ()=>{ window.location.href = 'waiting.html?game=' + encodeURIComponent(gid); });
+      const leaveBtn = document.getElementById('leave');
+      if (leaveBtn) {
+        leaveBtn.addEventListener('click', ()=>{ window.location.href = 'waiting.html?game=' + encodeURIComponent(gid); });
+      }
     })();
   </script>
 </body>

@@ -1,5 +1,4 @@
-import Piece from './piece.js';
-import PieceColor from './piece.js';
+import Piece, { PieceColor } from './piece.js';
 import Hand from './hand.js';
 
 class Team {
@@ -12,8 +11,8 @@ class Team {
         this.color = color;
         /** @type {Piece} */
         this.king = king;
-        /** @type {Hand} */
-        this.hand = new this.hand();
+    /** @type {Hand} */
+    this.hand = new Hand();
         /** @type {boolean} */
         this.hasMadeAction = false;
     }

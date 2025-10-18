@@ -6,6 +6,7 @@ services:
       - '4000:4000'
     volumes:
       - ../backend:/app
+      - ../engine:/app/engine
 
   frontend:
     image: nginx:stable-alpine

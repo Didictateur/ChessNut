@@ -28,6 +28,12 @@ function renderBoardFromState(state) {
   boardEl.style.display = 'grid';
   boardEl.style.gridTemplateColumns = `repeat(${w}, 1fr)`;
   boardEl.style.gridTemplateRows = `repeat(${h}, 1fr)`;
+  // Keep cells square regardless of board dimensions by setting an aspect-ratio on the board element.
+  // We want height / width ratio so each grid cell becomes square: aspect-ratio = h / w
+  boardEl.style.aspectRatio = `${w} / ${h}`; // CSS aspect-ratio uses width/height, but grid tracks make squares when width/height ratio is set accordingly
+  // Make the board responsive: max size will be limited by container width
+  boardEl.style.maxWidth = 'min(90vmin, 80vw)';
+  boardEl.style.width = '100%';
 
   for (let r = 0; r < h; r++) {
     for (let c = 0; c < w; c++) {

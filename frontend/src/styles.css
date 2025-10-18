@@ -22,3 +22,9 @@ main{padding:16px}
 
 /* Ensure selected cells have no visual effect (display-only mode) */
 .cell.selected{outline: none !important; box-shadow: none !important; border-color: inherit !important; background: inherit !important}
+
+/* Overlay for drawings (arrows/circles) */
+.board-overlay-wrapper{position:relative;width:100%;height:100%;}
+.board-overlay{position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:auto;z-index:30}
+.overlay-controls button{background:rgba(255,255,255,0.9);border:1px solid #ccc;padding:6px 8px;border-radius:4px;cursor:pointer}
+.overlay-controls button:hover{filter:brightness(0.95)}

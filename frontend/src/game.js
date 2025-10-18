@@ -10,7 +10,9 @@ function renderBoardFromState(state) {
   const container = q('#board-container');
   if(!container){ console.error('renderBoardFromState: #board-container not found'); return; }
   console.log('renderBoardFromState called, state present?', !!state);
+  // clear previous board and overlays
   container.innerHTML = '';
+  removeExistingOverlay(container);
   const boardEl = document.createElement('div');
   boardEl.className = 'board';
 
@@ -67,8 +69,10 @@ function renderBoardFromState(state) {
     }
   }
   container.appendChild(boardEl);
+  // (previously: overlay/drawing code removed per user request)
   console.log('renderBoardFromState: board appended (w=' + w + ', h=' + h + ')');
 }
+
 
 function setMeta(text) { q('#meta').textContent = text; }
 

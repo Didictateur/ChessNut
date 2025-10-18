@@ -60,3 +60,5 @@ class GameState {
         return team.hasKing();
     }
 }
+
+export default GameState;

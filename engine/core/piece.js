@@ -45,3 +45,5 @@ class Piece {
         return this.type;
     }
 }
+
+export default Piece;

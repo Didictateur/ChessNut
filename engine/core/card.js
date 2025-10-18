@@ -10,3 +10,5 @@ class Card {
         this.effect;
     }
 }
+
+export default Card;

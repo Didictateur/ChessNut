@@ -2,15 +2,6 @@ import Cell from './cell.js';
 import * as Movement from './movement/index.js';
 import Piece, { PieceColor, PieceType } from './piece.js';
 
-export default  {
-    Cell,
-    Movement,
-    Piece,
-    PieceColor,
-    PieceType,
-    Board
-};
-
 /**
  * Represents the game board.
  */
@@ -94,3 +85,12 @@ class Board {
         this.setPiece(4, 7, new Piece(PieceColor.BLACK, PieceType.KING, [Movement.KingMove]));
     }
 }
+
+export default  {
+    Cell,
+    Movement,
+    Piece,
+    PieceColor,
+    PieceType,
+    Board
+};

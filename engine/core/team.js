@@ -25,3 +25,5 @@ class Team {
         return this.king !== null;
     }
 }
+
+export default Team;

@@ -7,3 +7,5 @@ class Cell {
         this.piece = piece;
     }
 }
+
+export default Cell;

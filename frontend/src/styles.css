@@ -19,3 +19,6 @@ main{padding:16px}
 .piece{width:48px;height:48px}
 .game-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
 .controls button{margin-left:8px}
+
+/* Ensure selected cells have no visual effect (display-only mode) */
+.cell.selected{outline: none !important; box-shadow: none !important; border-color: inherit !important; background: inherit !important}

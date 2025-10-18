@@ -90,26 +90,9 @@ function renderBoardFromState(state, asWhite = null) {
 
       cell.appendChild(piece);
       boardEl.appendChild(cell);
-      // click to select/move
+      // clicks on cells should do absolutely nothing (display-only mode)
       cell.addEventListener('click', () => {
-        // if no game/socket, ignore
-        if (!currentGameId) return;
-        const x = parseInt(cell.dataset.x, 10);
-        const y = parseInt(cell.dataset.y, 10);
-        if (!selected) {
-          selected = { x, y };
-          cell.classList.add('selected');
-          setMeta('Selected ' + x + ',' + y);
-        } else {
-          // send move
-          const from = selected;
-          const to = { x, y };
-          selected = null;
-          // clear previously selected class
-          document.querySelectorAll('.cell.selected').forEach(el => el.classList.remove('selected'));
-          setMeta('Sending move ' + from.x + ',' + from.y + ' -> ' + to.x + ',' + to.y);
-          if (socket && myPlayerId && currentGameId) socket.emit('move', { gameId: currentGameId, playerId: myPlayerId, from, to });
-        }
+        // intentionally empty - no selection, no move, no UI changes
       });
     }
   }

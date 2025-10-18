@@ -97,10 +97,12 @@ function renderBoardFromState(state, asWhite = null) {
     }
   }
   container.appendChild(boardEl);
+  // (previously: overlay/drawing code removed per user request)
   // ensure player color display is in sync
   try{ const pc = document.getElementById('player-color'); if(pc && window && window.myColor) pc.textContent = 'Couleur: ' + window.myColor; }catch(e){}
   console.log('renderBoardFromState: board appended (w=' + w + ', h=' + h + ')');
 }
+
 
 function setMeta(text) { q('#meta').textContent = text; }
 

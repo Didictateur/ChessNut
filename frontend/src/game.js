@@ -34,7 +34,7 @@ function renderBoardFromState(state) {
       const cell = document.createElement('div');
   cell.className = 'cell';
   // alternate light/dark based on coordinates (classic checkerboard)
-  const isLight = ((r + c) % 2) === 0;
+  const isLight = ((r + c) % 2) === 1;
   cell.classList.add(isLight ? 'light' : 'dark');
       cell.dataset.x = c;
       cell.dataset.y = r;

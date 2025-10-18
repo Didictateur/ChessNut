@@ -11,7 +11,28 @@ function showBoard(gameId, role) {
   q('#board-section')?.classList?.remove('hidden');
   q('#game-id').textContent = gameId;
   q('#player-role').textContent = role;
-  renderBoard(role === 'white');
+  // determine this client's assigned color (if any) so we can render board from that perspective
+  (function(){
+    const stored = sessionStorage.getItem(`playerId:${gameId}`) || sessionStorage.getItem('chessnut:game:' + gameId + ':playerId');
+    // prefer server-provided state to compute orientation when available
+    fetch(`/api/game/${gameId}`).then(r => { if(!r.ok) throw new Error('no api'); return r.json(); }).then(g => {
+      try{
+        let asWhite = true;
+        if (stored && g && g.players) {
+          const me = g.players.find(p => p.id === stored);
+          if (me && me.colorAssigned) asWhite = (String(me.colorAssigned).toLowerCase() === 'white');
+        } else if (role) {
+          // fall back to role passed by caller
+          asWhite = (role === 'white');
+        }
+        if (g && g.state && typeof renderBoardFromState === 'function') renderBoardFromState(g.state, asWhite);
+        else renderBoard(asWhite);
+      }catch(e){ renderBoard(role === 'white'); }
+    }).catch(() => {
+      // backend not reachable: fall back to role param
+      renderBoard(role === 'white');
+    });
+  })();
 }
 
 q('#create-btn').addEventListener('click', () => {
@@ -19,7 +40,6 @@ q('#create-btn').addEventListener('click', () => {
   const id = 'game-' + Math.random().toString(36).slice(2,9);
   const pass = q('#create-pass').value;
   const name = q('#create-name').value || id;
-  // minimal create: we don't prompt for a pseudo; server will assign an internal id
   const nick = 'player';
   const colorChoice = 'random';
   const game = { id, name, pass: pass || null, owner: 'you', created: Date.now(), players: [{ id: 'p-' + Math.random().toString(36).slice(2,6), nickname: nick, colorChoice, colorAssigned: null }], started: false };
@@ -116,8 +136,7 @@ function renderGameListItem(ul, g){
     btn.addEventListener('click', () => {
       console.log('[frontend] join clicked for', g.id);
       if(g.pass){ const entered = prompt('Mot de passe pour rejoindre la partie'); if(entered !== g.pass){ alert('Mot de passe incorrect'); return; } }
-      const nick = prompt('Ton pseudo') || 'Player';
-      const payload = { id: g.id, pass: g.pass, nickname: nick };
+      const payload = { id: g.id, pass: g.pass, nickname: 'player' };
 
       // prefer backend host first
       fetch('http://localhost:4000/api/join', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) })
@@ -148,12 +167,14 @@ function renderBoard(asWhite=true) {
   container.innerHTML = '';
   const board = document.createElement('div');
   board.className = 'board';
-  if (!asWhite) board.classList.add('flipped');
-
-  for (let r = 0; r < 8; r++) {
+  // render without CSS rotation: draw ranks/files in visual order
+  for (let vr = 0; vr < 8; vr++) {
     const row = document.createElement('div');
     row.className = 'row';
-    for (let c = 0; c < 8; c++) {
+    for (let vc = 0; vc < 8; vc++) {
+      // For white perspective we want white at bottom -> state row = 7 - vr
+      const r = asWhite ? (7 - vr) : vr;
+      const c = asWhite ? vc : (7 - vc);
       const cell = document.createElement('div');
       cell.className = 'cell';
       const piece = document.createElement('img');

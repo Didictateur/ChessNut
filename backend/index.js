@@ -288,6 +288,16 @@ app.post('/api/start', async (req, res) => {
     if(Math.random() < 0.5){ p0.colorAssigned = 'white'; p1.colorAssigned = 'black'; } else { p0.colorAssigned = 'black'; p1.colorAssigned = 'white'; }
   }
   assign();
+  // Safety: if both players somehow received the same color (bug/regression), force distinct colors
+  try{
+    if (p0.colorAssigned && p1.colorAssigned && p0.colorAssigned === p1.colorAssigned) {
+      log('api/start: duplicate colorAssigned detected, forcing distinct assignment', { gameId: g.id, p0: p0.id, p1: p1.id, current: p0.colorAssigned });
+      p0.colorAssigned = 'white';
+      p1.colorAssigned = 'black';
+    }
+  }catch(e){ log('api/start: safety assignment check failed', { err: e && e.stack }); }
+  // Notify clients about players/colors immediately
+  try{ io.to(g.id).emit('player-update', g); }catch(e){ log('failed to emit player-update after assign', { err: e && e.stack }); }
   g.started = true;
   // Initialize a minimal game.state to be consumed by frontend.
   // We avoid importing engine/ here: state is a plain JS structure describing the board.

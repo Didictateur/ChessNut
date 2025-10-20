@@ -17,8 +17,10 @@ class Piece {
      * @param {PieceColor} color
      * @param {PieceType} type
      * @param {Array<import('./movement/index.js').default>} movements
+		 * @param {number} x
+		 * @param {number} y 
      */
-    constructor(color, type, movements) {
+    constructor(color, type, movements, x, y) {
         /** @type {PieceColor} */
         this.color = color;
         /** @type {PieceType} */
@@ -29,20 +31,10 @@ class Piece {
         this.movements = movements;
         /** @type {Array<import('./movement/index.js').default>} */
         this.priorityMovements = [];
-    }
-
-    /**
-     * @returns {PieceColor}
-     */
-    getColor() {
-        return this.color;
-    }
-
-    /**
-     * @returns {PieceType}
-     */
-    getType() {
-        return this.type;
+				/** @type {number} */
+				this.x = x;
+				/** @type {number} */
+				this.y = y;
     }
 }
 

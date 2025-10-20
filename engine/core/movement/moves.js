@@ -1,11 +1,12 @@
 import { generateLinearMoves } from './generateMoves.js';
 
+// basic moves
 class RookMove {
     /**
      * Return possible moves for a rook-like piece from `from` on the given `board`.
      * The move format is { x, y, capture: boolean }
      *
-     * ctx: { board, from: {x,y}, piece }
+     * ctx: { board, from: {x,y}, piece, allowRing }
      */
     static moves(ctx) {
         const orthogonals = [
@@ -20,6 +21,7 @@ class RookMove {
             from: ctx.from,
             piece: ctx.piece,
             directions: orthogonals,
+						allowRing: ctx.allowRing
         });
     }
 }
@@ -44,6 +46,7 @@ class BishopMove {
             from: ctx.from,
             piece: ctx.piece,
             directions: diagonals,
+						allowRing: ctx.allowRing
         });
     }
 }
@@ -69,6 +72,7 @@ class KnightMove {
             maxSteps: 1,
             allowEmpty: true,
             allowCapture: true,
+						allowRing: ctx.allowRing
         });
 
     }
@@ -92,6 +96,7 @@ class QueenMove {
             from: ctx.from,
             piece: ctx.piece,
             directions: directions,
+						allowRing: ctx.allowRing
         });
     }
 }
@@ -115,6 +120,7 @@ class KingMove {
             piece: ctx.piece,
             directions: directions,
             maxSteps: 1,
+						allowRing: ctx.allowRing
         });
     }
 }

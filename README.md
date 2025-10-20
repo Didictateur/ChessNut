@@ -96,3 +96,9 @@ Une pièce choisie ne peut maintenant se déplacer que si elle capture.
 Au yeux de l'ennemie, toutes les pièces se ressemblent pendant 2 tours.
 ### Petit pion
 Le joueur choisit un pion. À partir du prochain tour, il est promu en reine dès qu'il capture un pièce non pion.
+### Révolution
+Tous les pions sont aléatoirement changés en Cavalier, Fou ou Tour et les Cavaliers, Fous et Tours sont changés en pions.
+### Doppelganger
+Choisis une pièce. À partir de maintenant, devient chacune des pièces qu'elle capture.
+### Kurby
+Choisis une pièce. À sa prochaine capture, récupère les mouvements de la pièce capturée.

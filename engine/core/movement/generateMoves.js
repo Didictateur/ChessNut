@@ -13,7 +13,16 @@
  * - allowCapture=true
  * - allowEmpty=true
  */
-export function generateLinearMoves({ board, from, piece, directions, maxSteps = Infinity, allowCapture = true, allowEmpty = true }) {
+export function generateLinearMoves({
+	board,
+	from,
+	piece,
+	directions,
+	maxSteps = Infinity,
+	allowCapture = true,
+	allowEmpty = true,
+	allowRing = false
+}) {
     const moves = [];
     const w = board.getWidth();
     const h = board.getHeight();

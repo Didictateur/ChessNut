@@ -11,10 +11,12 @@ class Team {
         this.color = color;
         /** @type {Piece} */
         this.king = king;
-    /** @type {Hand} */
-    this.hand = new Hand();
+    		/** @type {Hand} */
+    		this.hand = new Hand();
         /** @type {boolean} */
         this.hasMadeAction = false;
+				/** @type {Array<Piece>} */
+				this.capture = [];
     }
 
     /**

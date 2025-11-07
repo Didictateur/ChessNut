@@ -8,15 +8,16 @@
 <body>
   <h2>ChessNut — Partie</h2>
   <div>Room: <strong id="roomId">-</strong> Player: <strong id="playerId">-</strong></div>
-  <div>Fen: <span id="fen">-</span></div>
-  <div>Joueurs:
-    <ul id="players"></ul>
-  </div>
-
-  <h3>Contrôles (dev)</h3>
-  <div>
-    From: <input id="from" size="5" /> To: <input id="to" size="5" /> Promotion: <input id="promo" size="3" />
-    <button id="move">Envoyer coup</button>
+  <div style="display:flex;gap:20px;align-items:flex-start">
+    <div>
+      <div>Fen: <span id="fen">-</span></div>
+      <div>Joueurs:
+        <ul id="players"></ul>
+      </div>
+    </div>
+    <div>
+      <div id="board" style="width:360px;height:360px;display:grid;grid-template-columns:repeat(8,1fr);border:1px solid #333"></div>
+    </div>
   </div>
 
   <h3>Événements</h3>
@@ -31,10 +32,11 @@
     document.getElementById('roomId').textContent = roomId || '-';
     document.getElementById('playerId').textContent = playerId || '-';
 
-    const logEl = document.getElementById('log');
-    const fenEl = document.getElementById('fen');
-    const playersEl = document.getElementById('players');
-    let socket = null;
+  const logEl = document.getElementById('log');
+  const fenEl = document.getElementById('fen');
+  const playersEl = document.getElementById('players');
+  const boardEl = document.getElementById('board');
+  let socket = null;
 
     function log(...args){ logEl.textContent += '\n' + args.map(a=>typeof a==='object'?JSON.stringify(a):a).join(' '); logEl.scrollTop = logEl.scrollHeight; }
 
@@ -53,10 +55,12 @@
           li.textContent = p.id + ' (' + p.color + ')';
           playersEl.appendChild(li);
         });
+        if(data.fen) renderFen(data.fen);
       });
 
-      socket.on('move:moved', (data)=>{ log('move:moved', data); fenEl.textContent = data.fen; });
-      socket.on('game:over', (data)=>{ log('game:over', data); fenEl.textContent = data.fen; });
+      socket.on('move:moved', (data)=>{ log('move:moved', data); fenEl.textContent = data.fen; renderFen(data.fen); });
+      socket.on('game:over', (data)=>{ log('game:over', data); fenEl.textContent = data.fen; renderFen(data.fen); });
+      socket.on('game:started', (data)=>{ log('game:started', data); fenEl.textContent = data.fen || '-'; renderFen(data.fen || ''); });
 
       socket.emit('room:join', { roomId, playerId }, (resp)=>{
         if(resp && resp.error){ log('join error', resp); alert(resp.error); return; }
@@ -76,6 +80,53 @@
         log('move accepted', resp);
       });
     });
+
+    // Board rendering using provided SVG assets. Accepts FEN.
+    const pieceSetPath = '/assets/chess-pieces/chess_1Kbyte_gambit';
+    // set board background image (if available)
+    boardEl.style.backgroundImage = "url('/assets/chess-pieces/boards/8x8_wood.svg')";
+    boardEl.style.backgroundSize = 'cover';
+    boardEl.style.position = 'relative';
+
+    function renderFen(fen){
+      if(!fen) return;
+      const parts = fen.split(' ');
+      const rows = parts[0].split('/');
+      boardEl.innerHTML = '';
+      for(let r=0;r<8;r++){
+        const row = rows[r];
+        let file = 0;
+        for(let i=0;i<row.length;i++){
+          const ch = row[i];
+          if(/[1-8]/.test(ch)){
+            const empties = parseInt(ch,10);
+            for(let e=0;e<empties;e++){
+              const sq = document.createElement('div');
+              sq.style.width = '100%'; sq.style.height = '100%';
+              sq.style.display = 'flex'; sq.style.alignItems='center'; sq.style.justifyContent='center';
+              boardEl.appendChild(sq);
+              file++;
+            }
+          } else {
+            const sq = document.createElement('div');
+            sq.style.width = '100%'; sq.style.height = '100%';
+            sq.style.display = 'flex'; sq.style.alignItems='center'; sq.style.justifyContent='center';
+            // determine filename from piece char
+            const isWhite = (ch === ch.toUpperCase());
+            const letter = ch.toUpperCase();
+            const filename = (isWhite ? 'w' + letter : 'b' + letter) + '.svg';
+            const img = document.createElement('img');
+            img.src = `${pieceSetPath}/${filename}`;
+            img.style.maxWidth = '78%';
+            img.style.maxHeight = '78%';
+            img.style.userSelect = 'none';
+            sq.appendChild(img);
+            boardEl.appendChild(sq);
+            file++;
+          }
+        }
+      }
+    }
   </script>
 </body>
 </html>

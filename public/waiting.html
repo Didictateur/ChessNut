@@ -11,6 +11,7 @@
     <div>Room: <strong id="roomId">-</strong></div>
     <div>Status: <strong id="status">-</strong></div>
     <div>Joueurs: <strong id="playerCount">0/2</strong></div>
+    <div>Hôte: <strong id="hostLabel">-</strong> <span id="youAreHost" style="display:none;color:green;font-weight:bold;margin-left:8px">(Vous êtes l'hôte)</span></div>
   </div>
   <div style="margin-top:8px">
     <button id="startBtn" style="display:none">Commencer la partie</button>
@@ -32,6 +33,9 @@
   let socket = null;
   let myPlayerId = null;
   let myColor = null;
+  let roomHostId = null;
+  const hostLabelEl = document.getElementById('hostLabel');
+  const youAreHostEl = document.getElementById('youAreHost');
 
     function log(...args){ console.log(...args); }
 
@@ -41,11 +45,53 @@
       socket = io();
       socket.on('connect', ()=>{ log('socket connecté', socket.id); });
 
-      socket.on('room:update', (data)=>{
+  socket.on('room:update', (data)=>{
         console.log('room:update', data);
         statusEl.textContent = data.status || '-';
         const count = (data.players||[]).length;
         playerCountEl.textContent = `${count}/2`;
+        // remember hostId from server updates; if missing, fall back to first player
+        if(data.hostId !== undefined && data.hostId !== null) {
+          roomHostId = data.hostId;
+        } else if ((data.players || []).length > 0) {
+          // fallback: first player is host
+          roomHostId = data.players[0].id;
+        } else {
+          roomHostId = null;
+        }
+
+        // update host label UI
+        if(hostLabelEl){
+          hostLabelEl.textContent = roomHostId || '-';
+          if(myPlayerId && roomHostId && myPlayerId === roomHostId){
+            youAreHostEl.style.display = 'inline';
+          } else {
+            youAreHostEl.style.display = 'none';
+          }
+        }
+
+        // enable start button only when there are 2 players and current user is host
+        const startBtn = document.getElementById('startBtn');
+        if(startBtn){
+          // host determined by explicit hostId sent by server (or fallback)
+          if(myPlayerId && roomHostId && myPlayerId === roomHostId){
+            startBtn.style.display = 'inline-block';
+            startBtn.disabled = count !== 2;
+          } else {
+            // hide for non-hosts
+            startBtn.style.display = 'none';
+          }
+        }
+      });
+
+      // register game started handler early so we don't miss the broadcast
+      socket.on('game:started', (data)=>{
+        log('game:started', data);
+        if(myPlayerId){
+          window.location.href = `/game.html?roomId=${encodeURIComponent(roomId)}&playerId=${encodeURIComponent(myPlayerId)}`;
+        } else {
+          window.location.href = `/game.html?roomId=${encodeURIComponent(roomId)}`;
+        }
       });
 
       socket.emit('room:join', { roomId, playerId }, (resp)=>{
@@ -58,11 +104,32 @@
         }
         myPlayerId = resp.playerId;
         myColor = resp.color;
-        log('Rejoint room', resp);
-        // show start button only to host (white)
-        if(myColor === 'white'){
-          document.getElementById('startBtn').style.display = 'inline-block';
+        // server may or may not include hostId in the response; fall back to color
+        if(resp.hostId !== undefined && resp.hostId !== null){
+          roomHostId = resp.hostId;
+        } else if(resp.color === 'white'){
+          roomHostId = resp.playerId; // assume creator (first join) is white
         }
+        log('Rejoint room', resp);
+        // update host UI immediately
+        if(hostLabelEl){ hostLabelEl.textContent = roomHostId || '-'; }
+        if(youAreHostEl){ youAreHostEl.style.display = (myPlayerId && roomHostId && myPlayerId === roomHostId) ? 'inline' : 'none'; }
+        if(myPlayerId && roomHostId && myPlayerId === roomHostId){
+          const btn = document.getElementById('startBtn');
+          btn.style.display = 'inline-block';
+          btn.disabled = true;
+        }
+        // after join, fetch room state to avoid missing a recent 'playing' state
+        fetch(`/rooms/${encodeURIComponent(roomId)}`).then(r => r.json()).then(roomInfo => {
+          if(roomInfo && roomInfo.status === 'playing'){
+            // server already marked room as playing; redirect immediately
+            if(myPlayerId){
+              window.location.href = `/game.html?roomId=${encodeURIComponent(roomId)}&playerId=${encodeURIComponent(myPlayerId)}`;
+            } else {
+              window.location.href = `/game.html?roomId=${encodeURIComponent(roomId)}`;
+            }
+          }
+        }).catch(e => { /* ignore */ });
       });
     }
 
@@ -89,16 +156,8 @@
       }
     });
 
-    // when server tells us game started, redirect both players to game page with playerId preserved
-    socket && socket.on && socket.on('game:started', (data)=>{
-      log('game:started', data);
-      // redirect, include playerId so client can rejoin as same player
-      if(myPlayerId){
-        window.location.href = `/game.html?roomId=${encodeURIComponent(roomId)}&playerId=${encodeURIComponent(myPlayerId)}`;
-      } else {
-        window.location.href = `/game.html?roomId=${encodeURIComponent(roomId)}`;
-      }
-    });
+    // fallback: if socket already existed and server emits game:started earlier, ensure handler exists
+    // (handled after join)
 
     
   </script>

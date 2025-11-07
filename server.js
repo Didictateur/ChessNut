@@ -5,11 +5,14 @@ const { Chess } = require('chess.js');
 const { v4: uuidv4 } = require('uuid');
 
 const app = express();
+const path = require('path');
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' } });
 
 app.use(express.json());
 app.use(express.static('public'));
+// Serve provided assets (piece sets, boards, etc.) under /assets
+app.use('/assets', express.static(path.join(__dirname, 'assets')));
 
 // In-memory rooms store. For production replace with persistent store.
 // room = { id, chess: Chess, players: [{id, socketId, color}], status }
@@ -18,14 +21,15 @@ const rooms = new Map();
 app.post('/rooms', (req, res) => {
   const id = uuidv4().slice(0, 8);
   const chess = new Chess();
-  rooms.set(id, { id, chess, players: [], status: 'waiting' });
+  // hostId will be set when the first player joins
+  rooms.set(id, { id, chess, players: [], status: 'waiting', hostId: null });
   res.json({ roomId: id });
 });
 
 app.get('/rooms/:id', (req, res) => {
   const room = rooms.get(req.params.id);
   if (!room) return res.status(404).json({ error: 'room not found' });
-  res.json({ id: room.id, fen: room.chess.fen(), players: room.players.map(p => ({ id: p.id, color: p.color })), status: room.status });
+  res.json({ id: room.id, fen: room.chess.fen(), players: room.players.map(p => ({ id: p.id, color: p.color })), status: room.status, hostId: room.hostId });
 });
 
 io.on('connection', (socket) => {
@@ -43,14 +47,18 @@ io.on('connection', (socket) => {
     socket.data.roomId = roomId;
     socket.data.playerId = assignedId;
 
+    // set hostId when first player joins
+    if (!room.hostId) room.hostId = assignedId;
+
 
     io.to(roomId).emit('room:update', {
       fen: room.chess.fen(),
       players: room.players.map(p => ({ id: p.id, color: p.color })),
-      status: room.status
+      status: room.status,
+      hostId: room.hostId
     });
 
-    cb && cb({ ok: true, color, roomId, playerId: assignedId });
+    cb && cb({ ok: true, color, roomId, playerId: assignedId, hostId: room.hostId });
   });
 
   socket.on('game:move', ({ roomId, from, to, promotion }, cb) => {
@@ -85,15 +93,16 @@ io.on('connection', (socket) => {
     const senderId = socket.data.playerId;
     if (!senderId) return cb && cb({ error: 'not joined' });
     if (room.players.length < 2) return cb && cb({ error: 'need 2 players to start' });
-    const host = room.players[0];
-    if (!host || host.id !== senderId) return cb && cb({ error: 'only host can start' });
+    // verify sender is the host (explicit hostId)
+    if (!room.hostId || room.hostId !== senderId) return cb && cb({ error: 'only host can start' });
 
     room.status = 'playing';
     io.to(roomId).emit('game:started', { roomId, fen: room.chess.fen() });
     io.to(roomId).emit('room:update', {
       fen: room.chess.fen(),
       players: room.players.map(p => ({ id: p.id, color: p.color })),
-      status: room.status
+      status: room.status,
+      hostId: room.hostId
     });
 
     cb && cb({ ok: true });
@@ -108,10 +117,16 @@ io.on('connection', (socket) => {
     room.players = room.players.filter(p => p.socketId !== socket.id);
     if (room.players.length < 2 && room.status === 'playing') room.status = 'waiting';
 
+    // if the host left, promote the next player to host (or null)
+    if (room.hostId && !room.players.find(p => p.id === room.hostId)) {
+      room.hostId = room.players[0] ? room.players[0].id : null;
+    }
+
     io.to(roomId).emit('room:update', {
       fen: room.chess.fen(),
       players: room.players.map(p => ({ id: p.id, color: p.color })),
-      status: room.status
+      status: room.status,
+      hostId: room.hostId
     });
   });
 });

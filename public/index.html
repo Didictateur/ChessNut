@@ -19,6 +19,7 @@
 
   <p>Après création ou connexion, vous serez redirigé·e vers la page de <strong>salle d'attente</strong> dédiée.</p>
 
+
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script>
     function log(...args){ console.log(...args); }
@@ -28,13 +29,26 @@
       const j = await r.json();
       document.getElementById('roomId').value = j.roomId;
       log('Room créée', j.roomId);
-      // redirect to waiting page (creator will auto-join there)
+      // redirect creator to waiting page
       window.location.href = `/waiting.html?roomId=${encodeURIComponent(j.roomId)}`;
     });
 
-    document.getElementById('join').addEventListener('click', ()=>{
+    document.getElementById('join').addEventListener('click', async ()=>{
       const roomId = document.getElementById('roomId').value.trim();
       if(!roomId){ alert('Entrez roomId'); return; }
+      // verify room exists before redirecting
+      try{
+        const resp = await fetch(`/rooms/${encodeURIComponent(roomId)}`);
+        if(!resp.ok){
+          const j = await resp.json().catch(()=>({ error: 'room not found' }));
+          alert(j.error || 'room not found');
+          return;
+        }
+      }catch(e){
+        alert('Erreur de connexion au serveur');
+        return;
+      }
+
       const playerId = document.getElementById('playerId').value.trim() || '';
       // redirect to waiting page; playerId optional
       const qs = `?roomId=${encodeURIComponent(roomId)}${playerId?`&playerId=${encodeURIComponent(playerId)}`:''}`;

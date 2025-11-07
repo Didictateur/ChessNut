@@ -336,7 +336,7 @@ app.post('/api/start', async (req, res) => {
 
   // only initialize if not already present
   if (!g.state) {
-    // attempt to import engine GameState for richer state; on failure we log detailed diagnostics
+    // attempt to import engine GameState for richer state; on failure we log diagnostics
     const importResult = await tryImportEngine();
     if (importResult.ok) {
       try {
@@ -344,10 +344,9 @@ app.post('/api/start', async (req, res) => {
         if (typeof GameState === 'function') {
           const gs = new GameState();
           g._engineState = gs;
-          // best-effort serialize
+          // best-effort serialize engine board into plain structure
           try{
             const serialized = (typeof gs.getBoard === 'function') ? (function(){
-              // serialize Board -> plain structure { board: [rows], width, height }
               const boardObj = gs.getBoard();
               const w = (typeof boardObj.getWidth === 'function') ? boardObj.getWidth() : (boardObj.width || 8);
               const h = (typeof boardObj.getHeight === 'function') ? boardObj.getHeight() : (boardObj.height || 8);
@@ -371,9 +370,9 @@ app.post('/api/start', async (req, res) => {
         }
       } catch(e){ log('failed to instantiate GameState, falling back', { err: e && e.stack }); g.state = initialState(); }
     } else {
-      // import failed: return 500 with short message, detailed info written to logs/file by tryImportEngine
-      log('api/start aborting due to engine import failure', { gameId: g.id });
-      return res.status(500).json({ error: 'engine import failed - see server logs' });
+      // engine import failed: do NOT abort. Use the plain initial state so server continues to work
+      log('api/start: engine import failed, falling back to plain initialState', { gameId: g.id, diagnostic: importResult });
+      g.state = initialState();
     }
   }
   // set initial turn: white starts

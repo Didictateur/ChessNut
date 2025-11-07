@@ -1,0 +1,81 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>ChessNut - Partie</title>
+  <style>body{font-family:Arial;margin:20px} input,button{padding:6px;margin:4px} #log{white-space:pre-wrap; border:1px solid #ddd;padding:8px;height:300px;overflow:auto} #players{margin:6px 0;padding-left:18px}</style>
+</head>
+<body>
+  <h2>ChessNut — Partie</h2>
+  <div>Room: <strong id="roomId">-</strong> Player: <strong id="playerId">-</strong></div>
+  <div>Fen: <span id="fen">-</span></div>
+  <div>Joueurs:
+    <ul id="players"></ul>
+  </div>
+
+  <h3>Contrôles (dev)</h3>
+  <div>
+    From: <input id="from" size="5" /> To: <input id="to" size="5" /> Promotion: <input id="promo" size="3" />
+    <button id="move">Envoyer coup</button>
+  </div>
+
+  <h3>Événements</h3>
+  <div id="log">Logs...</div>
+  <div style="margin-top:10px"><a href="/">Retour à la page principale</a></div>
+
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script>
+    function qs(name){ const url = new URL(window.location.href); return url.searchParams.get(name); }
+    const roomId = qs('roomId');
+    const playerId = qs('playerId') || undefined;
+    document.getElementById('roomId').textContent = roomId || '-';
+    document.getElementById('playerId').textContent = playerId || '-';
+
+    const logEl = document.getElementById('log');
+    const fenEl = document.getElementById('fen');
+    const playersEl = document.getElementById('players');
+    let socket = null;
+
+    function log(...args){ logEl.textContent += '\n' + args.map(a=>typeof a==='object'?JSON.stringify(a):a).join(' '); logEl.scrollTop = logEl.scrollHeight; }
+
+    if(!roomId){ alert('roomId manquant dans l\'URL'); }
+
+    function connectAndJoin(){
+      socket = io();
+      socket.on('connect', ()=>{ log('socket connecté', socket.id); });
+
+      socket.on('room:update', (data)=>{
+        log('room:update', data);
+        fenEl.textContent = data.fen || '-';
+        playersEl.innerHTML = '';
+        (data.players||[]).forEach(p=>{
+          const li = document.createElement('li');
+          li.textContent = p.id + ' (' + p.color + ')';
+          playersEl.appendChild(li);
+        });
+      });
+
+      socket.on('move:moved', (data)=>{ log('move:moved', data); fenEl.textContent = data.fen; });
+      socket.on('game:over', (data)=>{ log('game:over', data); fenEl.textContent = data.fen; });
+
+      socket.emit('room:join', { roomId, playerId }, (resp)=>{
+        if(resp && resp.error){ log('join error', resp); alert(resp.error); return; }
+        log('Rejoint room', resp);
+      });
+    }
+
+    connectAndJoin();
+
+    document.getElementById('move').addEventListener('click', ()=>{
+      if(!socket){ alert('non connecté'); return; }
+      const from = document.getElementById('from').value.trim();
+      const to = document.getElementById('to').value.trim();
+      const promotion = document.getElementById('promo').value.trim() || undefined;
+      socket.emit('game:move', { roomId, from, to, promotion }, (resp)=>{
+        if(resp && resp.error) { log('move error', resp); alert(resp.error); return; }
+        log('move accepted', resp);
+      });
+    });
+  </script>
+</body>
+</html>

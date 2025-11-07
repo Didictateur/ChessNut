@@ -1,0 +1,45 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>ChessNut - Test client</title>
+  <style>body{font-family:Arial;margin:20px} input,button{padding:6px;margin:4px} #log{white-space:pre-wrap; border:1px solid #ddd;padding:8px;height:300px;overflow:auto}</style>
+</head>
+<body>
+  <h2>ChessNut - Client de test</h2>
+  <div>
+    <button id="create">Créer une room</button>
+    Room ID: <input id="roomId" placeholder="ex: ab12cd34" />
+    <button id="join">Rejoindre</button>
+  </div>
+
+  <div style="margin-top:12px">
+    <label>Votre playerId (optionnel): <input id="playerId" placeholder="laisser vide pour générer" /></label>
+  </div>
+
+  <p>Après création ou connexion, vous serez redirigé·e vers la page de <strong>salle d'attente</strong> dédiée.</p>
+
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script>
+    function log(...args){ console.log(...args); }
+
+    document.getElementById('create').addEventListener('click', async ()=>{
+      const r = await fetch('/rooms', { method:'POST' });
+      const j = await r.json();
+      document.getElementById('roomId').value = j.roomId;
+      log('Room créée', j.roomId);
+      // redirect to waiting page (creator will auto-join there)
+      window.location.href = `/waiting.html?roomId=${encodeURIComponent(j.roomId)}`;
+    });
+
+    document.getElementById('join').addEventListener('click', ()=>{
+      const roomId = document.getElementById('roomId').value.trim();
+      if(!roomId){ alert('Entrez roomId'); return; }
+      const playerId = document.getElementById('playerId').value.trim() || '';
+      // redirect to waiting page; playerId optional
+      const qs = `?roomId=${encodeURIComponent(roomId)}${playerId?`&playerId=${encodeURIComponent(playerId)}`:''}`;
+      window.location.href = '/waiting.html' + qs;
+    });
+  </script>
+</body>
+</html>

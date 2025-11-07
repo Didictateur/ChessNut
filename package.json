@@ -1,0 +1,19 @@
+{
+  "name": "chessnut-server",
+  "version": "0.1.0",
+  "description": "Lightweight chess server with rooms for 2 players, real-time via Socket.IO",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "NODE_ENV=development node server.js"
+  },
+  "keywords": ["chess","socket.io","rooms","docker"],
+  "author": "Didictateur",
+  "license": "MIT",
+  "dependencies": {
+    "chess.js": "^1.1.2",
+    "express": "^4.18.2",
+    "socket.io": "^4.7.2",
+    "uuid": "^9.0.0"
+  }
+}

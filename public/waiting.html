@@ -1,0 +1,93 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>ChessNut - Salle d'attente</title>
+  <style>body{font-family:Arial;margin:20px} input,button{padding:6px;margin:4px} #log{white-space:pre-wrap; border:1px solid #ddd;padding:8px;height:300px;overflow:auto} #players{margin:6px 0;padding-left:18px}</style>
+</head>
+<body>
+  <h2>ChessNut — Salle d'attente</h2>
+  <div>
+    <div>Room: <strong id="roomId">-</strong></div>
+    <div>Status: <strong id="status">-</strong></div>
+    <div>Joueurs:
+      <ul id="players"></ul>
+    </div>
+  </div>
+  <div style="margin-top:8px">
+    <button id="startBtn" style="display:none">Commencer la partie</button>
+  </div>
+
+  <!-- Waiting room: only players list and start button. Events/board/controls removed per request -->
+  <div style="margin-top:10px"><a href="/">Retour à la page principale</a></div>
+
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script>
+    function qs(name){ const url = new URL(window.location.href); return url.searchParams.get(name); }
+    const roomId = qs('roomId');
+    const playerId = qs('playerId') || undefined;
+    document.getElementById('roomId').textContent = roomId || '-';
+
+    const statusEl = document.getElementById('status');
+    const playersEl = document.getElementById('players');
+  let socket = null;
+  let myPlayerId = null;
+  let myColor = null;
+
+    function log(...args){ console.log(...args); }
+
+    if(!roomId){ alert('roomId manquant dans l\'URL'); }
+
+    function connectAndJoin(){
+      socket = io();
+      socket.on('connect', ()=>{ log('socket connecté', socket.id); });
+
+      socket.on('room:update', (data)=>{
+        console.log('room:update', data);
+        statusEl.textContent = data.status || '-';
+        playersEl.innerHTML = '';
+        (data.players||[]).forEach(p=>{
+          const li = document.createElement('li');
+          li.textContent = p.id + ' (' + p.color + ')';
+          playersEl.appendChild(li);
+        });
+      });
+
+      socket.emit('room:join', { roomId, playerId }, (resp)=>{
+        if(resp && resp.error){ log('join error', resp); alert(resp.error); return; }
+        myPlayerId = resp.playerId;
+        myColor = resp.color;
+        log('Rejoint room', resp);
+        // show start button only to host (white)
+        if(myColor === 'white'){
+          document.getElementById('startBtn').style.display = 'inline-block';
+        }
+      });
+    }
+
+    connectAndJoin();
+
+    // Start button handler (host)
+    document.getElementById('startBtn').addEventListener('click', ()=>{
+      if(!socket) return;
+      socket.emit('game:start', { roomId }, (resp)=>{
+        if(resp && resp.error){ log('start error', resp); alert(resp.error); return; }
+        log('game:start acknowledged');
+      });
+    });
+
+    // when server tells us game started, redirect both players to game page with playerId preserved
+    socket && socket.on && socket.on('game:started', (data)=>{
+      log('game:started', data);
+      // redirect, include playerId so client can rejoin as same player
+      if(myPlayerId){
+        window.location.href = `/game.html?roomId=${encodeURIComponent(roomId)}&playerId=${encodeURIComponent(myPlayerId)}`;
+      } else {
+        window.location.href = `/game.html?roomId=${encodeURIComponent(roomId)}`;
+      }
+    });
+
+    
+  </script>
+</body>
+</html>

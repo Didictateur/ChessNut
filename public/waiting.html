@@ -10,12 +10,11 @@
   <div>
     <div>Room: <strong id="roomId">-</strong></div>
     <div>Status: <strong id="status">-</strong></div>
-    <div>Joueurs:
-      <ul id="players"></ul>
-    </div>
+    <div>Joueurs: <strong id="playerCount">0/2</strong></div>
   </div>
   <div style="margin-top:8px">
     <button id="startBtn" style="display:none">Commencer la partie</button>
+    <button id="copyInviteBtn" style="margin-left:8px">Copier le lien d'invitation</button>
   </div>
 
   <!-- Waiting room: only players list and start button. Events/board/controls removed per request -->
@@ -28,8 +27,8 @@
     const playerId = qs('playerId') || undefined;
     document.getElementById('roomId').textContent = roomId || '-';
 
-    const statusEl = document.getElementById('status');
-    const playersEl = document.getElementById('players');
+  const statusEl = document.getElementById('status');
+  const playerCountEl = document.getElementById('playerCount');
   let socket = null;
   let myPlayerId = null;
   let myColor = null;
@@ -45,16 +44,18 @@
       socket.on('room:update', (data)=>{
         console.log('room:update', data);
         statusEl.textContent = data.status || '-';
-        playersEl.innerHTML = '';
-        (data.players||[]).forEach(p=>{
-          const li = document.createElement('li');
-          li.textContent = p.id + ' (' + p.color + ')';
-          playersEl.appendChild(li);
-        });
+        const count = (data.players||[]).length;
+        playerCountEl.textContent = `${count}/2`;
       });
 
       socket.emit('room:join', { roomId, playerId }, (resp)=>{
-        if(resp && resp.error){ log('join error', resp); alert(resp.error); return; }
+        if(resp && resp.error){
+          console.warn('join error', resp);
+          alert(resp.error || 'Impossible de rejoindre la room');
+          // redirect back to home to let user retry/create
+          window.location.href = '/';
+          return;
+        }
         myPlayerId = resp.playerId;
         myColor = resp.color;
         log('Rejoint room', resp);
@@ -74,6 +75,18 @@
         if(resp && resp.error){ log('start error', resp); alert(resp.error); return; }
         log('game:start acknowledged');
       });
+    });
+
+    // Copy invite link (hidden link, no display)
+    document.getElementById('copyInviteBtn').addEventListener('click', async ()=>{
+      const link = `${window.location.origin}/waiting.html?roomId=${encodeURIComponent(roomId)}`;
+      try{
+        await navigator.clipboard.writeText(link);
+        alert('Lien d\'invitation copié dans le presse-papier');
+      }catch(e){
+        // fallback
+        window.prompt('Copie le lien ci-dessous', link);
+      }
     });
 
     // when server tells us game started, redirect both players to game page with playerId preserved

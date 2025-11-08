@@ -7,22 +7,12 @@
 </head>
 <body>
   <h2>ChessNut — Partie</h2>
-  <div>Room: <strong id="roomId">-</strong> Player: <strong id="playerId">-</strong></div>
+  <div>Room: <strong id="roomId">-</strong>
   <div style="display:flex;gap:20px;align-items:flex-start">
     <div>
-      <div>Fen: <span id="fen">-</span></div>
-      <div>Joueurs:
-        <ul id="players"></ul>
-      </div>
-    </div>
-    <div>
-      <div id="board" style="width:360px;height:360px;display:grid;grid-template-columns:repeat(8,1fr);border:1px solid #333"></div>
+      <div id="board" style="width:1000px;height:1000px;display:grid;grid-template-columns:repeat(8,1fr);border:1px solid #333"></div>
     </div>
   </div>
-
-  <h3>Événements</h3>
-  <div id="log">Logs...</div>
-  <div style="margin-top:10px"><a href="/">Retour à la page principale</a></div>
 
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script>

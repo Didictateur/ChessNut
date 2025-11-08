@@ -3,23 +3,32 @@
 <head>
   <meta charset="utf-8" />
   <title>ChessNut - Salle d'attente</title>
-  <style>body{font-family:Arial;margin:20px} input,button{padding:6px;margin:4px} #log{white-space:pre-wrap; border:1px solid #ddd;padding:8px;height:300px;overflow:auto} #players{margin:6px 0;padding-left:18px}</style>
+  <link rel="stylesheet" href="/styles/style.css">
 </head>
 <body>
-  <h2>ChessNut — Salle d'attente</h2>
-  <div>
-    <div>Room: <strong id="roomId">-</strong></div>
-    <div>Status: <strong id="status">-</strong></div>
-    <div>Joueurs: <strong id="playerCount">0/2</strong></div>
-    <div><span id="youAreHost" style="display:none;font-weight:bold">Vous êtes l'hôte</span></div>
-  </div>
-  <div style="margin-top:8px">
-    <button id="startBtn" style="display:none">Commencer la partie</button>
-    <button id="copyInviteBtn" style="margin-left:8px">Copier le lien d'invitation</button>
-  </div>
+  <div class="page">
+    <header class="hero card">
+      <div>
+        <div class="title">ChessNut — Salle d'attente</div>
+        <div class="subtitle">Préparez-vous, invitez un ami et lancez la partie quand tout le monde est prêt.</div>
+      </div>
+      <img class="decor" src="/assets/chess-pieces/boards/8x8_green.svg" alt="decor" />
+    </header>
 
-  <!-- Waiting room: only players list and start button. Events/board/controls removed per request -->
-  <div style="margin-top:10px"><a href="/">Retour à la page principale</a></div>
+    <section class="card">
+      <div>Room: <strong id="roomId">-</strong></div>
+      <div>Status: <strong id="status">-</strong></div>
+      <div>Joueurs: <strong id="playerCount">0/2</strong></div>
+      <div><span id="youAreHost" style="display:none;font-weight:bold">Vous êtes l'hôte</span></div>
+
+      <div style="margin-top:8px">
+        <button id="startBtn" style="display:none" class="btn-cta">Commencer la partie</button>
+        <button id="copyInviteBtn" style="margin-left:8px" class="btn-ghost">Copier le lien d'invitation</button>
+      </div>
+    </section>
+
+    <div style="margin-top:10px"><a href="/">Retour à la page principale</a></div>
+  </div>
 
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script>

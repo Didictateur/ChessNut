@@ -3,16 +3,32 @@
 <head>
   <meta charset="utf-8" />
   <title>ChessNut</title>
-  <style>body{font-family:Arial;margin:20px} input,button{padding:6px;margin:4px} #log{white-space:pre-wrap; border:1px solid #ddd;padding:8px;height:300px;overflow:auto}</style>
+  <link rel="stylesheet" href="/styles/style.css">
 </head>
 <body>
-  <h2>ChessNut</h2>
-  <div>
-    <div>
-        <button id="create">Créer une room</button>
-    </div>
-    <button id="join">Rejoindre</button>
-    Room ID: <input id="roomId" placeholder="ex: ab12cd34" />
+  <div class="page">
+    <header class="hero card">
+      <div>
+        <div class="title">ChessNut</div>
+        <div class="subtitle">Créez ou rejoignez une partie — rapide, simple et fun 🎯</div>
+      </div>
+      <div style="text-align:right">
+        <div class="muted">Invite your friends — play together</div>
+        <img class="decor" src="/assets/chess-pieces/boards/8x8_pink_1Kbyte_gambit.svg" alt="decor" />
+      </div>
+      <svg class="floating-piece" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><path fill="#fff" d="M10 90 L30 10 L50 90 Z" /></svg>
+    </header>
+
+    <section class="card lobby">
+      <div>
+        <button id="create" class="btn-cta">Créer une room</button>
+      </div>
+
+      <div class="controls">
+        <input id="roomId" class="input" placeholder="ex: ab12cd34" />
+        <button id="join" class="btn-ghost">Rejoindre</button>
+      </div>
+    </section>
   </div>
 
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>

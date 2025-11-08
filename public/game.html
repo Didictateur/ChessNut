@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <title>ChessNut - Partie</title>
-  <style>body{font-family:Arial;margin:20px} input,button{padding:6px;margin:4px} #log{white-space:pre-wrap; border:1px solid #ddd;padding:8px;height:300px;overflow:auto} #players{margin:6px 0;padding-left:18px}</style>
+  <link rel="stylesheet" href="/styles/style.css">
 </head>
 <body>
   <h2>ChessNut — Partie</h2>
   <div>Room: <strong id="roomId">-</strong>
-  <div style="display:flex;gap:20px;align-items:flex-start">
+  <div class="layout-row">
     <div>
-      <div id="board" style="width:1000px;height:1000px;display:grid;grid-template-columns:repeat(8,1fr);border:1px solid #333"></div>
+      <div id="board"></div>
     </div>
   </div>
 
@@ -73,10 +73,7 @@
 
     // Board rendering using provided SVG assets. Accepts FEN.
     const pieceSetPath = '/assets/chess-pieces/chess_1Kbyte_gambit';
-    // set board background image (if available)
-    boardEl.style.backgroundImage = "url('/assets/chess-pieces/boards/8x8_wood.svg')";
-    boardEl.style.backgroundSize = 'cover';
-    boardEl.style.position = 'relative';
+  // board visual defaults are handled by CSS (background, size, border, position)
 
     function renderFen(fen){
       if(!fen) return;
@@ -88,28 +85,24 @@
         let file = 0;
         for(let i=0;i<row.length;i++){
           const ch = row[i];
-          if(/[1-8]/.test(ch)){
+            if(/[1-8]/.test(ch)){
             const empties = parseInt(ch,10);
             for(let e=0;e<empties;e++){
               const sq = document.createElement('div');
-              sq.style.width = '100%'; sq.style.height = '100%';
-              sq.style.display = 'flex'; sq.style.alignItems='center'; sq.style.justifyContent='center';
+              sq.className = 'square';
               boardEl.appendChild(sq);
               file++;
             }
           } else {
             const sq = document.createElement('div');
-            sq.style.width = '100%'; sq.style.height = '100%';
-            sq.style.display = 'flex'; sq.style.alignItems='center'; sq.style.justifyContent='center';
+            sq.className = 'square';
             // determine filename from piece char
             const isWhite = (ch === ch.toUpperCase());
             const letter = ch.toUpperCase();
             const filename = (isWhite ? 'w' + letter : 'b' + letter) + '.svg';
             const img = document.createElement('img');
             img.src = `${pieceSetPath}/${filename}`;
-            img.style.maxWidth = '78%';
-            img.style.maxHeight = '78%';
-            img.style.userSelect = 'none';
+            img.className = 'piece';
             sq.appendChild(img);
             boardEl.appendChild(sq);
             file++;

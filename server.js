@@ -20,16 +20,20 @@ const rooms = new Map();
 
 app.post('/rooms', (req, res) => {
   const id = uuidv4().slice(0, 8);
-  const chess = new Chess();
+  // allow optional board size in request body (default 8)
+  const size = (req.body && parseInt(req.body.size, 10)) || 8;
+  // For standard 8x8 chess we use chess.js. For other sizes we keep a placeholder state
+  const chess = size === 8 ? new Chess() : null;
   // hostId will be set when the first player joins
-  rooms.set(id, { id, chess, players: [], status: 'waiting', hostId: null });
-  res.json({ roomId: id });
+  rooms.set(id, { id, chess, players: [], status: 'waiting', hostId: null, size, cards: {}, playedCards: [] });
+  res.json({ roomId: id, size });
 });
 
 app.get('/rooms/:id', (req, res) => {
   const room = rooms.get(req.params.id);
   if (!room) return res.status(404).json({ error: 'room not found' });
-  res.json({ id: room.id, fen: room.chess.fen(), players: room.players.map(p => ({ id: p.id, color: p.color })), status: room.status, hostId: room.hostId });
+  const fen = room.chess ? room.chess.fen() : null;
+  res.json({ id: room.id, fen, size: room.size, players: room.players.map(p => ({ id: p.id, color: p.color })), status: room.status, hostId: room.hostId, cards: Object.keys(room.cards || {}) });
 });
 
 io.on('connection', (socket) => {
@@ -52,10 +56,12 @@ io.on('connection', (socket) => {
 
 
     io.to(roomId).emit('room:update', {
-      fen: room.chess.fen(),
+      fen: room.chess ? room.chess.fen() : null,
       players: room.players.map(p => ({ id: p.id, color: p.color })),
       status: room.status,
-      hostId: room.hostId
+      hostId: room.hostId,
+      size: room.size,
+      cards: Object.keys(room.cards || {})
     });
 
     cb && cb({ ok: true, color, roomId, playerId: assignedId, hostId: room.hostId });
@@ -66,6 +72,9 @@ io.on('connection', (socket) => {
     if (!room) return cb && cb({ error: 'room not found' });
 
     const chess = room.chess;
+
+    // If we have a chess.js instance (standard 8x8) use it for validation
+    if (!chess) return cb && cb({ error: 'custom board sizes not yet supported for moves' });
 
     // Validate move
     const move = chess.move({ from, to, promotion });
@@ -99,10 +108,12 @@ io.on('connection', (socket) => {
     room.status = 'playing';
     io.to(roomId).emit('game:started', { roomId, fen: room.chess.fen() });
     io.to(roomId).emit('room:update', {
-      fen: room.chess.fen(),
+      fen: room.chess ? room.chess.fen() : null,
       players: room.players.map(p => ({ id: p.id, color: p.color })),
       status: room.status,
-      hostId: room.hostId
+      hostId: room.hostId,
+      size: room.size,
+      cards: Object.keys(room.cards || {})
     });
 
     cb && cb({ ok: true });
@@ -123,11 +134,49 @@ io.on('connection', (socket) => {
     }
 
     io.to(roomId).emit('room:update', {
-      fen: room.chess.fen(),
+      fen: room.chess ? room.chess.fen() : null,
       players: room.players.map(p => ({ id: p.id, color: p.color })),
       status: room.status,
-      hostId: room.hostId
+      hostId: room.hostId,
+      size: room.size,
+      cards: Object.keys(room.cards || {})
     });
+  });
+
+  // Provide legal moves for a given square (for standard 8x8 via chess.js)
+  socket.on('game:legalMoves', ({ roomId, square }, cb) => {
+    const room = rooms.get(roomId);
+    if (!room) return cb && cb({ error: 'room not found' });
+    if (!room.chess) return cb && cb({ error: 'legal moves not supported for custom board sizes yet', moves: [] });
+    try{
+      const moves = room.chess.moves({ square, verbose: true }) || [];
+      return cb && cb({ ok: true, moves });
+    }catch(e){
+      return cb && cb({ error: 'invalid square', moves: [] });
+    }
+  });
+
+  // Simple cards API via sockets: list/play
+  socket.on('card:list', ({ roomId }, cb) => {
+    const room = rooms.get(roomId);
+    if(!room) return cb && cb({ error: 'room not found' });
+    // return available card types (placeholder)
+    const available = [
+      { id: 'invert', name: 'Invert Turn', description: 'Swap movement directions for one move' },
+      { id: 'teleport', name: 'Teleport', description: 'Move one piece to any empty square' }
+    ];
+    cb && cb({ ok: true, cards: available });
+  });
+
+  socket.on('card:play', ({ roomId, playerId, cardId, payload }, cb) => {
+    const room = rooms.get(roomId);
+    if(!room) return cb && cb({ error: 'room not found' });
+    // store played card (placeholder behaviour) and broadcast
+    const played = { id: uuidv4().slice(0,8), playerId, cardId, payload, ts: Date.now() };
+    room.playedCards = room.playedCards || [];
+    room.playedCards.push(played);
+    io.to(roomId).emit('card:played', played);
+    cb && cb({ ok: true, played });
   });
 });
 

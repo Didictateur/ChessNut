@@ -7,7 +7,7 @@
 </head>
 <body>
   <h2>ChessNut — Partie</h2>
-  <div>Room: <strong id="roomId">-</strong>
+  <div>Room: <strong id="roomId">-</strong> &nbsp;•&nbsp; Vous jouez: <strong id="myColor">-</strong>
   <div class="layout-row">
     <div>
       <div id="board"></div>
@@ -42,7 +42,9 @@
   const fenEl = document.getElementById('fen');
   const playersEl = document.getElementById('players');
   const boardEl = document.getElementById('board');
+  const myColorEl = document.getElementById('myColor');
   let socket = null;
+  let myColor = null;
 
     // safe logger: prefer on-page log if present, otherwise console
     function log(...args){
@@ -91,6 +93,19 @@
       socket.emit('room:join', { roomId, playerId }, (resp)=>{
         if(resp && resp.error){ log('join error', resp); alert(resp.error); return; }
         log('Rejoint room', resp);
+        // remember assigned id/color from server
+        if(resp.playerId){
+          if(playerIdEl) playerIdEl.textContent = resp.playerId;
+        }
+        if(resp.color){
+          myColor = resp.color;
+          if(myColorEl) myColorEl.textContent = myColor;
+          // orient board for black
+          if(boardEl){
+            if(myColor === 'black') boardEl.classList.add('flipped');
+            else boardEl.classList.remove('flipped');
+          }
+        }
       });
     }
 

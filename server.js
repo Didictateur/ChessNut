@@ -25,7 +25,7 @@ app.post('/rooms', (req, res) => {
   // For standard 8x8 chess we use chess.js. For other sizes we keep a placeholder state
   const chess = size === 8 ? new Chess() : null;
   // hostId will be set when the first player joins
-  rooms.set(id, { id, chess, players: [], status: 'waiting', hostId: null, size, cards: {}, playedCards: [] });
+  rooms.set(id, { id, chess, players: [], status: 'waiting', hostId: null, size, cards: {}, playedCards: [], removalTimers: new Map() });
   res.json({ roomId: id, size });
 });
 
@@ -43,10 +43,24 @@ io.on('connection', (socket) => {
     const room = rooms.get(roomId);
     if (!room) return cb && cb({ error: 'room not found' });
     if (room.players.length >= 2) return cb && cb({ error: 'room full' });
-
     const assignedId = playerId || uuidv4();
-    const color = room.players.length === 0 ? 'white' : 'black';
-    room.players.push({ id: assignedId, socketId: socket.id, color });
+
+    // If this player was pending removal (disconnect during navigation), cancel removal
+    if(room.removalTimers && room.removalTimers.has(assignedId)){
+      clearTimeout(room.removalTimers.get(assignedId));
+      room.removalTimers.delete(assignedId);
+    }
+
+    // If playerId corresponds to an existing player, treat this as a reconnection
+    let existing = room.players.find(p => p.id === assignedId);
+    let color;
+    if(existing){
+      existing.socketId = socket.id;
+      color = existing.color;
+    } else {
+      color = room.players.length === 0 ? 'white' : 'black';
+      room.players.push({ id: assignedId, socketId: socket.id, color });
+    }
     socket.join(roomId);
     socket.data.roomId = roomId;
     socket.data.playerId = assignedId;
@@ -124,23 +138,43 @@ io.on('connection', (socket) => {
     if (!roomId) return;
     const room = rooms.get(roomId);
     if (!room) return;
-
-    room.players = room.players.filter(p => p.socketId !== socket.id);
-    if (room.players.length < 2 && room.status === 'playing') room.status = 'waiting';
-
-    // if the host left, promote the next player to host (or null)
-    if (room.hostId && !room.players.find(p => p.id === room.hostId)) {
-      room.hostId = room.players[0] ? room.players[0].id : null;
+    // delay removal to allow fast reconnects (e.g. navigation between pages)
+    const playerId = socket.data.playerId;
+    if(playerId && room.removalTimers){
+      const t = setTimeout(()=>{
+        room.players = room.players.filter(p => p.id !== playerId);
+        // if the host left, promote the next player to host (or null)
+        if (room.hostId && !room.players.find(p => p.id === room.hostId)) {
+          room.hostId = room.players[0] ? room.players[0].id : null;
+        }
+        if (room.players.length < 2 && room.status === 'playing') room.status = 'waiting';
+        io.to(roomId).emit('room:update', {
+          fen: room.chess ? room.chess.fen() : null,
+          players: room.players.map(p => ({ id: p.id, color: p.color })),
+          status: room.status,
+          hostId: room.hostId,
+          size: room.size,
+          cards: Object.keys(room.cards || {})
+        });
+        room.removalTimers.delete(playerId);
+      }, 5000);
+      room.removalTimers.set(playerId, t);
+    } else {
+      // fallback: immediate removal
+      room.players = room.players.filter(p => p.socketId !== socket.id);
+      if (room.players.length < 2 && room.status === 'playing') room.status = 'waiting';
+      if (room.hostId && !room.players.find(p => p.id === room.hostId)) {
+        room.hostId = room.players[0] ? room.players[0].id : null;
+      }
+      io.to(roomId).emit('room:update', {
+        fen: room.chess ? room.chess.fen() : null,
+        players: room.players.map(p => ({ id: p.id, color: p.color })),
+        status: room.status,
+        hostId: room.hostId,
+        size: room.size,
+        cards: Object.keys(room.cards || {})
+      });
     }
-
-    io.to(roomId).emit('room:update', {
-      fen: room.chess ? room.chess.fen() : null,
-      players: room.players.map(p => ({ id: p.id, color: p.color })),
-      status: room.status,
-      hostId: room.hostId,
-      size: room.size,
-      cards: Object.keys(room.cards || {})
-    });
   });
 
   // Provide legal moves for a given square (for standard 8x8 via chess.js)

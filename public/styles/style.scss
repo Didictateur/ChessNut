@@ -64,6 +64,10 @@ a:hover{text-decoration:underline}
 .square.dark{background: linear-gradient(180deg, rgba(0,0,0,0.18), rgba(0,0,0,0.12));}
 .square{border:1px solid rgba(0,0,0,0.06)}
 
+/* flipped board for black perspective */
+#board.flipped{transform:rotate(180deg)}
+#board.flipped .square img{transform:rotate(180deg)}
+
 /* Lobby / hero styles - decorative and fun */
 .hero{
   display:flex;align-items:center;justify-content:space-between;padding:28px;border-radius:12px;margin-bottom:18px;overflow:hidden;position:relative;border:1px solid rgba(255,255,255,0.04);

@@ -1,7 +1,6 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const { Chess } = require('chess.js');
 const { v4: uuidv4 } = require('uuid');
 
 const app = express();
@@ -15,24 +14,36 @@ app.use(express.static('public'));
 app.use('/assets', express.static(path.join(__dirname, 'assets')));
 
 // In-memory rooms store. For production replace with persistent store.
-// room = { id, chess: Chess, players: [{id, socketId, color}], status }
+// room = { id, boardFEN: string|null, turn: 'w'|'b'|null, players: [{id, socketId, color}], status }
 const rooms = new Map();
+
+// Placeholder: compute legal moves for a square in the given room.
+// This is intentionally a stub — you will implement the full rules engine.
+// (fields like { from, to, piece, color, flags, captured, san } are typical).
+function computeLegalMoves(room, square){
+  // TODO: implement rule engine. For now return empty array so client shows nothing.
+  return [];
+}
 
 app.post('/rooms', (req, res) => {
   const id = uuidv4().slice(0, 8);
   // allow optional board size in request body (default 8)
   const size = (req.body && parseInt(req.body.size, 10)) || 8;
-  // For standard 8x8 chess we use chess.js. For other sizes we keep a placeholder state
-  const chess = size === 8 ? new Chess() : null;
+  // For standard 8x8 we initialize a FEN string as the canonical board state.
+  // manually (or by a separate engine). This server stores the board FEN and
+  // the active turn so custom logic can operate on them.
+  const startingFEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+  const boardFEN = size === 8 ? startingFEN : null;
+  const turn = size === 8 ? 'w' : null; // 'w' or 'b'
   // hostId will be set when the first player joins
-  rooms.set(id, { id, chess, players: [], status: 'waiting', hostId: null, size, cards: {}, playedCards: [], removalTimers: new Map() });
+  rooms.set(id, { id, boardFEN, turn, players: [], status: 'waiting', hostId: null, size, cards: {}, playedCards: [], removalTimers: new Map() });
   res.json({ roomId: id, size });
 });
 
 app.get('/rooms/:id', (req, res) => {
   const room = rooms.get(req.params.id);
   if (!room) return res.status(404).json({ error: 'room not found' });
-  const fen = room.chess ? room.chess.fen() : null;
+  const fen = room.boardFEN || null;
   res.json({ id: room.id, fen, size: room.size, players: room.players.map(p => ({ id: p.id, color: p.color })), status: room.status, hostId: room.hostId, cards: Object.keys(room.cards || {}) });
 });
 
@@ -70,7 +81,7 @@ io.on('connection', (socket) => {
 
 
     io.to(roomId).emit('room:update', {
-      fen: room.chess ? room.chess.fen() : null,
+      fen: room.boardFEN || null,
       players: room.players.map(p => ({ id: p.id, color: p.color })),
       status: room.status,
       hostId: room.hostId,
@@ -85,26 +96,10 @@ io.on('connection', (socket) => {
     const room = rooms.get(roomId);
     if (!room) return cb && cb({ error: 'room not found' });
 
-    const chess = room.chess;
-
-    // If we have a chess.js instance (standard 8x8) use it for validation
-    if (!chess) return cb && cb({ error: 'custom board sizes not yet supported for moves' });
-
-    // Validate move
-    const move = chess.move({ from, to, promotion });
-    if (!move) return cb && cb({ error: 'invalid move' });
-
-    io.to(roomId).emit('move:moved', { move, fen: chess.fen() });
-
-    if (chess.isGameOver()) {
-      room.status = 'finished';
-      let result = 'draw';
-      if (chess.isCheckmate()) result = 'checkmate';
-      else if (chess.isStalemate()) result = 'stalemate';
-      io.to(roomId).emit('game:over', { result, fen: chess.fen() });
-    }
-
-    cb && cb({ ok: true, move, fen: chess.fen() });
+    // Move handling/validation is intentionally not implemented here because
+    // Implement a function to validate & apply moves on the room state and
+    // then emit 'move:moved' with move details and updated room.boardFEN.
+    return cb && cb({ error: 'move handling not implemented on server; implement custom engine' });
   });
 
   // Host can start the game explicitly
@@ -120,9 +115,9 @@ io.on('connection', (socket) => {
     if (!room.hostId || room.hostId !== senderId) return cb && cb({ error: 'only host can start' });
 
     room.status = 'playing';
-    io.to(roomId).emit('game:started', { roomId, fen: room.chess.fen() });
+    io.to(roomId).emit('game:started', { roomId, fen: room.boardFEN });
     io.to(roomId).emit('room:update', {
-      fen: room.chess ? room.chess.fen() : null,
+      fen: room.boardFEN || null,
       players: room.players.map(p => ({ id: p.id, color: p.color })),
       status: room.status,
       hostId: room.hostId,
@@ -149,7 +144,7 @@ io.on('connection', (socket) => {
         }
         if (room.players.length < 2 && room.status === 'playing') room.status = 'waiting';
         io.to(roomId).emit('room:update', {
-          fen: room.chess ? room.chess.fen() : null,
+          fen: room.boardFEN || null,
           players: room.players.map(p => ({ id: p.id, color: p.color })),
           status: room.status,
           hostId: room.hostId,
@@ -167,7 +162,7 @@ io.on('connection', (socket) => {
         room.hostId = room.players[0] ? room.players[0].id : null;
       }
       io.to(roomId).emit('room:update', {
-        fen: room.chess ? room.chess.fen() : null,
+        fen: room.boardFEN || null,
         players: room.players.map(p => ({ id: p.id, color: p.color })),
         status: room.status,
         hostId: room.hostId,
@@ -177,15 +172,15 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Provide legal moves for a given square (for standard 8x8 via chess.js)
+  // delegates to `computeLegalMoves` which is a stub you should implement.
   socket.on('game:legalMoves', ({ roomId, square }, cb) => {
     const room = rooms.get(roomId);
     if (!room) return cb && cb({ error: 'room not found' });
-    if (!room.chess) return cb && cb({ error: 'legal moves not supported for custom board sizes yet', moves: [] });
     try{
-      const moves = room.chess.moves({ square, verbose: true }) || [];
+      const moves = computeLegalMoves(room, square) || [];
       return cb && cb({ ok: true, moves });
     }catch(e){
+      console.error('game:legalMoves error', e);
       return cb && cb({ error: 'invalid square', moves: [] });
     }
   });

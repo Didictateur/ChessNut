@@ -106,9 +106,8 @@
       socket.emit('room:join', { roomId, playerId }, (resp)=>{
         if(resp && resp.error){
           console.warn('join error', resp);
-          alert(resp.error || 'Impossible de rejoindre la room');
-          // redirect back to home to let user retry/create
-          window.location.href = '/';
+          // do not alert or force-redirect; show error in status and keep page for debugging/retry
+          try{ document.getElementById('status').textContent = resp.error || 'Impossible de rejoindre la room'; }catch(e){}
           return;
         }
         myPlayerId = resp.playerId;

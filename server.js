@@ -42,8 +42,7 @@ io.on('connection', (socket) => {
   socket.on('room:join', ({ roomId, playerId }, cb) => {
     const room = rooms.get(roomId);
     if (!room) return cb && cb({ error: 'room not found' });
-    if (room.players.length >= 2) return cb && cb({ error: 'room full' });
-    const assignedId = playerId || uuidv4();
+  const assignedId = playerId || uuidv4();
 
     // If this player was pending removal (disconnect during navigation), cancel removal
     if(room.removalTimers && room.removalTimers.has(assignedId)){
@@ -53,6 +52,7 @@ io.on('connection', (socket) => {
 
     // If playerId corresponds to an existing player, treat this as a reconnection
     let existing = room.players.find(p => p.id === assignedId);
+
     let color;
     if(existing){
       existing.socketId = socket.id;

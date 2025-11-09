@@ -111,7 +111,28 @@
 
     connectAndJoin();
 
-    // allow clicking on the board to request legal moves for a square
+    // show markers for legal moves when clicking any square (any piece color)
+    function clearLegalMarkers(){
+      const prev = boardEl.querySelectorAll('.move-marker');
+      prev.forEach(p=>p.remove());
+    }
+
+    function showLegalMoves(moves){
+      clearLegalMarkers();
+      (moves||[]).forEach(m => {
+        const to = m.to || (m.move && m.move.to);
+        if(!to) return;
+        const target = boardEl.querySelector(`.square[data-square="${to}"]`);
+        if(!target) return;
+        const marker = document.createElement('div');
+        marker.className = 'move-marker';
+        // store metadata if needed later
+        marker.dataset.from = m.from || '';
+        marker.dataset.to = to;
+        target.appendChild(marker);
+      });
+    }
+
     if(boardEl){
       boardEl.addEventListener('click', (ev)=>{
         const sqEl = ev.target.closest && ev.target.closest('.square');
@@ -120,8 +141,9 @@
         if(!square) return;
         if(socket){
           socket.emit('game:legalMoves', { roomId, square }, (resp)=>{
-            if(resp && resp.error){ log('legalMoves error', resp); return; }
+            if(resp && resp.error){ log('legalMoves error', resp); clearLegalMarkers(); return; }
             log('legalMoves for', square, resp.moves || resp);
+            showLegalMoves(resp.moves || []);
           });
         }
       });

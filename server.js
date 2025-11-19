@@ -14,37 +14,64 @@ app.use(express.static('public'));
 app.use('/assets', express.static(path.join(__dirname, 'assets')));
 
 // In-memory rooms store. For production replace with persistent store.
-// room = { id, boardFEN: string|null, turn: 'w'|'b'|null, players: [{id, socketId, color}], status }
+// room = { id, boardState: object|null, players: [{id, socketId, color}], status, size }
 const rooms = new Map();
 
 // Placeholder: compute legal moves for a square in the given room.
-// This is intentionally a stub — you will implement the full rules engine.
-// (fields like { from, to, piece, color, flags, captured, san } are typical).
+// `boardState` is the canonical JSON representation of the board for this server.
+// Example boardState: { width:8, height:8, turn:'w', version:1, pieces: [{ square:'e2', type:'P', color:'w', id:'w_p1' }, ... ] }
 function computeLegalMoves(room, square){
-  // TODO: implement rule engine. For now return empty array so client shows nothing.
+  // TODO: implement custom rules engine here. For now return empty list.
   return [];
+}
+
+function startingBoardState8(){
+  // returns a simple pieces array with square names for standard chess starting position
+  const rows = [
+    'rnbqkbnr',
+    'pppppppp',
+    '........',
+    '........',
+    '........',
+    '........',
+    'PPPPPPPP',
+    'RNBQKBNR'
+  ];
+  const pieces = [];
+  for(let r=0;r<8;r++){
+    const row = rows[r];
+    for(let f=0;f<8;f++){
+      const ch = row[f];
+      if(ch === '.') continue;
+      const fileLetter = String.fromCharCode('a'.charCodeAt(0) + f);
+      const rank = 8 - r;
+      const square = `${fileLetter}${rank}`;
+      const isWhite = (ch === ch.toUpperCase());
+      const type = ch.toUpperCase();
+      const color = isWhite ? 'w' : 'b';
+      const id = (color === 'w' ? 'w_' : 'b_') + type + '_' + pieces.length;
+      pieces.push({ square, type, color, id });
+    }
+  }
+  return { width: 8, height: 8, turn: 'w', version: 1, pieces };
 }
 
 app.post('/rooms', (req, res) => {
   const id = uuidv4().slice(0, 8);
   // allow optional board size in request body (default 8)
   const size = (req.body && parseInt(req.body.size, 10)) || 8;
-  // For standard 8x8 we initialize a FEN string as the canonical board state.
-  // manually (or by a separate engine). This server stores the board FEN and
-  // the active turn so custom logic can operate on them.
-  const startingFEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
-  const boardFEN = size === 8 ? startingFEN : null;
-  const turn = size === 8 ? 'w' : null; // 'w' or 'b'
+  // For standard 8x8 we initialize a boardState JSON as the canonical board state.
+  const boardState = size === 8 ? startingBoardState8() : null;
   // hostId will be set when the first player joins
-  rooms.set(id, { id, boardFEN, turn, players: [], status: 'waiting', hostId: null, size, cards: {}, playedCards: [], removalTimers: new Map() });
+  rooms.set(id, { id, boardState, players: [], status: 'waiting', hostId: null, size, cards: {}, playedCards: [], removalTimers: new Map() });
   res.json({ roomId: id, size });
 });
 
 app.get('/rooms/:id', (req, res) => {
   const room = rooms.get(req.params.id);
   if (!room) return res.status(404).json({ error: 'room not found' });
-  const fen = room.boardFEN || null;
-  res.json({ id: room.id, fen, size: room.size, players: room.players.map(p => ({ id: p.id, color: p.color })), status: room.status, hostId: room.hostId, cards: Object.keys(room.cards || {}) });
+  const boardState = room.boardState || null;
+  res.json({ id: room.id, boardState, size: room.size, players: room.players.map(p => ({ id: p.id, color: p.color })), status: room.status, hostId: room.hostId, cards: Object.keys(room.cards || {}) });
 });
 
 io.on('connection', (socket) => {
@@ -81,7 +108,7 @@ io.on('connection', (socket) => {
 
 
     io.to(roomId).emit('room:update', {
-      fen: room.boardFEN || null,
+      boardState: room.boardState || null,
       players: room.players.map(p => ({ id: p.id, color: p.color })),
       status: room.status,
       hostId: room.hostId,
@@ -96,9 +123,9 @@ io.on('connection', (socket) => {
     const room = rooms.get(roomId);
     if (!room) return cb && cb({ error: 'room not found' });
 
-    // Move handling/validation is intentionally not implemented here because
-    // Implement a function to validate & apply moves on the room state and
-    // then emit 'move:moved' with move details and updated room.boardFEN.
+    // Move handling/validation is intentionally not implemented here.
+    // Implement a function to validate & apply moves on the room.boardState and
+    // then emit 'move:moved' with move details and updated room.boardState.
     return cb && cb({ error: 'move handling not implemented on server; implement custom engine' });
   });
 
@@ -115,9 +142,9 @@ io.on('connection', (socket) => {
     if (!room.hostId || room.hostId !== senderId) return cb && cb({ error: 'only host can start' });
 
     room.status = 'playing';
-    io.to(roomId).emit('game:started', { roomId, fen: room.boardFEN });
+    io.to(roomId).emit('game:started', { roomId, boardState: room.boardState });
     io.to(roomId).emit('room:update', {
-      fen: room.boardFEN || null,
+      boardState: room.boardState || null,
       players: room.players.map(p => ({ id: p.id, color: p.color })),
       status: room.status,
       hostId: room.hostId,
@@ -137,14 +164,14 @@ io.on('connection', (socket) => {
     const playerId = socket.data.playerId;
     if(playerId && room.removalTimers){
       const t = setTimeout(()=>{
-        room.players = room.players.filter(p => p.id !== playerId);
+          room.players = room.players.filter(p => p.id !== playerId);
         // if the host left, promote the next player to host (or null)
         if (room.hostId && !room.players.find(p => p.id === room.hostId)) {
           room.hostId = room.players[0] ? room.players[0].id : null;
         }
         if (room.players.length < 2 && room.status === 'playing') room.status = 'waiting';
         io.to(roomId).emit('room:update', {
-          fen: room.boardFEN || null,
+          boardState: room.boardState || null,
           players: room.players.map(p => ({ id: p.id, color: p.color })),
           status: room.status,
           hostId: room.hostId,
@@ -162,7 +189,7 @@ io.on('connection', (socket) => {
         room.hostId = room.players[0] ? room.players[0].id : null;
       }
       io.to(roomId).emit('room:update', {
-        fen: room.boardFEN || null,
+        boardState: room.boardState || null,
         players: room.players.map(p => ({ id: p.id, color: p.color })),
         status: room.status,
         hostId: room.hostId,

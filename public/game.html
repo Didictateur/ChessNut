@@ -39,7 +39,6 @@
 
   // optional UI elements: support removing the sidebar/sections without breaking JS
   const logEl = document.getElementById('log');
-  const fenEl = document.getElementById('fen');
   const playersEl = document.getElementById('players');
   const boardEl = document.getElementById('board');
   const myColorEl = document.getElementById('myColor');
@@ -66,7 +65,7 @@
 
       socket.on('room:update', (data)=>{
         log('room:update', data);
-        if(fenEl) fenEl.textContent = data.fen || '-';
+  // server now sends `boardState` (JSON). renderBoardFromState will handle it.
         if(playersEl){
           playersEl.innerHTML = '';
           (data.players||[]).forEach(p=>{
@@ -83,12 +82,11 @@
             boardEl.style.width = side + 'px';
             boardEl.style.height = side + 'px';
         }
-        if(data.fen) renderFen(data.fen);
+    if(data.boardState) renderBoardFromState(data.boardState);
       });
-
-  socket.on('move:moved', (data)=>{ log('move:moved', data); if(fenEl) fenEl.textContent = data.fen; renderFen(data.fen); });
-  socket.on('game:over', (data)=>{ log('game:over', data); if(fenEl) fenEl.textContent = data.fen; renderFen(data.fen); });
-  socket.on('game:started', (data)=>{ log('game:started', data); if(fenEl) fenEl.textContent = data.fen || '-'; renderFen(data.fen || ''); });
+  socket.on('move:moved', (data)=>{ log('move:moved', data); if(data.boardState) renderBoardFromState(data.boardState); });
+  socket.on('game:over', (data)=>{ log('game:over', data); if(data.boardState) renderBoardFromState(data.boardState); });
+  socket.on('game:started', (data)=>{ log('game:started', data); if(data.boardState) renderBoardFromState(data.boardState); });
 
       socket.emit('room:join', { roomId, playerId }, (resp)=>{
         if(resp && resp.error){ log('join error', resp); alert(resp.error); return; }
@@ -166,46 +164,29 @@
       });
     }
 
-    // Board rendering using provided SVG assets. Accepts FEN.
+    // Board rendering using provided SVG assets and `boardState` JSON.
     const pieceSetPath = '/assets/chess-pieces/chess_maestro_bw';
   // board visual defaults are handled by CSS (background, size, border, position)
 
-    function renderFen(fen){
-      if(!fen) return;
-      // only handle standard FEN for 8x8; for other sizes server should send a 'board' structure
-      const parts = fen.split(' ');
-      const rows = parts[0].split('/');
+    function renderBoardFromState(boardState){
+      if(!boardState) return;
       // clear existing pieces but keep squares if present
       const squares = boardEl.querySelectorAll('.square');
       squares.forEach(s=> s.innerHTML = '');
 
-      // place pieces according to FEN (assume 8x8)
-      for(let r=0;r<rows.length;r++){
-        const row = rows[r];
-        let file = 0;
-        for(let i=0;i<row.length;i++){
-          const ch = row[i];
-          if(/[1-8]/.test(ch)){
-            const empties = parseInt(ch,10);
-            file += empties;
-          } else {
-            const isWhite = (ch === ch.toUpperCase());
-            const letter = ch.toUpperCase();
-            const filename = (isWhite ? 'w' + letter : 'b' + letter) + '.svg';
-            const rank = 8 - r; // FEN rows are from rank 8..1
-            const fileLetter = String.fromCharCode('a'.charCodeAt(0) + file);
-            const squareName = `${fileLetter}${rank}`;
-            const sqEl = boardEl.querySelector(`.square[data-square="${squareName}"]`);
-            if(sqEl){
-              const img = document.createElement('img');
-              img.src = `${pieceSetPath}/${filename}`;
-              img.className = 'piece';
-              sqEl.appendChild(img);
-            }
-            file++;
-          }
-        }
-      }
+      // place pieces according to boardState.pieces (expects algebraic square names)
+      (boardState.pieces || []).forEach(p => {
+        const squareName = p.square;
+        if(!squareName) return;
+        const sqEl = boardEl.querySelector(`.square[data-square="${squareName}"]`);
+        if(!sqEl) return;
+        const letter = p.type ? p.type.toUpperCase() : '?';
+        const filename = (p.color === 'w' ? 'w' + letter : 'b' + letter) + '.svg';
+        const img = document.createElement('img');
+        img.src = `${pieceSetPath}/${filename}`;
+        img.className = 'piece';
+        sqEl.appendChild(img);
+      });
     }
 
     // build grid with independent square elements and data-square attributes

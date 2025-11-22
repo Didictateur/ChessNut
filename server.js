@@ -40,6 +40,31 @@ function sendRoomUpdate(room){
       handsOwn: (room.hands && room.hands[p.id]) ? room.hands[p.id] : [],
       handCounts
     });
+    // Create a per-recipient boardState view that only hides pieces targeted by an 'invisible' effect
+    try{
+      if(base.boardState && base.boardState.pieces && Array.isArray(base.boardState.pieces)){
+        const filtered = Object.assign({}, base.boardState);
+        filtered.pieces = (base.boardState.pieces || []).filter(piece => {
+          try{
+            // If a piece has an explicit invisible flag, hide it from recipients who are not the owner
+            if(piece.invisible){
+              const ownerPlayer = (room.players || []).find(pl => (pl.color && pl.color[0]) === piece.color);
+              const ownerId = ownerPlayer && ownerPlayer.id;
+              if(ownerId && ownerId !== p.id) return false;
+            }
+            // If an 'invisible' active effect targets this piece, hide it from recipients who are not the effect owner
+            const inv = (room.activeCardEffects || []).find(e => e && e.type === 'invisible' && (e.pieceId === piece.id || e.pieceSquare === piece.square));
+            if(inv && inv.playerId && inv.playerId !== p.id){
+              return false; // hide this piece for this recipient
+            }
+            return true;
+          }catch(_){ return true; }
+        });
+        payload.boardState = filtered;
+      } else {
+        payload.boardState = base.boardState || null;
+      }
+    }catch(_){ payload.boardState = base.boardState || null; }
     // attach visible squares for this recipient (fog of war)
     try{
       payload.visibleSquares = Array.from(visibleSquaresForPlayer(room, p.id) || []);
@@ -123,7 +148,7 @@ function buildDefaultDeck(){
     ['kamikaz','Détruit une de ses pièces, détruisant toutes les pièces adjacentes'],
     // ['retour à la case départ','Désigne une pièce qui retourne à sa position initiale'],
     // ['glissade','La pièce désignée ne peut plus s arrêter si elle se déplace en diagonale ou en ligne droite. Soit elle percute une pièce et la capture, soit elle tombe du plateau et est capturée'],
-    // ['invisible','Une des pièces devient invisible pour l adversaire'],
+    ['invisible','Une des pièces devient invisible pour l adversaire'],
     // ['épidémie','Toutes les pièces sur le territoire enemie est est capturée'],
     // ['glue','Toutes les pièces autour de la pièce désignée ne peuvent pas bouger tant que cette dernière ne bouge pas'],
     // ['coin coin','Possibilité de se téléporter depuis  un coin vers n importe quel autre coin'],
@@ -679,7 +704,24 @@ io.on('connection', (socket) => {
           room.captured = room.captured || [];
           const originalOwner = (room.players || []).find(p => (p.color && p.color[0]) === capturedPiece.color);
           room.captured.push({ id: uuidv4().slice(0,8), piece: capturedPiece, originalOwnerId: (originalOwner && originalOwner.id) || null, capturedBy: senderId, ts: Date.now() });
+          // ensure the captured piece object no longer carries the 'invisible' flag so it won't
+          // incorrectly reappear invisible if resurrected or inspected elsewhere
+          try{ if(capturedPiece && capturedPiece.invisible) delete capturedPiece.invisible; }catch(_){ }
         }catch(_){ /* ignore bookkeeping errors */ }
+        // If there were any 'invisible' effects targeting the captured piece or its square,
+        // remove them so the square does not remain hidden for non-owners when another piece arrives.
+        try{
+          room.activeCardEffects = room.activeCardEffects || [];
+          for(let ei = room.activeCardEffects.length - 1; ei >= 0; ei--){
+            const ev = room.activeCardEffects[ei];
+            if(!ev) continue;
+            if(ev.type === 'invisible' && (ev.pieceId === capturedPiece.id || ev.pieceSquare === capturedPiece.square)){
+              // remove effect and notify clients
+              try{ room.activeCardEffects.splice(ei,1); }catch(_){ }
+              try{ io.to(room.id).emit('card:effect:removed', { roomId: room.id, effectId: ev.id, type: ev.type, playerId: ev.playerId }); }catch(_){ }
+            }
+          }
+        }catch(_){ }
       }
       // move the piece
       moving.square = to;
@@ -774,14 +816,28 @@ io.on('connection', (socket) => {
           room.activeCardEffects = room.activeCardEffects || [];
           for(let i = room.activeCardEffects.length - 1; i >= 0; i--){
             const e = room.activeCardEffects[i];
-            if(e.playerId === senderId && typeof e.remainingTurns === 'number'){
-              e.remainingTurns = e.remainingTurns - 1;
-              // emit informative event when effect is decremented/removed
-              try{ io.to(room.id).emit('card:effect:updated', { roomId: room.id, effect: e }); }catch(_){ }
-              if(e.remainingTurns <= 0){
-                // remove expired effect
-                room.activeCardEffects.splice(i,1);
-                try{ io.to(room.id).emit('card:effect:removed', { roomId: room.id, effectId: e.id, type: e.type, playerId: e.playerId }); }catch(_){ }
+            if(typeof e.remainingTurns === 'number'){
+              // determine whether this effect should be decremented when the player who just finished their turn is `senderId`.
+              let shouldDecrement = false;
+              if(e.decrementOn === 'opponent'){
+                // decrement when the finished-turn player is NOT the effect owner
+                shouldDecrement = (e.playerId !== senderId);
+              } else if(e.decrementOn === 'owner'){
+                // decrement only when the finished-turn player is the effect owner (legacy/default behavior)
+                shouldDecrement = (e.playerId === senderId);
+              } else {
+                // default: existing semantics (decrement on the owner's turn)
+                shouldDecrement = (e.playerId === senderId);
+              }
+              if(shouldDecrement){
+                e.remainingTurns = e.remainingTurns - 1;
+                // emit informative event when effect is decremented/removed
+                try{ io.to(room.id).emit('card:effect:updated', { roomId: room.id, effect: e }); }catch(_){ }
+                if(e.remainingTurns <= 0){
+                  // remove expired effect
+                  room.activeCardEffects.splice(i,1);
+                  try{ io.to(room.id).emit('card:effect:removed', { roomId: room.id, effectId: e.id, type: e.type, playerId: e.playerId }); }catch(_){ }
+                }
               }
             }
           }
@@ -793,7 +849,7 @@ io.on('connection', (socket) => {
 
       // at this point the board has been updated (and possibly the turn flipped)
       // determine next player and perform their draw BEFORE broadcasting the move, so the draw happens at the start of their turn
-      const moved = { playerId: senderId, from, to, boardState: board };
+  const moved = { playerId: senderId, from, to };
       try{
         if(!consumedDoubleMove){
           const nextColor = board.turn; // 'w' or 'b'
@@ -814,7 +870,7 @@ io.on('connection', (socket) => {
       }
 
       // now broadcast the move to all clients (move event separate from room:update)
-      io.to(roomId).emit('move:moved', moved);
+    io.to(roomId).emit('move:moved', moved);
 
       return cb && cb({ ok: true, moved });
     }catch(err){
@@ -835,9 +891,10 @@ io.on('connection', (socket) => {
     // verify sender is the host (explicit hostId)
     if (!room.hostId || room.hostId !== senderId) return cb && cb({ error: 'only host can start' });
 
-    room.status = 'playing';
-    io.to(roomId).emit('game:started', { roomId, boardState: room.boardState });
-    sendRoomUpdate(room);
+  room.status = 'playing';
+  // Do not broadcast the raw boardState to all sockets (use per-recipient sendRoomUpdate to enforce invisibility)
+  io.to(roomId).emit('game:started', { roomId });
+  sendRoomUpdate(room);
 
     // draw initial card for the player to move (beginning of their turn)
     // If the player already has a card (for instance the special starter card), skip the automatic draw
@@ -1239,6 +1296,38 @@ io.on('connection', (socket) => {
             try{ io.to(room.id).emit('mine:detonated', { roomId: room.id, square: target }); }catch(_){ }
             played.payload = Object.assign({}, payload, { applied: 'kamikaz', appliedTo: target, affected: affected, removedCount: removedPieces.length });
           }catch(e){ console.error('kamikaz effect error', e); }
+        }
+        // invisible: make one of your pieces invisible to the opponent for a number of turns
+        else if(cardId === 'invisible' || (typeof cardId === 'string' && cardId.indexOf('invis') !== -1)){
+          try{
+            const board = room.boardState;
+            let target = payload && payload.targetSquare;
+            if(!target){ try{ target = socket.data && socket.data.lastSelectedSquare; }catch(e){ target = null; } }
+            const roomPlayer = room.players.find(p => p.id === senderId);
+            const playerColorShort = (roomPlayer && roomPlayer.color && roomPlayer.color[0]) || null;
+            const targetPiece = (board && board.pieces || []).find(p => p.square === target);
+            // validate target exists and belongs to the player
+            if(!board || !target || !targetPiece || targetPiece.color !== playerColorShort){
+              // restore removed card to hand and remove from discard if necessary
+              try{
+                room.hands = room.hands || {};
+                room.hands[senderId] = room.hands[senderId] || [];
+                if(removed) room.hands[senderId].push(removed);
+                room.discard = room.discard || [];
+                for(let i = room.discard.length - 1; i >= 0; i--){ if(room.discard[i] && room.discard[i].id === (removed && removed.id)){ room.discard.splice(i,1); break; } }
+              }catch(e){ console.error('restore removed card error', e); }
+              return cb && cb({ error: 'no valid target' });
+            }
+            // apply invisible effect bound to the piece id so only the owner can see it
+            room.activeCardEffects = room.activeCardEffects || [];
+            // Mark the piece object itself as invisible so the flag follows the piece when it moves
+            try{ targetPiece.invisible = true; }catch(_){ }
+            // Permanent invisible effect: do NOT set remainingTurns — the effect persists until explicitly removed by another action.
+            const effect = { id: played.id, type: 'invisible', pieceId: targetPiece.id, pieceSquare: target, playerId: senderId, ts: Date.now() };
+            room.activeCardEffects.push(effect);
+            try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect }); }catch(_){ }
+            played.payload = Object.assign({}, payload, { applied: 'invisible', appliedTo: target });
+          }catch(e){ console.error('invisible effect error', e); }
         }
         // brouillard de guerre: target a player so their board is fogged (they only see adjacent squares)
         else if(cardId === 'brouillard_de_guerre' || (typeof cardId === 'string' && cardId.indexOf('brouillard') !== -1)){

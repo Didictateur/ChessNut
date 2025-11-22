@@ -7,6 +7,7 @@
 </head>
 <body>
   <h2>ChessNut — Partie</h2>
+  <div id="turnBanner" style="margin-bottom:8px"></div>
   <div>Room: <strong id="roomId">-</strong> &nbsp;•&nbsp; Vous jouez: <strong id="myColor">-</strong>
   <div class="layout-row">
     <div>
@@ -87,10 +88,13 @@
             boardEl.style.width = side + 'px';
             boardEl.style.height = side + 'px';
         }
-    if(data.boardState) renderBoardFromState(data.boardState);
+    if(data.boardState) {
+      renderBoardFromState(data.boardState);
+      updateTurnBanner(data.boardState);
+    }
       });
-  socket.on('game:over', (data)=>{ log('game:over', data); if(data.boardState) renderBoardFromState(data.boardState); });
-  socket.on('game:started', (data)=>{ log('game:started', data); if(data.boardState) renderBoardFromState(data.boardState); });
+  socket.on('game:over', (data)=>{ log('game:over', data); if(data.boardState){ renderBoardFromState(data.boardState); updateTurnBanner(data.boardState); } });
+  socket.on('game:started', (data)=>{ log('game:started', data); if(data.boardState){ renderBoardFromState(data.boardState); updateTurnBanner(data.boardState); } });
       // selection events (include moves) broadcasted by server
       socket.on('game:select', (data) => {
         try{
@@ -151,6 +155,24 @@
     }
 
     connectAndJoin();
+
+      function updateTurnBanner(boardState){
+        const banner = document.getElementById('turnBanner');
+        if(!banner) return;
+        if(!boardState || !boardState.turn || !myColor){
+          banner.classList.remove('show');
+          return;
+        }
+        // myColor is 'white' or 'black', boardState.turn is 'w' or 'b'
+        const myShort = (myColor && myColor[0]) || '';
+        if(myShort === boardState.turn){
+          banner.textContent = "C'est à vous de jouer";
+          banner.classList.add('show');
+        } else {
+          banner.textContent = "En attente du coup de l'adversaire";
+          banner.classList.add('show');
+        }
+      }
 
     // movement UI removed: legalMoves and move markers are disabled
 

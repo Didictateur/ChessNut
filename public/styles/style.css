@@ -40,6 +40,10 @@ a:hover{text-decoration:underline}
 /* layout helpers used from game.html */
 .layout-row{display:flex;gap:20px;align-items:flex-start}
 
+/* turn banner */
+#turnBanner{color:#0b1220;background:#f6ad55;padding:8px 12px;border-radius:8px;font-weight:700;display:none}
+#turnBanner.show{display:inline-block}
+
 /* board tweaks */
 #board{border:1px solid #333;position:relative;background-image: url('/assets/chess-pieces/boards/8x8_wood.svg');background-size:cover}
 

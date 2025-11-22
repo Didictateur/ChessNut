@@ -3,23 +3,23 @@
 html,body{height:100%}
 body{
   font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-  margin:0;padding:24px;background: linear-gradient(180deg, #0b1220 0%, #0f172a 60%);color:#e6eef8;
+  margin:0;padding:24px;background: linear-gradient(180deg,#f7fafc 0%, #eef2f7 60%);color:#0b1220;
 }
 
 .page{max-width:1100px;margin:0 auto}
 
-header h2{margin:0 0 12px 0;color:#fff;text-shadow:0 1px 0 rgba(0,0,0,0.4)}
+header h2{margin:0 0 12px 0;color:#0b1220}
 
-.card{background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border:1px solid rgba(255,255,255,0.04);padding:16px;border-radius:10px;box-shadow:0 6px 20px rgba(2,6,23,0.6);}
+.card{background: linear-gradient(180deg, #ffffff, #fbfdff);border:1px solid rgba(11,18,32,0.06);padding:16px;border-radius:10px;box-shadow:0 6px 18px rgba(11,18,32,0.06);} 
 
-button{background:#2b6cb0;color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600}
-button[disabled]{opacity:0.5;cursor:not-allowed}
-input[type="text"], input[type="search"]{padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.08);background:transparent;color:inherit}
+button{background:#2563eb;color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600}
+button[disabled]{opacity:0.6;cursor:not-allowed}
+input[type="text"], input[type="search"]{padding:8px;border-radius:8px;border:1px solid rgba(11,18,32,0.06);background:transparent;color:inherit}
 
-a{color:#f6ad55;text-decoration:none}
+a{color:#2563eb;text-decoration:none}
 a:hover{text-decoration:underline}
 
-#log{white-space:pre-wrap;border-radius:8px;background:rgba(255,255,255,0.03);padding:8px;height:280px;overflow:auto;color:#dfeeff}
+#log{white-space:pre-wrap;border-radius:8px;background:#f3f6f9;padding:8px;height:280px;overflow:auto;color:#0b1220}
 
 #board{width:800px;height:800px;display:grid;grid-template-columns:repeat(8,1fr);border-radius:6px;overflow:hidden;background-size:cover}
 
@@ -27,13 +27,14 @@ a:hover{text-decoration:underline}
   #board{width:min(92vw,680px);height:min(92vw,680px)}
 }
 
-.muted{opacity:0.8;color:#b9c6d9}
+.muted{opacity:0.9;color:#475569}
 
 .controls{display:flex;gap:8px;align-items:center}
 
 #players{margin:6px 0;padding-left:18px}
 
-#copyInviteBtn{background:transparent;border:1px solid rgba(255,255,255,0.06);color:#fff;padding:6px 10px;border-radius:8px}
+/* invite button - dark text for light theme */
+#copyInviteBtn{background:transparent;border:1px solid rgba(11,18,32,0.06);color:#0b1220;padding:6px 10px;border-radius:8px}
 
 #youAreHost{background:rgba(255,255,255,0.04);padding:6px 8px;border-radius:6px;margin-left:6px}
 
@@ -41,11 +42,12 @@ a:hover{text-decoration:underline}
 .layout-row{display:flex;gap:20px;align-items:flex-start}
 
 /* turn banner */
-#turnBanner{color:#0b1220;background:#f6ad55;padding:8px 12px;border-radius:8px;font-weight:700;display:none}
+/* turn banner - light theme */
+#turnBanner{color:#07203a;background:#c7f9d9;padding:8px 12px;border-radius:8px;font-weight:700;display:none}
 #turnBanner.show{display:inline-block}
 
 /* board tweaks */
-#board{border:1px solid #333;position:relative;background-image: url('/assets/chess-pieces/boards/8x8_wood.svg');background-size:cover}
+#board{border:1px solid rgba(11,18,32,0.06);position:relative;background-image: url('/assets/chess-pieces/boards/8x8_wood.svg');background-size:cover}
 
 /* square cells and piece images (used by renderFen) */
 .square{width:100%;height:100%;display:flex;align-items:center;justify-content:center}
@@ -56,18 +58,18 @@ a:hover{text-decoration:underline}
 .square .move-marker{
   position:absolute;
   left:50%;top:50%;transform:translate(-50%,-50%);
-  width:18%;height:18%;border-radius:50%;pointer-events:auto;cursor:pointer;background:rgba(96,165,250,0.95);
-  box-shadow:0 2px 6px rgba(2,6,23,0.6);z-index:3;transition:transform 120ms ease, opacity 120ms ease;
+  width:18%;height:18%;border-radius:50%;pointer-events:auto;cursor:pointer;background:rgba(37,99,235,0.95);
+  box-shadow:0 2px 6px rgba(11,18,32,0.06);z-index:3;transition:transform 120ms ease, opacity 120ms ease;
 }
 .square .move-marker:hover{ transform:translate(-50%,-50%) scale(1.12); opacity:0.95 }
 
 /* highlighted/selected square when a player selects a piece */
 .square.selected{
   outline: 3px solid rgba(245,158,11,0.95); /* amber */
-  box-shadow: inset 0 0 0 3px rgba(245,158,11,0.08), 0 8px 24px rgba(245,158,11,0.06);
+  box-shadow: inset 0 0 0 3px rgba(245,158,11,0.06), 0 8px 20px rgba(11,18,32,0.04);
   z-index: 4;
 }
-.square.selected .piece{transform: scale(1.06); transition: transform 140ms ease}
+.square.selected .piece{transform: scale(1.04); transition: transform 140ms ease}
 
 /* hide the visual selection outline for a square while keeping the piece visible */
 .square.hide-selection.selected,
@@ -79,15 +81,16 @@ a:hover{text-decoration:underline}
 
 /* remote selection (other player's selection) */
 .square.selected-remote{
-  outline: 3px solid rgba(59,130,246,0.95); /* blue */
-  box-shadow: inset 0 0 0 3px rgba(59,130,246,0.06), 0 6px 16px rgba(59,130,246,0.04);
+  outline: 3px solid rgba(37,99,235,0.95); /* blue */
+  box-shadow: inset 0 0 0 3px rgba(37,99,235,0.06), 0 6px 16px rgba(11,18,32,0.04);
   z-index: 3;
 }
 .square.selected-remote .piece{transform: scale(1.02); transition: transform 140ms ease}
 
 /* basic checkerboard coloring */
-.square.light{background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));}
-.square.dark{background: linear-gradient(180deg, rgba(0,0,0,0.18), rgba(0,0,0,0.12));}
+.square.light{background: linear-gradient(180deg, #f8fafc, #f1f5f9);}
+.quare.dark{background: linear-gradient(180deg, #e6eef8, #dbe9f5);} 
+.square.dark{background: linear-gradient(180deg, #e6eef8, #dbe9f5);} 
 .square{border:1px solid rgba(0,0,0,0.06)}
 
 /* flipped board for black perspective */
@@ -96,17 +99,17 @@ a:hover{text-decoration:underline}
 
 /* Lobby / hero styles - decorative and fun */
 .hero{
-  display:flex;align-items:center;justify-content:space-between;padding:28px;border-radius:12px;margin-bottom:18px;overflow:hidden;position:relative;border:1px solid rgba(255,255,255,0.04);
-  background: linear-gradient(135deg, rgba(43,108,176,0.14), rgba(246,173,85,0.06));
+  display:flex;align-items:center;justify-content:space-between;padding:28px;border-radius:12px;margin-bottom:18px;overflow:hidden;position:relative;border:1px solid rgba(11,18,32,0.04);
+  background: linear-gradient(135deg, rgba(99,102,241,0.06), rgba(99,102,241,0.03));
 }
 .hero .title{font-size:28px;font-weight:800;letter-spacing:-0.5px}
-.hero .subtitle{color:rgba(255,255,255,0.85);margin-top:6px;font-weight:500}
+.hero .subtitle{color:rgba(11,18,32,0.65);margin-top:6px;font-weight:500}
 .hero .decor{position:absolute;right:-80px;top:-60px;opacity:0.06;width:420px;height:420px;filter:blur(6px);transform:rotate(20deg)}
 
 .card.lobby{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:14px}
 
 /* buttons variants */
-.btn-ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);padding:8px 10px;border-radius:8px;color:inherit}
+.btn-ghost{background:transparent;border:1px solid rgba(11,18,32,0.06);padding:8px 10px;border-radius:8px;color:inherit}
 .btn-cta{background:linear-gradient(90deg,#3b82f6,#60a5fa);box-shadow:0 8px 20px rgba(59,130,246,0.18)}
 
 /* floating small piece icons */

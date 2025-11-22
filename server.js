@@ -730,14 +730,26 @@ io.on('connection', (socket) => {
           if(!target){
             try{ target = socket.data && socket.data.lastSelectedSquare; }catch(e){ target = null; }
           }
-          if(!board) {
-            played.payload = Object.assign({}, payload, { applied: 'rebondir', appliedTo: null, note: 'no board state' });
-          } else {
-            room.activeCardEffects = room.activeCardEffects || [];
-            // effect: type, pieceSquare, playerId, expiresOnMoveVersion (optional)
-            room.activeCardEffects.push({ id: played.id, type: 'rebondir', pieceSquare: target, playerId: senderId });
-            played.payload = Object.assign({}, payload, { applied: 'rebondir', appliedTo: target });
+          // validate target exists and belongs to the player; if invalid, restore card to hand and abort
+          const roomPlayer = room.players.find(p => p.id === senderId);
+          const playerColorShort = (roomPlayer && roomPlayer.color && roomPlayer.color[0]) || null;
+          const targetPiece = (board && board.pieces || []).find(p => p.square === target);
+          if(!board || !target || !targetPiece || targetPiece.color !== playerColorShort){
+            // restore removed card to hand and remove from discard if necessary
+            try{
+              room.hands = room.hands || {};
+              room.hands[senderId] = room.hands[senderId] || [];
+              if(removed) room.hands[senderId].push(removed);
+              room.discard = room.discard || [];
+              // try to remove the removed card instance from discard (last occurrence)
+              for(let i = room.discard.length - 1; i >= 0; i--){ if(room.discard[i] && room.discard[i].id === (removed && removed.id)){ room.discard.splice(i,1); break; } }
+            }catch(e){ console.error('restore removed card error', e); }
+            return cb && cb({ error: 'no valid target' });
           }
+          // apply the rebond effect
+          room.activeCardEffects = room.activeCardEffects || [];
+          room.activeCardEffects.push({ id: played.id, type: 'rebondir', pieceSquare: target, playerId: senderId });
+          played.payload = Object.assign({}, payload, { applied: 'rebondir', appliedTo: target });
         }catch(e){ console.error('rebondir effect error', e); }
       }
     }catch(e){

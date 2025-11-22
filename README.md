@@ -85,7 +85,7 @@ Déplace une pièce du plateau pendant que le joueur adverse à les yeux fermés
 Replace le roi dans sa position initiale, et place un nouveau pion à l'ancienne position du roi
 ### Reversi
 Si deux pions encadrent parfaitement une pièce adverse, cette dernière change de camp
-### PLus on est de fous, plus on rit
+### Plus on est de fous, plus on rit
 Si le joueur possède deux fous dans la même diagonale, alors toutes les pièces adverses encadrées par ces deux fous sont capturés
 ### Cluster
 Désigne 4 pions formant un rectangle. Tant que ces pions ne bougent pas, aucune pièce ne peut sortir ou rentrer dans ce rectangle.
@@ -96,7 +96,7 @@ La position de toutes les pièces sont échangées aléatoirement.
 ### La parrure
 Une reine est dégradée en pion
 ### Tricherie
-Regarde les trois prochaines cartes de la pioche.
+Choisis une carte de la pioche parmis trois.
 ### Tout ou rien
 Une pièce choisie ne peut maintenant se déplacer que si elle capture.
 ### Tous les mêmes

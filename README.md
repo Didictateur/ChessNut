@@ -1,5 +1,12 @@
 # ChessNut
 
+## Paramètre de partie
+
+- piocher ET jouer / piocher OU jouer
+- choix de la couleur
+- selection des cartes
+- avec/sans timer
+
 ## Liste des cartes
 
 ### Rétrécir le plateau

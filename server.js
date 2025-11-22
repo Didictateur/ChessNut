@@ -700,18 +700,16 @@ io.on('connection', (socket) => {
         for(let i = room.activeCardEffects.length - 1; i >= 0; i--){
           const e = room.activeCardEffects[i];
           if(e && e.type === 'mine' && e.square === to){
-            // owner is immune to their own mine (assumption). Only detonate for other players.
-            if(e.playerId !== senderId){
-              // remove the moving piece from the board
-              const rmIdx = pieces.findIndex(p => p.id === moving.id);
-              if(rmIdx >= 0){ pieces.splice(rmIdx, 1); }
-              // consume the mine
-              try{ room.activeCardEffects.splice(i,1); }catch(_){ }
-              // broadcast detonation to the room (informational)
-              try{ io.to(roomId).emit('mine:detonated', { roomId: room.id, ownerId: e.playerId, detonatorId: senderId, square: to, piece: moving }); }catch(_){ }
-              // privately inform the owner as well with effect id and piece details
-              try{ const owner = (room.players||[]).find(p => p.id === e.playerId); if(owner && owner.socketId) io.to(owner.socketId).emit('mine:detonated:private', { roomId: room.id, effectId: e.id, square: to, piece: moving }); }catch(_){ }
-            }
+            // detonate for any piece that lands on the mine (owner included)
+            // remove the moving piece from the board
+            const rmIdx = pieces.findIndex(p => p.id === moving.id);
+            if(rmIdx >= 0){ pieces.splice(rmIdx, 1); }
+            // consume the mine
+            try{ room.activeCardEffects.splice(i,1); }catch(_){ }
+            // broadcast detonation to the room (informational)
+            try{ io.to(roomId).emit('mine:detonated', { roomId: room.id, ownerId: e.playerId, detonatorId: senderId, square: to, piece: moving }); }catch(_){ }
+            // privately inform the owner as well with effect id and piece details
+            try{ const owner = (room.players||[]).find(p => p.id === e.playerId); if(owner && owner.socketId) io.to(owner.socketId).emit('mine:detonated:private', { roomId: room.id, effectId: e.id, square: to, piece: moving }); }catch(_){ }
             // a mine was found/handled; break (only one mine per square expected)
             break;
           }

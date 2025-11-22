@@ -211,6 +211,25 @@
         }catch(e){ console.warn('move:moved handler error', e); }
       });
 
+      // mine detonation: show explosion animation at the square and remove local mine visual immediately
+      socket.on('mine:detonated', (evt) => {
+        try{
+          log('recv mine:detonated', evt);
+          // evt.square is algebraic name like 'e4'
+          if(evt && evt.square) showExplosionAt(evt.square);
+          // remove any mine image/dot at that square (owner will get updated minesOwn via room:update)
+          try{
+            const sqEl = boardEl && boardEl.querySelector && boardEl.querySelector(`.square[data-square="${evt.square}"]`);
+            if(sqEl){ const img = sqEl.querySelector('.mine-img'); if(img) img.remove(); const dot = sqEl.querySelector('.mine-dot'); if(dot) dot.remove(); }
+          }catch(_){ }
+        }catch(e){ console.warn('mine:detonated handler error', e); }
+      });
+
+      // private detonation info for the mine owner (optional handling)
+      socket.on('mine:detonated:private', (evt) => {
+        try{ log('recv mine:detonated:private', evt); /* could show owner-specific UI later */ }catch(e){}
+      });
+
       socket.emit('room:join', { roomId, playerId }, (resp)=>{
         if(resp && resp.error){ log('join error', resp); alert(resp.error); return; }
         log('Rejoint room', resp);
@@ -498,6 +517,53 @@
         if(!el.style.position) el.style.position = 'relative';
         el.appendChild(img);
       });
+    }
+
+    // show an explosion animation centered on a square (client-side visual)
+    function showExplosionAt(square){
+      if(!boardEl || !square) return;
+      const sqEl = boardEl.querySelector(`.square[data-square="${square}"]`);
+      if(!sqEl) return;
+      // ensure container is positioned so absolute centering works
+      if(!sqEl.style.position) sqEl.style.position = 'relative';
+
+      // Try to play an authored explosion video if available; fallback to CSS explosion if not.
+      const videoPath = '/assets/media/FireElement01.mov';
+      const vid = document.createElement('video');
+      vid.className = 'explosion-video';
+      vid.src = videoPath;
+      vid.autoplay = true; vid.muted = true; vid.playsInline = true; vid.loop = false; vid.preload = 'auto';
+      vid.style.pointerEvents = 'none';
+
+      let usedVideo = false;
+      // Attach event listeners to handle success or failure
+      const cleanup = ()=>{ try{ if(vid && vid.parentNode) vid.parentNode.removeChild(vid); }catch(_){ } };
+      vid.addEventListener('canplay', ()=>{
+        // video is available and can play — use it
+        try{ sqEl.appendChild(vid); usedVideo = true; vid.play().catch(()=>{}); }
+        catch(_){ usedVideo = false; }
+      }, { once: true });
+      // if video errors (file missing or codec issue), fallback to CSS explosion
+      vid.addEventListener('error', ()=>{
+        try{ cleanup(); }catch(_){ }
+        // fallback animation
+        const ex = document.createElement('div'); ex.className = 'explosion'; sqEl.appendChild(ex);
+        requestAnimationFrame(()=> ex.classList.add('play'));
+        setTimeout(()=>{ try{ ex.remove(); }catch(_){ if(ex && ex.parentNode) ex.parentNode.removeChild(ex); } }, 700);
+      }, { once: true });
+      // If video ends, remove it
+      vid.addEventListener('ended', ()=>{ try{ cleanup(); }catch(_){ } }, { once: true });
+      // start loading — if canplay won't fire within a short time, fallback to CSS
+      vid.load();
+      // fallback timeout: if video hasn't started in 180ms, show CSS explosion instead
+      setTimeout(()=>{
+        if(!usedVideo){
+          try{ vid.pause(); if(vid && vid.parentNode) vid.parentNode.removeChild(vid); }catch(_){ }
+          const ex = document.createElement('div'); ex.className = 'explosion'; sqEl.appendChild(ex);
+          requestAnimationFrame(()=> ex.classList.add('play'));
+          setTimeout(()=>{ try{ ex.remove(); }catch(_){ if(ex && ex.parentNode) ex.parentNode.removeChild(ex); } }, 700);
+        }
+      }, 180);
     }
 
     // target highlighting helpers

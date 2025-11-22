@@ -154,6 +154,37 @@ a:hover{text-decoration:underline}
 }
 .btn-cancel:hover{ background: #fff5f5; }
 
+/* explosion animation used when a mine detonates */
+.explosion{
+  position:absolute;
+  left:50%; top:50%; transform:translate(-50%,-50%) scale(0.6);
+  width:64%; height:64%; border-radius:50%; pointer-events:none; z-index:6;
+  background: radial-gradient(circle at 30% 30%, rgba(255,255,200,0.98) 0%, rgba(255,160,60,0.95) 40%, rgba(220,40,40,0.95) 60%, rgba(120,10,10,0.85) 100%);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.35), inset 0 6px 18px rgba(255,255,255,0.08);
+  opacity: 1; transform-origin:50% 50%;
+  transform: translate(-50%,-50%) scale(0.2);
+}
+.explosion.play{ animation: explode 520ms ease-out forwards; }
+@keyframes explode{
+  0%{ transform: translate(-50%,-50%) scale(0.2); opacity:1; filter: blur(0px); }
+  60%{ transform: translate(-50%,-50%) scale(1.15); opacity:0.95; filter: blur(1px); }
+  100%{ transform: translate(-50%,-50%) scale(1.6); opacity:0; filter: blur(6px); }
+}
+
+/* small debris puffs for a subtle effect */
+.explosion::after{
+  content:''; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+  width:120%; height:120%; border-radius:50%; background: radial-gradient(circle, rgba(255,200,100,0.6) 0%, rgba(255,200,100,0.0) 40%);
+  opacity:0; animation: debris 520ms ease-out forwards;
+}
+@keyframes debris{ 0%{ opacity:0.9; transform:translate(-50%,-50%) scale(0.8); } 100%{ opacity:0; transform:translate(-50%,-50%) scale(1.8); } }
+
+/* video-based explosion: used when a .mov/mp4 file is provided in /assets/media/ */
+.explosion-video{
+  position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); z-index:7; pointer-events:none;
+  width:160%; height:auto; max-width:220px; max-height:220px; display:block; object-fit:contain;
+}
+
 /* floating small piece icons */
 .floating-piece{position:absolute;opacity:0.06;width:160px;height:160px;pointer-events:none;transform:translate(-10%,-10%);}
 

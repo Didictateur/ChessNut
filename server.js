@@ -388,12 +388,8 @@ io.on('connection', (socket) => {
     room.hands = room.hands || {};
     // ensure deck exists for legacy rooms
     if(!room.deck) room.deck = buildDefaultDeck();
-    // if this is the first player joining the room, give them the 'agrandir_plateau' card
-    if(!existing && room.players.length === 1){
-      // single unique exemplar
-      room.hands[assignedId] = room.hands[assignedId] || [];
-      room.hands[assignedId].push({ id: 'card_agrandir_1', cardId: 'agrandir_plateau', title: 'Agrandir le plateau', description: 'Rajoute une rangée dans toutes les directions' });
-    }
+    // Note: starter card removed. Previously the first joining player received an 'Agrandir le plateau' starter card here.
+    // The starter card was removed to avoid duplicate/unused cards in gameplay.
     socket.join(roomId);
     socket.data.roomId = roomId;
     socket.data.playerId = assignedId;
@@ -681,7 +677,7 @@ io.on('connection', (socket) => {
 
     // Implement specific card effects here
     try{
-  if(cardId === 'agrandir_plateau' || cardId === 'expand_board'){
+  if(cardId === 'agrandir_plateau' || cardId === 'expand_board' || (typeof cardId === 'string' && cardId.indexOf('agrandir') !== -1)){
         // Expand the board by adding one file/column on the left and right and one rank on top and bottom.
         const board = room.boardState;
         if(board && board.width && board.height){

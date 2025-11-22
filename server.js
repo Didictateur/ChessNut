@@ -100,7 +100,7 @@ function buildDefaultDeck(){
   const cards = [
     // ['tronquer le plateau','Tronque au maximum le plateau sans supprimer de pièce'],
     ['rebondir sur les bords','Les déplacements en diagonales de la pièce sélectionnée peuvent rebondir une fois sur les bords'],
-    ['agrandir le plateau','Rajoute une rangée dans toutes les directions'],
+    // ['agrandir le plateau','Rajoute une rangée dans toutes les directions'],
     ['adoubement','La pièce sélectionnée peut maintenant faire les déplacements du cavalier en plus'],
     ['folie','La pièce sélectionnée peut maintenant faire les déplacements du fou en plus'],
     ['fortification','La pièce sélectionnée peut maintenant faire les déplacements de la tour en plus'],

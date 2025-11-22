@@ -107,7 +107,7 @@ function buildDefaultDeck(){
     ['jouer deux fois','Le joueur peut déplacer deux pièces'],
     // ['annulation d une carte','Annule l effet d une carte qui est jouée par l adversaire'],
     ['placement de mines','Le joueur place une mine sur une case vide sans la révéler au joueur adverse. Une pièce qui se pose dessus explose et est capturée par le joueur ayant placé la mine'],
-    // ['vole d une pièce','Désigne une pièce non roi qui change de camp'],
+    ['vole d une pièce','Désigne une pièce non roi qui change de camp'],
     // ['promotion','Un pion au choix est promu reine'],
     // ['vole d une carte','Vole une carte aléatoirement au joueur adverse'],
     // ['resurection','Choisie une pièce capturée pour la ressuciter dans son camp'],
@@ -996,7 +996,10 @@ io.on('connection', (socket) => {
       console.error('card removal error', e);
     }
 
-    // Implement specific card effects here
+  // Implement specific card effects here
+  // Convention: For cards that require a target, if the target is invalid the card is consumed by default
+  // (player loses the card). If you want a different behavior for a specific card, explicitly restore
+  // the removed card to the player's hand in that branch. This keeps UX consistent across cards.
     try{
   if(cardId === 'agrandir_plateau' || cardId === 'expand_board' || (typeof cardId === 'string' && cardId.indexOf('agrandir') !== -1)){
         // Expand the board by adding one file/column on the left and right and one rank on top and bottom.
@@ -1198,6 +1201,38 @@ io.on('connection', (socket) => {
             try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect }); }catch(_){ }
             played.payload = Object.assign({}, payload, { applied: 'double_move', moves: effect.remainingMoves });
           }catch(e){ console.error('double_move effect error', e); }
+        }
+        // vol de pièce: transfer ownership of a targeted enemy piece to the playing player
+        else if((typeof cardId === 'string' && (cardId.indexOf('vol') !== -1 || cardId.indexOf('vole') !== -1 || cardId.indexOf('steal') !== -1))){
+          try{
+            const board = room.boardState;
+            let target = payload && payload.targetSquare;
+            if(!target){ try{ target = socket.data && socket.data.lastSelectedSquare; }catch(e){ target = null; } }
+            const roomPlayer = room.players.find(p => p.id === senderId);
+            const playerColorShort = (roomPlayer && roomPlayer.color && roomPlayer.color[0]) || null;
+            const targetPiece = (board && board.pieces || []).find(p => p.square === target);
+            // validate target exists and belongs to the opponent and is not a king
+            if(!board || !target || !targetPiece || targetPiece.color === playerColorShort || (targetPiece.type && String(targetPiece.type).toLowerCase() === 'k')){
+              // Invalid target: by convention the card is consumed and not restored. Record failure in payload
+              played.payload = Object.assign({}, payload, { applied: 'steal_failed', attemptedTo: target });
+              // Notify only the owner that the card was used but the steal did not happen
+              try{ const owner = (room.players || []).find(p => p.id === senderId); if(owner && owner.socketId) io.to(owner.socketId).emit('card:effect:applied', { roomId: room.id, effect: { id: played.id, type: 'steal_failed', playerId: senderId, square: target, ts: Date.now() } }); }catch(_){ }
+              // continue without creating a steal effect
+            } else {
+            // perform the theft: change piece color to the player's color
+            const oldColor = targetPiece.color;
+            targetPiece.color = playerColorShort;
+
+            // record a steal effect so clients can track it if needed
+            room.activeCardEffects = room.activeCardEffects || [];
+            const originalOwner = (room.players || []).find(p => (p.color && p.color[0]) === oldColor);
+            const effect = { id: played.id, type: 'steal', pieceId: targetPiece.id, pieceSquare: target, fromColor: oldColor, toPlayerId: senderId, originalOwnerId: originalOwner && originalOwner.id, playerId: senderId, ts: Date.now() };
+            room.activeCardEffects.push(effect);
+            try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect }); }catch(_){ }
+
+            played.payload = Object.assign({}, payload, { applied: 'steal', appliedTo: target, fromColor: oldColor });
+            }
+          }catch(e){ console.error('steal effect error', e); }
         }
       // rebondir: grant a one-time bounce ability to a specific piece (targetSquare required in payload)
       else if(cardId === 'rebondir_sur_les_bords' || cardId === 'rebondir' || (typeof cardId === 'string' && cardId.indexOf('rebondir') !== -1)){

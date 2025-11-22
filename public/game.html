@@ -77,6 +77,8 @@
       if(id.indexOf('adoub') !== -1) return 'owned';
       if(id.indexOf('folie') !== -1 || id.indexOf('fou') !== -1) return 'owned';
       if(id.indexOf('fortif') !== -1 || id.indexOf('fortification') !== -1) return 'owned';
+      // steal/vol card targets an enemy piece
+      if(id.indexOf('vol') !== -1 || id.indexOf('vole') !== -1 || id.indexOf('steal') !== -1) return 'enemy';
       return null;
     }
 
@@ -518,6 +520,9 @@
         } else if(type === 'owned'){
           const occ = (currentBoardState.pieces||[]).find(p=>p.square===sq);
           if(occ && occ.color === myShort) sqEl.classList.add('targetable');
+        } else if(type === 'enemy'){
+          const occ = (currentBoardState.pieces||[]).find(p=>p.square===sq);
+          if(occ && occ.color && occ.color !== myShort) sqEl.classList.add('targetable');
         }
       });
       // add a small note near hands

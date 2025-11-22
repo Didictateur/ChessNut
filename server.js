@@ -27,7 +27,8 @@ function sendRoomUpdate(room){
     hostId: room.hostId,
     size: (room.boardState && room.boardState.width) || room.size,
     cards: Object.keys(room.cards || {}),
-    deckCount: (room.deck && room.deck.length) || 0
+    deckCount: (room.deck && room.deck.length) || 0,
+    discardCount: (room.discard && room.discard.length) || 0
   };
 
   const handCounts = {};
@@ -571,9 +572,31 @@ io.on('connection', (socket) => {
   socket.on('card:play', ({ roomId, playerId, cardId, payload }, cb) => {
     const room = rooms.get(roomId);
     if(!room) return cb && cb({ error: 'room not found' });
+    // enforce sender identity from socket (don't trust client-supplied playerId)
+    const senderId = socket.data.playerId;
+    if(!senderId) return cb && cb({ error: 'not joined' });
     // store played card and apply card effects when applicable
-    const played = { id: uuidv4().slice(0,8), playerId, cardId, payload, ts: Date.now() };
+    const played = { id: uuidv4().slice(0,8), playerId: senderId, cardId, payload, ts: Date.now() };
     room.playedCards = room.playedCards || [];
+
+    // remove the played card from the player's hand and move it to discard
+    try{
+      room.hands = room.hands || {};
+      const hand = room.hands[senderId] || [];
+      // find by unique id or by cardId (first match)
+      const idx = hand.findIndex(c => (c.id && c.id === (payload && payload.id)) || (c.cardId && c.cardId === cardId) || (c.id && c.id === cardId));
+      if(idx === -1){
+        return cb && cb({ error: 'you do not have that card' });
+      }
+      const removed = hand.splice(idx,1)[0];
+      room.hands[senderId] = hand;
+      room.discard = room.discard || [];
+      room.discard.push(removed);
+      // attach the removed card object to the played record for informational broadcast
+      played.card = removed;
+    }catch(e){
+      console.error('card removal error', e);
+    }
 
     // Implement specific card effects here
     try{
@@ -618,11 +641,11 @@ io.on('connection', (socket) => {
       console.error('card:play effect error', e);
     }
 
-    room.playedCards.push(played);
-    // emit card played to entire room (informational)
-    io.to(roomId).emit('card:played', played);
-    // send personalized room updates
-    sendRoomUpdate(room);
+  room.playedCards.push(played);
+  // emit card played to entire room (informational)
+  io.to(roomId).emit('card:played', played);
+  // send personalized room updates (will include updated hands and discardCount)
+  sendRoomUpdate(room);
 
     cb && cb({ ok: true, played });
   });

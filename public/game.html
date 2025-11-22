@@ -22,10 +22,7 @@
         </div>
         <pre id="log" style="margin-top:8px;height:160px;overflow:auto">logs...</pre>
       </section>
-      <section class="card" id="handsSection" style="margin-top:12px">
-        <div><strong>Cartes du joueur</strong></div>
-        <div id="hands" style="margin-top:8px;display:flex;flex-direction:column;gap:8px"></div>
-      </section>
+      <div id="hands" style="margin-top:8px;display:flex;flex-direction:column;gap:8px"></div>
     </aside>
   </div>
 
@@ -119,6 +116,31 @@
           // show a small inline notification in the hands section
           showCardDrawnNotification(data);
         }catch(e){ console.warn('card:drawn handler error', e); }
+      });
+      // when a card is played by any player, ensure the UI removes it from the owner's hand
+      socket.on('card:played', (data) => {
+        try{
+          log('recv card:played', data);
+          // data.played or data depending on server shape
+          const played = data && data.played ? data.played : data;
+          const cardObj = played && (played.card || played.cardObj || null);
+          const owner = played && played.playerId;
+          // if we have the card object and it's our card, remove its DOM element
+          if(owner === myPlayerId){
+            // find the card element by uuid (data-card-uuid) or by cardId
+            const row = document.querySelector('.cards-row');
+            if(row){
+              const elems = Array.from(row.querySelectorAll('.pokemon-card'));
+              elems.forEach(el => {
+                const uuid = el.dataset.cardUuid || '';
+                const cid = el.dataset.cardId || '';
+                if((cardObj && cardObj.id && uuid && uuid === cardObj.id) || (cardObj && cardObj.cardId && cid && cid === cardObj.cardId)){
+                  el.remove();
+                }
+              });
+            }
+          }
+        }catch(e){ console.warn('card:played handler error', e); }
       });
       // selection events (include moves) broadcasted by server
       socket.on('game:select', (data) => {
@@ -445,21 +467,9 @@
       const header = document.createElement('div');
       header.className = 'pokemon-hand-header';
       const title = document.createElement('div');
-      title.textContent = 'Votre main';
+      title.textContent = 'Vos cartes';
       title.className = 'pokemon-hand-title';
       header.appendChild(title);
-
-      // show public counts for other players (small badges)
-      const countsWrap = document.createElement('div');
-      countsWrap.className = 'pokemon-hand-counts';
-      Object.entries(handCounts||{}).forEach(([pid, cnt])=>{
-        if(pid === myPlayerId) return;
-        const b = document.createElement('div');
-        b.className = 'opponent-count';
-        b.textContent = `${pid}: ${cnt}`;
-        countsWrap.appendChild(b);
-      });
-      header.appendChild(countsWrap);
       wrap.appendChild(header);
 
       const row = document.createElement('div');

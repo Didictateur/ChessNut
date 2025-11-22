@@ -49,7 +49,12 @@ a:hover{text-decoration:underline}
 
 /* marker shown on target squares for legal moves */
 .square{position:relative}
-/* move markers removed */
+.square .move-marker{
+  position:absolute;
+  left:50%;top:50%;transform:translate(-50%,-50%);
+  width:18%;height:18%;border-radius:50%;pointer-events:none;background:rgba(96,165,250,0.95);
+  box-shadow:0 2px 6px rgba(2,6,23,0.6);z-index:3;
+}
 
 /* highlighted/selected square when a player selects a piece */
 .square.selected{
@@ -58,6 +63,14 @@ a:hover{text-decoration:underline}
   z-index: 4;
 }
 .square.selected .piece{transform: scale(1.06); transition: transform 140ms ease}
+
+/* hide the visual selection outline for a square while keeping the piece visible */
+.square.hide-selection.selected,
+.square.hide-selection.selected-remote{
+  outline: none !important;
+  box-shadow: none !important;
+}
+.square.hide-selection{transition:background 120ms ease}
 
 /* remote selection (other player's selection) */
 .square.selected-remote{

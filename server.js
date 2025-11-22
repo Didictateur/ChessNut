@@ -21,8 +21,123 @@ const rooms = new Map();
 // `boardState` is the canonical JSON representation of the board for this server.
 // Example boardState: { width:8, height:8, turn:'w', version:1, pieces: [{ square:'e2', type:'P', color:'w', id:'w_p1' }, ... ] }
 function computeLegalMoves(room, square){
-  // TODO: implement custom rules engine here. For now return empty list.
-  return [];
+  // Basic pseudo-legal move generator for standard chess-like pieces.
+  // - Does not perform check detection (moves that leave king in check are allowed).
+  // - Does not implement castling or en-passant.
+  // - Returns moves as array of { from, to }.
+  if(!room || !room.boardState || !square) return [];
+  const state = room.boardState;
+  const width = state.width || 8;
+  const height = state.height || 8;
+
+  // helpers
+  function squareToCoord(sq){
+    if(!/^[a-z][1-9][0-9]*$/i.test(sq)) return null;
+    const file = sq.charCodeAt(0) - 'a'.charCodeAt(0);
+    const rank = parseInt(sq.slice(1),10) - 1; // 0-indexed
+    return { x: file, y: rank };
+  }
+  function coordToSquare(x,y){
+    if(x < 0 || y < 0 || x >= width || y >= height) return null;
+    return String.fromCharCode('a'.charCodeAt(0) + x) + (y+1);
+  }
+  function getPieceAt(sq){
+    if(!sq) return null;
+    return (state.pieces || []).find(p => p.square === sq) || null;
+  }
+  function isInside(x,y){ return x >= 0 && y >= 0 && x < width && y < height; }
+
+  const piece = getPieceAt(square);
+  if(!piece) return [];
+  const color = piece.color; // 'w' or 'b'
+  const fromCoord = squareToCoord(square);
+  if(!fromCoord) return [];
+  const moves = [];
+
+  // add move helper
+  function pushIfEmptyOrCapture(tx,ty){
+    if(!isInside(tx,ty)) return false;
+    const toSq = coordToSquare(tx,ty);
+    const occupant = getPieceAt(toSq);
+    if(!occupant){
+      moves.push({ from: square, to: toSq });
+      return true; // can continue sliding
+    }
+    // capture allowed if different color
+    if(occupant.color !== color){
+      moves.push({ from: square, to: toSq });
+    }
+    return false; // blocked
+  }
+
+  const x = fromCoord.x, y = fromCoord.y;
+
+  const type = (piece.type || '').toUpperCase();
+  if(type === 'P'){
+    // pawn
+    const forward = (color === 'w') ? 1 : -1;
+    const startRank = (color === 'w') ? 1 : (height - 2);
+    const oneY = y + forward;
+    const oneSq = coordToSquare(x, oneY);
+    if(isInside(x, oneY) && !getPieceAt(oneSq)){
+      moves.push({ from: square, to: oneSq });
+      // double push from starting rank
+      const twoY = y + forward*2;
+      const twoSq = coordToSquare(x, twoY);
+      if(y === startRank && isInside(x, twoY) && !getPieceAt(twoSq)){
+        moves.push({ from: square, to: twoSq });
+      }
+    }
+    // captures
+    [[x-1, y+forward],[x+1, y+forward]].forEach(([tx,ty])=>{
+      if(!isInside(tx,ty)) return;
+      const tsq = coordToSquare(tx,ty);
+      const occ = getPieceAt(tsq);
+      if(occ && occ.color !== color) moves.push({ from: square, to: tsq });
+    });
+    return moves;
+  }
+
+  if(type === 'N'){
+    const deltas = [[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]];
+    deltas.forEach(([dx,dy])=>{
+      const tx = x + dx, ty = y + dy;
+      if(!isInside(tx,ty)) return;
+      const tsq = coordToSquare(tx,ty);
+      const occ = getPieceAt(tsq);
+      if(!occ || occ.color !== color) moves.push({ from: square, to: tsq });
+    });
+    return moves;
+  }
+
+  if(type === 'B' || type === 'Q' || type === 'R'){
+    const directions = [];
+    if(type === 'B' || type === 'Q') directions.push([1,1],[1,-1],[-1,1],[-1,-1]);
+    if(type === 'R' || type === 'Q') directions.push([1,0],[-1,0],[0,1],[0,-1]);
+    directions.forEach(([dx,dy])=>{
+      let tx = x + dx, ty = y + dy;
+      while(isInside(tx,ty)){
+        const cont = pushIfEmptyOrCapture(tx,ty);
+        if(!cont) break;
+        tx += dx; ty += dy;
+      }
+    });
+    return moves;
+  }
+
+  if(type === 'K'){
+    for(let dx=-1; dx<=1; dx++) for(let dy=-1; dy<=1; dy++){
+      if(dx === 0 && dy === 0) continue;
+      const tx = x + dx, ty = y + dy;
+      if(!isInside(tx,ty)) continue;
+      const tsq = coordToSquare(tx,ty);
+      const occ = getPieceAt(tsq);
+      if(!occ || occ.color !== color) moves.push({ from: square, to: tsq });
+    }
+    return moves;
+  }
+
+  return moves;
 }
 
 function startingBoardState8(){
@@ -201,14 +316,34 @@ io.on('connection', (socket) => {
 
   // delegates to `computeLegalMoves` which is a stub you should implement.
   // legalMoves API removed (movement UI disabled)
+  // Re-add legalMoves API to compute and return pseudo-legal moves for a square.
+  socket.on('game:legalMoves', ({ roomId, square }, cb) => {
+    const room = rooms.get(roomId);
+    if (!room) return cb && cb({ error: 'room not found' });
+    try{
+      const moves = computeLegalMoves(room, square) || [];
+      return cb && cb({ ok: true, moves });
+    }catch(e){
+      console.error('game:legalMoves error', e);
+      return cb && cb({ error: 'invalid square', moves: [] });
+    }
+  });
 
   // propagate selection made by one client to the other clients in the same room
   socket.on('game:select', ({ roomId, square }, cb) => {
     const room = rooms.get(roomId);
     if(!room) return cb && cb({ error: 'room not found' });
     const playerId = socket.data.playerId || null;
-    // broadcast to other sockets in the room (exclude sender)
-    socket.to(roomId).emit('game:select', { playerId, square });
+    // compute legal moves for the selected square (allow capturing king)
+    let moves = [];
+    try{
+      if(square) moves = computeLegalMoves(room, square) || [];
+    }catch(e){
+      console.error('computeLegalMoves error', e);
+      moves = [];
+    }
+    // broadcast selection + moves to ALL clients in the room (including sender)
+    io.to(roomId).emit('game:select', { playerId, square, moves });
     cb && cb({ ok: true });
   });
 

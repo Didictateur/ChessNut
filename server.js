@@ -120,7 +120,7 @@ function buildDefaultDeck(){
     // ['carte sans effet',"N'a aucun effet"],
     // ['défausse','Le joueur adverse défausse une carte de son choix'],
     // ['immunité à la capture','Désigne une pièce qui ne pourra pas être capturée au prochain tour'],
-    // ['kamikaz','Détruit une de ses pièces, détruisant toutes les pièces adjacentes'],
+    ['kamikaz','Détruit une de ses pièces, détruisant toutes les pièces adjacentes'],
     // ['retour à la case départ','Désigne une pièce qui retourne à sa position initiale'],
     // ['glissade','La pièce désignée ne peut plus s arrêter si elle se déplace en diagonale ou en ligne droite. Soit elle percute une pièce et la capture, soit elle tombe du plateau et est capturée'],
     // ['invisible','Une des pièces devient invisible pour l adversaire'],
@@ -1175,6 +1175,70 @@ io.on('connection', (socket) => {
               played.payload = Object.assign({}, payload, { applied: 'promotion', appliedTo: target, fromType: oldType, toType: targetPiece.type });
             }
           }catch(e){ console.error('promotion effect error', e); }
+        }
+        // kamikaz: destroy one of your pieces and all adjacent pieces
+        else if(cardId === 'kamikaz' || (typeof cardId === 'string' && cardId.indexOf('kamikaz') !== -1)){
+          try{
+            const board = room.boardState;
+            // determine target square from payload or last selected
+            let target = payload && payload.targetSquare;
+            if(!target){ try{ target = socket.data && socket.data.lastSelectedSquare; }catch(e){ target = null; } }
+            const roomPlayer = room.players.find(p => p.id === senderId);
+            const playerColorShort = (roomPlayer && roomPlayer.color && roomPlayer.color[0]) || null;
+            const targetPiece = (board && board.pieces || []).find(p => p.square === target);
+            // validate target exists and belongs to the player
+            if(!board || !target || !targetPiece || targetPiece.color !== playerColorShort){
+              // restore removed card to hand and abort
+              try{
+                room.hands = room.hands || {};
+                room.hands[senderId] = room.hands[senderId] || [];
+                if(removed) room.hands[senderId].push(removed);
+                room.discard = room.discard || [];
+                for(let i = room.discard.length - 1; i >= 0; i--){ if(room.discard[i] && room.discard[i].id === (removed && removed.id)){ room.discard.splice(i,1); break; } }
+              }catch(e){ console.error('restore removed card error', e); }
+              return cb && cb({ error: 'no valid target' });
+            }
+            // compute affected squares: target + neighbors
+            function neighbors(sq){
+              if(!sq) return [];
+              const m = String(sq).toLowerCase().match(/^([a-z])([0-9]+)$/i);
+              if(!m) return [];
+              const file = m[1].charCodeAt(0) - 'a'.charCodeAt(0);
+              const rank = parseInt(m[2],10) - 1;
+              const w = (board.width || 8), h = (board.height || 8);
+              const out = [];
+              for(let dx=-1; dx<=1; dx++) for(let dy=-1; dy<=1; dy++){
+                const nx = file + dx, ny = rank + dy;
+                if(nx<0||ny<0||nx>=w||ny>=h) continue;
+                out.push(String.fromCharCode('a'.charCodeAt(0)+nx) + (ny+1));
+              }
+              return out;
+            }
+            const affected = neighbors(target);
+            const removedPieces = [];
+            // remove pieces on affected squares and record them as captured by sender
+            for(let i = (board.pieces || []).length - 1; i >= 0; i--){
+              const p = board.pieces[i];
+              if(p && affected.indexOf(p.square) !== -1){
+                const cp = board.pieces.splice(i,1)[0];
+                try{
+                  room.captured = room.captured || [];
+                  const originalOwner = (room.players || []).find(pl => (pl.color && pl.color[0]) === cp.color);
+                  room.captured.push({ id: uuidv4().slice(0,8), piece: cp, originalOwnerId: (originalOwner && originalOwner.id) || null, capturedBy: senderId, ts: Date.now() });
+                }catch(_){ }
+                removedPieces.push({ id: cp.id, square: cp.square, type: cp.type, color: cp.color });
+              }
+            }
+            // bump board version and record effect
+            board.version = (board.version || 0) + 1;
+            const effect = { id: played.id, type: 'kamikaz', playerId: senderId, targetSquare: target, affectedSquares: affected, removed: removedPieces, ts: Date.now() };
+            room.activeCardEffects = room.activeCardEffects || [];
+            room.activeCardEffects.push(effect);
+            try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect }); }catch(_){ }
+            // reuse the mine detonation animation on clients for kamikaz: show the same explosion visual
+            try{ io.to(room.id).emit('mine:detonated', { roomId: room.id, square: target }); }catch(_){ }
+            played.payload = Object.assign({}, payload, { applied: 'kamikaz', appliedTo: target, affected: affected, removedCount: removedPieces.length });
+          }catch(e){ console.error('kamikaz effect error', e); }
         }
         // brouillard de guerre: target a player so their board is fogged (they only see adjacent squares)
         else if(cardId === 'brouillard_de_guerre' || (typeof cardId === 'string' && cardId.indexOf('brouillard') !== -1)){

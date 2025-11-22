@@ -49,6 +49,11 @@ function sendRoomUpdate(room){
         payload.minesOwn = mines;
       }catch(_){ payload.minesOwn = []; }
     }catch(e){ payload.visibleSquares = []; }
+    // attach captured pieces that belong to this recipient so they may choose one for resurrection
+    try{
+      const shortColor = (p.color && p.color[0]) || null;
+      payload.capturedOwn = (room.captured || []).filter(c => c && c.piece && c.piece.color === shortColor).map(c => ({ id: c.id, type: c.piece.type, originalId: c.piece.id, originalSquare: c.piece.square, capturedBy: c.capturedBy, ts: c.ts }));
+    }catch(_){ payload.capturedOwn = []; }
     if(p.socketId){
       io.to(p.socketId).emit('room:update', payload);
     }
@@ -110,9 +115,8 @@ function buildDefaultDeck(){
     ['vole d une pièce','Désigne une pièce non roi qui change de camp'],
     ['promotion','Un pion au choix est promu'],
     ['vole d une carte','Vole une carte aléatoirement au joueur adverse'],
-    // ['vole d une carte','Vole une carte aléatoirement au joueur adverse'],
-    // ['resurection','Choisie une pièce capturée pour la ressuciter dans son camp'],
-    // ['carte sans effet','N a aucun effet'],
+    ['resurection','Ressucite la dernière pièce perdue'],
+    // ['carte sans effet',"N'a aucun effet"],
     // ['défausse','Le joueur adverse défausse une carte de son choix'],
     // ['immunité à la capture','Désigne une pièce qui ne pourra pas être capturée au prochain tour'],
     // ['kamikaz','Détruit une de ses pièces, détruisant toutes les pièces adjacentes'],
@@ -138,7 +142,7 @@ function buildDefaultDeck(){
     // ['vacances','Choisie une pièce qui sort du plateau pendant deux tours. Ce après quoi elle tente de revenir: si la case est occupée, alors la pièce vacancière est capturée par la pièce occupant la case.'],
     // ['mélange','La position de toutes les pièces sont échangées aléatoirement.'],
     // ['la parrure','Une reine est dégradée en pion'],
-    // ['tricherie','Regarde les trois prochaines cartes de la pioche.'],
+    // ['tricherie','Choisis une carte de la pioche parmis trois'],
     // ['tout ou rien','Une pièce choisie ne peut maintenant se déplacer que si elle capture.'],
     // ['tous les mêmes','Au yeux de l ennemie, toutes les pièces se ressemblent pendant 2 tours.'],
     // ['petit pion','Le joueur choisit un pion. À partir du prochain tour, il est promu en reine dès qu il capture un pièce non pion.'],
@@ -668,8 +672,13 @@ io.on('connection', (socket) => {
       // apply move: remove any piece on target (capture)
       const targetIndex = pieces.findIndex(p => p.square === to);
       if(targetIndex >= 0){
-        // remove captured piece
-        pieces.splice(targetIndex, 1);
+        // remove captured piece and record it for potential resurrection
+        const capturedPiece = pieces.splice(targetIndex, 1)[0];
+        try{
+          room.captured = room.captured || [];
+          const originalOwner = (room.players || []).find(p => (p.color && p.color[0]) === capturedPiece.color);
+          room.captured.push({ id: uuidv4().slice(0,8), piece: capturedPiece, originalOwnerId: (originalOwner && originalOwner.id) || null, capturedBy: senderId, ts: Date.now() });
+        }catch(_){ /* ignore bookkeeping errors */ }
       }
       // move the piece
       moving.square = to;
@@ -702,9 +711,16 @@ io.on('connection', (socket) => {
           const e = room.activeCardEffects[i];
           if(e && e.type === 'mine' && e.square === to){
             // detonate for any piece that lands on the mine (owner included)
-            // remove the moving piece from the board
+            // remove the moving piece from the board and record it as captured by the mine owner
             const rmIdx = pieces.findIndex(p => p.id === moving.id);
-            if(rmIdx >= 0){ pieces.splice(rmIdx, 1); }
+            if(rmIdx >= 0){
+              const capturedPiece = pieces.splice(rmIdx, 1)[0];
+              try{
+                room.captured = room.captured || [];
+                const originalOwner = (room.players || []).find(p => (p.color && p.color[0]) === capturedPiece.color);
+                room.captured.push({ id: uuidv4().slice(0,8), piece: capturedPiece, originalOwnerId: (originalOwner && originalOwner.id) || null, capturedBy: e.playerId, ts: Date.now() });
+              }catch(_){ }
+            }
             // consume the mine
             try{ room.activeCardEffects.splice(i,1); }catch(_){ }
             // broadcast detonation to the room (informational)
@@ -1301,7 +1317,65 @@ io.on('connection', (socket) => {
               }
             }
           }catch(e){ console.error('steal-card effect error', e); }
-        }
+          }
+          // resurrection: bring back one of your captured pieces and place it on an empty square
+          else if((typeof cardId === 'string' && cardId.indexOf('resur') !== -1) || (typeof cardId === 'string' && cardId.indexOf('ressur') !== -1)){
+            try{
+              const roomPlayer = room.players.find(p => p.id === senderId);
+              const playerColorShort = (roomPlayer && roomPlayer.color && roomPlayer.color[0]) || null;
+              // list captured pieces that originally belonged to this player
+              const available = (room.captured || []).filter(c => c && c.piece && c.piece.color === playerColorShort);
+              if(!available || available.length === 0){
+                played.payload = Object.assign({}, payload, { applied: 'resurrection_failed_no_captured' });
+                try{ const owner = (room.players || []).find(p => p.id === senderId); if(owner && owner.socketId) io.to(owner.socketId).emit('card:effect:applied', { roomId: room.id, effect: { id: played.id, type: 'resurrection_failed_no_captured', playerId: senderId, ts: Date.now() } }); }catch(_){ }
+              } else {
+                // allow client to specify which captured entry to resurrect
+                const selectedId = payload && (payload.captureId || payload.capturedId || payload.targetCapturedId || payload.selectedCapturedId);
+                let capturedEntry = null;
+                if(selectedId){
+                  const idx = (room.captured || []).findIndex(c => c && c.id === selectedId && c.piece && c.piece.color === playerColorShort);
+                  if(idx !== -1) capturedEntry = room.captured[idx];
+                }
+                if(!capturedEntry){
+                  // fallback: pick the most recently captured of the player's pieces
+                  capturedEntry = available[available.length - 1];
+                }
+                if(!capturedEntry){
+                  played.payload = Object.assign({}, payload, { applied: 'resurrection_failed_no_valid' });
+                  try{ const owner = (room.players || []).find(p => p.id === senderId); if(owner && owner.socketId) io.to(owner.socketId).emit('card:effect:applied', { roomId: room.id, effect: { id: played.id, type: 'resurrection_failed_no_valid', playerId: senderId, ts: Date.now() } }); }catch(_){ }
+                } else {
+                  // placement square
+                  let target = payload && payload.targetSquare;
+                  if(!target){ try{ target = socket.data && socket.data.lastSelectedSquare; }catch(e){ target = null; } }
+                  const board = room.boardState;
+                  const occupied = (board && board.pieces || []).find(p => p.square === target);
+                  if(!board || !target || occupied){
+                    // invalid placement: consume card but report failure to owner
+                    played.payload = Object.assign({}, payload, { applied: 'resurrection_failed_bad_square', attemptedTo: target });
+                    try{ const owner = (room.players || []).find(p => p.id === senderId); if(owner && owner.socketId) io.to(owner.socketId).emit('card:effect:applied', { roomId: room.id, effect: { id: played.id, type: 'resurrection_failed_bad_square', playerId: senderId, square: target, ts: Date.now() } }); }catch(_){ }
+                  } else {
+                    // remove captured entry from the capture log
+                    for(let i = room.captured.length - 1; i >= 0; i--){ if(room.captured[i] && room.captured[i].id === capturedEntry.id){ room.captured.splice(i,1); break; } }
+                    // create a new piece object and place it
+                    const orig = capturedEntry.piece || {};
+                    const newPiece = Object.assign({}, orig);
+                    newPiece.id = ((playerColorShort === 'w') ? 'w_' : 'b_') + (newPiece.type || 'P') + '_' + uuidv4().slice(0,6);
+                    newPiece.square = target;
+                    newPiece.color = playerColorShort;
+                    if(newPiece.promoted) newPiece.promoted = true;
+                    board.pieces = board.pieces || [];
+                    board.pieces.push(newPiece);
+                    // record effect and broadcast
+                    const effect = { id: played.id, type: 'resurrection', pieceId: newPiece.id, pieceType: newPiece.type, placedAt: target, playerId: senderId, ts: Date.now() };
+                    room.activeCardEffects = room.activeCardEffects || [];
+                    room.activeCardEffects.push(effect);
+                    try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect }); }catch(_){ }
+                    played.payload = Object.assign({}, payload, { applied: 'resurrection', appliedTo: target, resurrectedId: newPiece.id, resurrectedType: newPiece.type });
+                  }
+                }
+              }
+            }catch(e){ console.error('resurrection effect error', e); }
+          }
       // rebondir: grant a one-time bounce ability to a specific piece (targetSquare required in payload)
       else if(cardId === 'rebondir_sur_les_bords' || cardId === 'rebondir' || (typeof cardId === 'string' && cardId.indexOf('rebondir') !== -1)){
         try{

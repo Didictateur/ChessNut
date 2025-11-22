@@ -42,7 +42,7 @@ Un pion au choix est promu
 ### Vole d'une carte
 Vole une carte aléatoirement au joueur adverse
 ### Resurection
-Choisie une pièce capturée pour la ressuciter dans son camp
+Ressucite la dernière pièce perdue
 ### Carte sans effet
 N'a aucun effet
 ### Défausse
@@ -88,7 +88,7 @@ Si deux pions encadrent parfaitement une pièce adverse, cette dernière change 
 ### Plus on est de fous, plus on rit
 Si le joueur possède deux fous dans la même diagonale, alors toutes les pièces adverses encadrées par ces deux fous sont capturés
 ### Cluster
-Désigne 4 pions formant un rectangle. Tant que ces pions ne bougent pas, aucune pièce ne peut sortir ou rentrer dans ce rectangle.
+Désigne 4 pions formant un rectangle. Tant que ces pions ne bougent pas ou que l'une d'elle est capturée, aucune pièce ne peut sortir ou rentrer dans ce rectangle.
 ### Vacances
 Choisie une pièce qui sort du plateau pendant deux tours. Ce après quoi elle tente de revenir: si la case est occupée, alors la pièce vacancière est capturée par la pièce occupant la case.
 ### Mélange

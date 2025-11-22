@@ -124,7 +124,21 @@ function drawCardForPlayer(room, playerId){
     return null;
   }
   if(hand.length >= 5) return null; // hand full
-  if(room.deck.length === 0) return null; // no cards
+  if(room.deck.length === 0){
+    // if deck empty, try to refill from discard and shuffle
+    if(room.discard && room.discard.length > 0){
+      // move all discard into deck
+      room.deck = room.discard.splice(0).concat(room.deck || []);
+      // simple Fisher-Yates shuffle
+      for(let i = room.deck.length - 1; i > 0; i--){
+        const j = Math.floor(Math.random() * (i + 1));
+        const tmp = room.deck[i]; room.deck[i] = room.deck[j]; room.deck[j] = tmp;
+      }
+      // notify players that the deck was reshuffled
+      (room.players || []).forEach(p => { if(p.socketId) io.to(p.socketId).emit('deck:reshuffled', { roomId: room.id, deckCount: room.deck.length }); });
+    }
+  }
+  if(room.deck.length === 0) return null; // no cards even after reshuffle
   // pick random index
   const idx = Math.floor(Math.random() * room.deck.length);
   const card = room.deck.splice(idx,1)[0];

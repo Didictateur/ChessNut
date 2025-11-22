@@ -115,7 +115,8 @@ function buildDefaultDeck(){
     ['vole d une pièce','Désigne une pièce non roi qui change de camp'],
     ['promotion','Un pion au choix est promu'],
     ['vole d une carte','Vole une carte aléatoirement au joueur adverse'],
-    ['resurection','Ressucite la dernière pièce perdue'],
+    ['resurection','Choisie une pièce capturée pour la ressuciter dans son camp'],
+    ['carte sans effet',"N'a aucun effet"],
     // ['carte sans effet',"N'a aucun effet"],
     // ['défausse','Le joueur adverse défausse une carte de son choix'],
     // ['immunité à la capture','Désigne une pièce qui ne pourra pas être capturée au prochain tour'],
@@ -1317,6 +1318,14 @@ io.on('connection', (socket) => {
               }
             }
           }catch(e){ console.error('steal-card effect error', e); }
+          }
+          // carte sans effet: consumed but does nothing
+          else if((typeof cardId === 'string' && (cardId.indexOf('carte_sans_effet') !== -1 || cardId.indexOf('sans_effet') !== -1 || cardId.indexOf('no_effect') !== -1))){
+            try{
+              // no game state change; just inform the owner that the card was consumed with no effect
+              played.payload = Object.assign({}, payload, { applied: 'no_effect' });
+              try{ const owner = (room.players || []).find(p => p.id === senderId); if(owner && owner.socketId) io.to(owner.socketId).emit('card:effect:applied', { roomId: room.id, effect: { id: played.id, type: 'no_effect', playerId: senderId, ts: Date.now() } }); }catch(_){ }
+            }catch(e){ console.error('no_effect card error', e); }
           }
           // resurrection: bring back one of your captured pieces and place it on an empty square
           else if((typeof cardId === 'string' && cardId.indexOf('resur') !== -1) || (typeof cardId === 'string' && cardId.indexOf('ressur') !== -1)){

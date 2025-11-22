@@ -7,6 +7,7 @@
 - selection des cartes
 - avec/sans timer
 - nombre max de carte
+- avec/sans remise des cartes
 
 ## Liste des cartes
 

@@ -49,8 +49,8 @@ function sendRoomUpdate(room){
 // Build a default deck from README list. Each card has a unique id, cardId (slug), title and description.
 function buildDefaultDeck(){
   const cards = [
-    // ['rétrécir le plateau','Tronque au maximum le plateau sans supprimer de pièce'],
-    ['agrandir le plateau','Rajoute une rangée dans toutes les directions'],
+  ['tronquer le plateau','Tronque au maximum le plateau sans supprimer de pièce'],
+  ['agrandir le plateau','Rajoute une rangée dans toutes les directions'],
     // ['rebondir sur les bords','Les déplacements en diagonales de la pièce séléctionées peuvent rebondir une fois sur les bords'],
     // ['adoubement','La pièce sélectionnée peut maintenant faire les déplacements du cavalier en plus'],
     // ['folie','La pièce sélectionnée peut maintenant faire les déplacements du fou en plus'],
@@ -600,7 +600,7 @@ io.on('connection', (socket) => {
 
     // Implement specific card effects here
     try{
-      if(cardId === 'agrandir_plateau' || cardId === 'expand_board'){
+  if(cardId === 'agrandir_plateau' || cardId === 'expand_board'){
         // Expand the board by adding one file/column on the left and right and one rank on top and bottom.
         const board = room.boardState;
         if(board && board.width && board.height){
@@ -635,6 +635,69 @@ io.on('connection', (socket) => {
 
           // record effect details on payload for clients
           played.payload = Object.assign({}, payload, { applied: 'agrandir_plateau', oldWidth: oldW, oldHeight: oldH, newWidth: newW, newHeight: newH });
+        }
+      } else if(cardId === 'tronquer_plateau' || cardId === 'tronquer_le_plateau' || (typeof cardId === 'string' && cardId.indexOf('tronquer') !== -1)){
+        // Shrink the board by trimming empty outer files/ranks as much as possible without removing any piece.
+        const board = room.boardState;
+        if(board && board.width && board.height){
+          const oldW = board.width;
+          const oldH = board.height;
+          let width = oldW;
+          let height = oldH;
+
+          // helper: parse square -> coords (0-indexed)
+          function squareToCoord(sq){
+            if(!sq || typeof sq !== 'string') return null;
+            const file = sq.charCodeAt(0) - 'a'.charCodeAt(0);
+            const rank = parseInt(sq.slice(1),10) - 1;
+            return { x: file, y: rank };
+          }
+          function coordToSquare(x,y){
+            return String.fromCharCode('a'.charCodeAt(0) + x) + (y+1);
+          }
+
+          function colHasPiece(x){
+            return (board.pieces || []).some(p => { const c = squareToCoord(p.square); return c && c.x === x; });
+          }
+          function rowHasPiece(y){
+            return (board.pieces || []).some(p => { const c = squareToCoord(p.square); return c && c.y === y; });
+          }
+
+          // trim left columns that are empty
+          while(width > 1 && !colHasPiece(0)){
+            // shift all pieces left by 1
+            (board.pieces || []).forEach(p => {
+              const c = squareToCoord(p.square);
+              if(!c) return;
+              p.square = coordToSquare(c.x - 1, c.y);
+            });
+            width -= 1;
+          }
+          // trim right columns that are empty
+          while(width > 1 && !colHasPiece(width - 1)){
+            // no shift needed for trimming right
+            width -= 1;
+          }
+          // trim bottom ranks that are empty
+          while(height > 1 && !rowHasPiece(0)){
+            // shift all pieces down by 1 (y-1)
+            (board.pieces || []).forEach(p => {
+              const c = squareToCoord(p.square);
+              if(!c) return;
+              p.square = coordToSquare(c.x, c.y - 1);
+            });
+            height -= 1;
+          }
+          // trim top ranks that are empty
+          while(height > 1 && !rowHasPiece(height - 1)){
+            height -= 1;
+          }
+
+          board.width = width;
+          board.height = height;
+          board.version = (board.version || 0) + 1;
+
+          played.payload = Object.assign({}, payload, { applied: 'tronquer_plateau', oldWidth: oldW, oldHeight: oldH, newWidth: width, newHeight: height });
         }
       }
     }catch(e){

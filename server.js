@@ -99,7 +99,7 @@ function buildDefaultDeck(){
     // ['brouillard de guerre','Les joueur ne peuvent voir que au alentour de leurs pièces pendant 4 tours'],
     // ['changer la pièce à capturer','Le joueur choisie la nouvelle pièce jouant le rôle de roi sans la révéler'],
     // ['trou de ver','Deux cases du plateau deviennent maintenant la même'],
-    // ['jouer deux fois','Le joueur peut déplacer deux pièces'],
+    ['jouer deux fois','Le joueur peut déplacer deux pièces'],
     // ['annulation d une carte','Annule l effet d une carte qui est jouée par l adversaire'],
     // ['placement de mines','Le joueur place une mine sur une case vide sans la révéler au joueur adverse. Une pièce qui se pose dessus explose et est capturée par le joueur ayant placé la mine'],
     // ['vole d une pièce','Désigne une pièce non roi qui change de camp'],
@@ -179,7 +179,12 @@ function drawCardForPlayer(room, playerId){
     }
   }
   if(room.deck.length === 0) return null; // no cards even after reshuffle
-  // pick random index
+  // shuffle deck before drawing (always shuffle to ensure randomness)
+  for(let i = room.deck.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = room.deck[i]; room.deck[i] = room.deck[j]; room.deck[j] = tmp;
+  }
+  // pick random index from the freshly shuffled deck
   const idx = Math.floor(Math.random() * room.deck.length);
   const card = room.deck.splice(idx,1)[0];
   // normalize title capitalization just in case this deck was created earlier with inconsistent casing

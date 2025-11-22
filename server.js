@@ -218,7 +218,8 @@ function computeLegalMoves(room, square){
   const x = fromCoord.x, y = fromCoord.y;
   const type = (piece.type || '').toUpperCase();
   // detect if this specific piece has a permanent adoubement effect (grants knight moves)
-  const hasAdoubement = (room.activeCardEffects || []).some(e => e.type === 'adoubement' && e.pieceSquare === square);
+  // effects may be bound either to the piece's current square or to the piece id (preferred)
+  const hasAdoubement = (room.activeCardEffects || []).some(e => e.type === 'adoubement' && ((e.pieceId && e.pieceId === piece.id) || e.pieceSquare === square));
 
   // helper to add knight (N) deltas when a piece has been adoubé
   function addAdoubementMoves(){
@@ -278,8 +279,8 @@ function computeLegalMoves(room, square){
     if(type === 'B' || type === 'Q') directions.push([1,1],[1,-1],[-1,1],[-1,-1]);
     if(type === 'R' || type === 'Q') directions.push([1,0],[-1,0],[0,1],[0,-1]);
 
-    // detect if this specific piece has an active rebondir effect
-    const hasRebond = (room.activeCardEffects || []).some(e => e.type === 'rebondir' && e.pieceSquare === square);
+  // detect if this specific piece has an active rebondir effect (match by id or square)
+  const hasRebond = (room.activeCardEffects || []).some(e => e.type === 'rebondir' && ((e.pieceId && e.pieceId === piece.id) || e.pieceSquare === square));
 
     directions.forEach(([dx0,dy0])=>{
       if(!hasRebond){
@@ -490,10 +491,23 @@ io.on('connection', (socket) => {
       // move the piece
       moving.square = to;
 
-      // consume any active card effects bound to this piece (they apply to the piece once and are then removed)
+      // consume any active card effects bound to this piece (rebondir is one-time and should be removed)
+      // also update any persistent effects (like adoubement) to track the piece's new square so they remain active
       try{
         room.activeCardEffects = room.activeCardEffects || [];
-        room.activeCardEffects = room.activeCardEffects.filter(e => !(e.type === 'rebondir' && e.pieceSquare === from));
+        // iterate backwards so we can splice safely
+        for(let i = room.activeCardEffects.length - 1; i >= 0; i--){
+          const e = room.activeCardEffects[i];
+          // remove one-time rebondir if it refers to this piece (by pieceId or by its old square)
+          if(e.type === 'rebondir' && (e.pieceSquare === from || (e.pieceId && e.pieceId === moving.id))){
+            room.activeCardEffects.splice(i,1);
+            continue;
+          }
+          // if the effect is bound to the piece id, update its recorded square so the effect persists after moves
+          if(e.pieceId && e.pieceId === moving.id){
+            e.pieceSquare = to;
+          }
+        }
       }catch(e){ console.error('consuming card effects error', e); }
 
       // advance version and flip turn
@@ -778,9 +792,9 @@ io.on('connection', (socket) => {
             }catch(e){ console.error('restore removed card error', e); }
             return cb && cb({ error: 'no valid target' });
           }
-          // apply permanent adoubement effect
+          // apply permanent adoubement effect (bind to piece id so it persists when the piece moves)
           room.activeCardEffects = room.activeCardEffects || [];
-          room.activeCardEffects.push({ id: played.id, type: 'adoubement', pieceSquare: target, playerId: senderId });
+          room.activeCardEffects.push({ id: played.id, type: 'adoubement', pieceId: targetPiece.id, pieceSquare: target, playerId: senderId });
           played.payload = Object.assign({}, payload, { applied: 'adoubement', appliedTo: target });
         }catch(e){ console.error('adoubement effect error', e); }
       }
@@ -809,9 +823,9 @@ io.on('connection', (socket) => {
             }catch(e){ console.error('restore removed card error', e); }
             return cb && cb({ error: 'no valid target' });
           }
-          // apply the rebond effect
+          // apply the rebond effect (also record pieceId so it can be identified after moves)
           room.activeCardEffects = room.activeCardEffects || [];
-          room.activeCardEffects.push({ id: played.id, type: 'rebondir', pieceSquare: target, playerId: senderId });
+          room.activeCardEffects.push({ id: played.id, type: 'rebondir', pieceId: targetPiece.id, pieceSquare: target, playerId: senderId });
           played.payload = Object.assign({}, payload, { applied: 'rebondir', appliedTo: target });
         }catch(e){ console.error('rebondir effect error', e); }
       }

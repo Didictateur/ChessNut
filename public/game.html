@@ -433,38 +433,78 @@
     }
 
     // render player's own hand and public counts for others
+    // New: render as horizontal 'pokemon-style' cards side-by-side
     function renderHands(handsOwn, handCounts){
       const handsEl = document.getElementById('hands');
       if(!handsEl) return;
       handsEl.innerHTML = '';
-      // show our own hand
+
       const wrap = document.createElement('div');
-      wrap.className = 'player-hand';
+      wrap.className = 'player-hand pokemon-hand';
+
+      const header = document.createElement('div');
+      header.className = 'pokemon-hand-header';
       const title = document.createElement('div');
-      title.style.fontWeight = '700';
-      title.style.marginBottom = '6px';
       title.textContent = 'Votre main';
-      wrap.appendChild(title);
-      const list = document.createElement('div');
-      list.style.display = 'flex';
-      list.style.flexDirection = 'column';
-      list.style.gap = '6px';
-      (handsOwn || []).slice(0,5).forEach(c => {
-        const cardEl = document.createElement('div');
-        cardEl.className = 'card-item';
-        const img = document.createElement('div');
-        img.className = 'card-art';
-        img.textContent = 'Illustration';
-        const meta = document.createElement('div');
-        meta.className = 'card-meta';
-        const h = document.createElement('div'); h.className = 'card-title'; h.textContent = c.title || c.cardId || 'Carte';
-        const p = document.createElement('div'); p.className = 'card-desc'; p.textContent = c.description || '';
-        meta.appendChild(h); meta.appendChild(p);
-        cardEl.appendChild(img);
-        cardEl.appendChild(meta);
-        list.appendChild(cardEl);
+      title.className = 'pokemon-hand-title';
+      header.appendChild(title);
+
+      // show public counts for other players (small badges)
+      const countsWrap = document.createElement('div');
+      countsWrap.className = 'pokemon-hand-counts';
+      Object.entries(handCounts||{}).forEach(([pid, cnt])=>{
+        if(pid === myPlayerId) return;
+        const b = document.createElement('div');
+        b.className = 'opponent-count';
+        b.textContent = `${pid}: ${cnt}`;
+        countsWrap.appendChild(b);
       });
-      wrap.appendChild(list);
+      header.appendChild(countsWrap);
+      wrap.appendChild(header);
+
+      const row = document.createElement('div');
+      row.className = 'cards-row';
+
+      (handsOwn || []).slice(0,10).forEach(c => {
+        const cardEl = document.createElement('div');
+        cardEl.className = 'pokemon-card';
+        cardEl.dataset.cardId = c.cardId || c.id || '';
+        cardEl.dataset.cardUuid = c.id || '';
+
+        const top = document.createElement('div'); top.className = 'pokemon-card-top';
+        const art = document.createElement('div'); art.className = 'pokemon-card-art';
+        art.textContent = '';
+        top.appendChild(art);
+
+        const mid = document.createElement('div'); mid.className = 'pokemon-card-mid';
+        const h = document.createElement('div'); h.className = 'pokemon-card-title'; h.textContent = c.title || c.cardId || 'Carte';
+        const p = document.createElement('div'); p.className = 'pokemon-card-desc'; p.textContent = c.description || '';
+        mid.appendChild(h); mid.appendChild(p);
+
+        const footer = document.createElement('div'); footer.className = 'pokemon-card-footer';
+        const playBtn = document.createElement('button'); playBtn.className = 'card-play-btn'; playBtn.textContent = 'Jouer';
+        footer.appendChild(playBtn);
+
+        cardEl.appendChild(top);
+        cardEl.appendChild(mid);
+        cardEl.appendChild(footer);
+
+        // clicking the whole card or the play button emits card:play
+        function emitPlay(){
+          if(!socket) return;
+          const cid = cardEl.dataset.cardId;
+          socket.emit('card:play', { roomId, playerId: myPlayerId, cardId: cid, payload: {} }, (resp)=>{
+            if(resp && resp.error){ log('card:play error', resp); alert(resp.error); }
+            else { log('card played', resp); }
+          });
+        }
+        cardEl.addEventListener('click', (ev)=>{ if(ev.target === playBtn) return; emitPlay(); });
+        playBtn.addEventListener('click', (ev)=>{ ev.stopPropagation(); emitPlay(); });
+
+        row.appendChild(cardEl);
+      });
+
+      wrap.appendChild(row);
       handsEl.appendChild(wrap);
     }
 

@@ -43,6 +43,11 @@ function sendRoomUpdate(room){
     // attach visible squares for this recipient (fog of war)
     try{
       payload.visibleSquares = Array.from(visibleSquaresForPlayer(room, p.id) || []);
+      // attach any mines owned by this recipient (mines are hidden from other players)
+      try{
+        const mines = (room.activeCardEffects || []).filter(e => e.type === 'mine' && e.playerId === p.id).map(e => e.square);
+        payload.minesOwn = mines;
+      }catch(_){ payload.minesOwn = []; }
     }catch(e){ payload.visibleSquares = []; }
     if(p.socketId){
       io.to(p.socketId).emit('room:update', payload);
@@ -101,7 +106,7 @@ function buildDefaultDeck(){
     // ['trou de ver','Deux cases du plateau deviennent maintenant la même'],
     ['jouer deux fois','Le joueur peut déplacer deux pièces'],
     // ['annulation d une carte','Annule l effet d une carte qui est jouée par l adversaire'],
-    // ['placement de mines','Le joueur place une mine sur une case vide sans la révéler au joueur adverse. Une pièce qui se pose dessus explose et est capturée par le joueur ayant placé la mine'],
+    ['placement de mines','Le joueur place une mine sur une case vide sans la révéler au joueur adverse. Une pièce qui se pose dessus explose et est capturée par le joueur ayant placé la mine'],
     // ['vole d une pièce','Désigne une pièce non roi qui change de camp'],
     // ['promotion','Un pion au choix est promu reine'],
     // ['vole d une carte','Vole une carte aléatoirement au joueur adverse'],
@@ -687,6 +692,32 @@ io.on('connection', (socket) => {
         }
       }catch(e){ console.error('consuming card effects error', e); }
 
+      // Check for hidden mines at the destination square. If a mine belonging to another player
+      // is present, detonate it: remove the moving piece and consume the mine. The mine location
+      // is kept private (only the owner sees it in their `minesOwn`), but detonations are public.
+      try{
+        room.activeCardEffects = room.activeCardEffects || [];
+        for(let i = room.activeCardEffects.length - 1; i >= 0; i--){
+          const e = room.activeCardEffects[i];
+          if(e && e.type === 'mine' && e.square === to){
+            // owner is immune to their own mine (assumption). Only detonate for other players.
+            if(e.playerId !== senderId){
+              // remove the moving piece from the board
+              const rmIdx = pieces.findIndex(p => p.id === moving.id);
+              if(rmIdx >= 0){ pieces.splice(rmIdx, 1); }
+              // consume the mine
+              try{ room.activeCardEffects.splice(i,1); }catch(_){ }
+              // broadcast detonation to the room (informational)
+              try{ io.to(roomId).emit('mine:detonated', { roomId: room.id, ownerId: e.playerId, detonatorId: senderId, square: to, piece: moving }); }catch(_){ }
+              // privately inform the owner as well with effect id and piece details
+              try{ const owner = (room.players||[]).find(p => p.id === e.playerId); if(owner && owner.socketId) io.to(owner.socketId).emit('mine:detonated:private', { roomId: room.id, effectId: e.id, square: to, piece: moving }); }catch(_){ }
+            }
+            // a mine was found/handled; break (only one mine per square expected)
+            break;
+          }
+        }
+      }catch(err){ console.error('mine detonation error', err); }
+
       // advance board version
       board.version = (board.version || 0) + 1;
 
@@ -1126,6 +1157,36 @@ io.on('connection', (socket) => {
             try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect }); }catch(_){}
             played.payload = Object.assign({}, payload, { applied: 'anneau' });
           }catch(e){ console.error('anneau effect error', e); }
+        }
+        // placement de mines: place a hidden mine on an empty square (hidden from other players)
+        else if((typeof cardId === 'string' && cardId.indexOf('mine') !== -1)){
+          try{
+            const board = room.boardState;
+            let target = payload && payload.targetSquare;
+            if(!target){ try{ target = socket.data && socket.data.lastSelectedSquare; }catch(e){ target = null; } }
+            // validate board and empty target
+            const targetOccupied = (board && board.pieces || []).find(p => p.square === target);
+            if(!board || !target || targetOccupied){
+              // Invalid target: the card is still consumed (player loses the card as requested).
+              // We do not restore the removed card to the player's hand. Record in played payload that the placement failed.
+              played.payload = Object.assign({}, payload, { applied: 'mine_failed', attemptedTo: target });
+              // Notify only the owner that the card was used but the mine was not placed
+              try{ const owner = (room.players || []).find(p => p.id === senderId); if(owner && owner.socketId) io.to(owner.socketId).emit('card:effect:applied', { roomId: room.id, effect: { id: played.id, type: 'mine_failed', playerId: senderId, square: target, ts: Date.now() } }); }catch(_){ }
+              // continue without creating a mine
+            } else {
+            // record mine effect scoped to the player; do NOT broadcast location to other players
+            room.activeCardEffects = room.activeCardEffects || [];
+            const effect = { id: played.id, type: 'mine', playerId: senderId, square: target, ts: Date.now() };
+            room.activeCardEffects.push(effect);
+            // notify only the owner about the mine placement (keep it hidden from opponents)
+            try{
+              const owner = (room.players || []).find(p => p.id === senderId);
+              if(owner && owner.socketId) io.to(owner.socketId).emit('card:effect:applied', { roomId: room.id, effect });
+            }catch(_){ }
+            // for the public played record we mark the card as used without revealing the square
+            played.payload = Object.assign({}, payload, { applied: 'mine' });
+          }
+        }catch(e){ console.error('mine placement error', e); }
         }
         // jouer deux fois: grant the playing player one extra move this turn (does not allow another card play)
         else if(cardId === 'jouer_deux_fois' || (typeof cardId === 'string' && cardId.indexOf('jouer') !== -1 && cardId.indexOf('deux') !== -1)){

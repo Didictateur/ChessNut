@@ -53,6 +53,8 @@
   const remoteMoves = {};
   // current boardState cached locally
   let currentBoardState = null;
+  let myMines = [];
+  let pendingCard = null; // when set, next square click is used as card target
 
     // safe logger: prefer on-page log if present, otherwise console
     function log(...args){
@@ -64,6 +66,18 @@
       } else {
         console.log(...args);
       }
+    }
+
+    // helper: decide if a card requires a target selected after clicking 'Jouer'
+    function cardRequiresTarget(cardId){
+      if(!cardId) return null;
+      const id = String(cardId).toLowerCase();
+      if(id.indexOf('mine') !== -1) return 'empty';
+      if(id.indexOf('rebond') !== -1) return 'owned';
+      if(id.indexOf('adoub') !== -1) return 'owned';
+      if(id.indexOf('folie') !== -1 || id.indexOf('fou') !== -1) return 'owned';
+      if(id.indexOf('fortif') !== -1 || id.indexOf('fortification') !== -1) return 'owned';
+      return null;
     }
 
     if(!roomId){ alert('roomId manquant dans l\'URL'); }
@@ -95,6 +109,10 @@
       renderBoardFromState(data.boardState);
       updateTurnBanner(data.boardState);
     }
+    // store mines owned by this client (private)
+    try{ myMines = data.minesOwn || []; }catch(e){ myMines = []; }
+    // after rendering the board, render mines for owner
+    try{ renderMines(); }catch(e){ }
     // render hands: prefer new private `handsOwn` + `handCounts`.
     // If server (or older code) mistakenly sends a full `hands` object, only show the current player's own hand and public counts — never reveal other players' cards.
     if(data.hands){
@@ -353,6 +371,28 @@
         const square = sqEl.getAttribute('data-square');
         if(!square) return;
 
+        // If we're in a pending card-targeting mode, handle target selection and do NOT attempt moves
+        if(pendingCard){
+          const req = pendingCard.requireType; // 'empty' or 'owned'
+          if(req === 'empty'){
+            const occupied = currentBoardState && Array.isArray(currentBoardState.pieces) && currentBoardState.pieces.find(p => p.square === square);
+            if(occupied){ log('square not empty for mine placement'); return; }
+          } else if(req === 'owned'){
+            const piece = currentBoardState && Array.isArray(currentBoardState.pieces) && currentBoardState.pieces.find(p => p.square === square);
+            const myShort = (myColor && myColor[0]) || '';
+            if(!piece || piece.color !== myShort){ log('select one of your pieces'); return; }
+          }
+          // send card:play with targetSquare
+          socket.emit('card:play', { roomId, playerId: myPlayerId, cardId: pendingCard.cardId, payload: { targetSquare: square } }, (resp)=>{
+            if(resp && resp.error){ log('card:play error', resp); alert(resp.error); }
+            else { log('card played with target', resp); }
+          });
+          // clear pending state and highlights
+          pendingCard = null;
+          clearTargetHighlights();
+          return;
+        }
+
         // If this square contains a move-marker (either clicked marker or square area), attempt the move.
         // Prefer the actual clicked marker if present, otherwise look for a marker element inside the square.
         const clickedMarker = ev.target.closest && ev.target.closest('.move-marker');
@@ -381,8 +421,12 @@
           return;
         }
 
-        // default: clicked empty square -> clear selection
-        clearSelection();
+        // default: clicked empty square -> select it (toggle)
+        if(selectedSquare === square){
+          clearSelection();
+        } else {
+          setSelection(square);
+        }
       });
     }
 
@@ -428,6 +472,89 @@
       Object.entries(remoteMoves).forEach(([pid, moves]) => {
         if(Array.isArray(moves) && moves.length) showRemoteLegalMoves(pid, moves);
       });
+      // render any mines owned by this player
+      try{ renderMines(); }catch(e){ }
+    }
+
+    // draw mine icons on squares for mines owned by this client
+    function renderMines(){
+      if(!boardEl) return;
+      // remove old mine markers
+      // remove old mine markers (either image or dot)
+      const prev = boardEl.querySelectorAll('.mine-dot, .mine-img');
+      prev.forEach(p=>p.remove());
+      (myMines || []).forEach(sq => {
+        const el = boardEl.querySelector(`.square[data-square="${sq}"]`);
+        if(!el) return;
+        // create an image element so the mine has a transparent background and crisp edges
+        const img = document.createElement('img');
+        img.className = 'mine-img';
+        // use a project asset (SVG) that has a transparent background
+        img.src = '/assets/img/bomb.jpg';
+        img.draggable = false;
+        // ensure container is positioned so absolute centering works
+        if(!el.style.position) el.style.position = 'relative';
+        el.appendChild(img);
+      });
+    }
+
+    // target highlighting helpers
+    function clearTargetHighlights(){
+      if(!boardEl) return;
+      const prev = boardEl.querySelectorAll('.square.targetable');
+      prev.forEach(p=>p.classList.remove('targetable'));
+      const note = document.getElementById('pendingNote'); if(note) note.remove();
+    }
+    function highlightTargets(type){
+      if(!boardEl || !currentBoardState) return;
+      clearTargetHighlights();
+      const myShort = (myColor && myColor[0]) || '';
+      Array.from(boardEl.querySelectorAll('.square')).forEach(sqEl => {
+        const sq = sqEl.getAttribute('data-square');
+        if(!sq) return;
+        if(type === 'empty'){
+          const occ = (currentBoardState.pieces||[]).find(p=>p.square===sq);
+          if(!occ) sqEl.classList.add('targetable');
+        } else if(type === 'owned'){
+          const occ = (currentBoardState.pieces||[]).find(p=>p.square===sq);
+          if(occ && occ.color === myShort) sqEl.classList.add('targetable');
+        }
+      });
+      // add a small note near hands
+      try{
+        const handsEl = document.getElementById('hands');
+        if(handsEl){
+          const note = document.createElement('div');
+          note.id = 'pendingNote';
+          note.style.marginTop = '8px';
+          note.style.display = 'flex';
+          note.style.alignItems = 'center';
+          note.style.gap = '8px';
+          const txt = document.createElement('span');
+          txt.textContent = 'Sélectionnez la case cible pour la carte...';
+          txt.style.fontWeight = '700';
+          note.appendChild(txt);
+          const cancelBtn = document.createElement('button');
+          cancelBtn.type = 'button';
+          cancelBtn.id = 'pendingCancelBtn';
+          cancelBtn.textContent = 'Annuler';
+          // use a dedicated class to ensure good contrast against the hands background
+          cancelBtn.className = 'btn-cancel';
+          cancelBtn.addEventListener('click', (ev)=>{ ev.stopPropagation(); cancelPendingCard(); });
+          note.appendChild(cancelBtn);
+          handsEl.prepend(note);
+        }
+      }catch(e){}
+    }
+
+    // cancel a pending card selection (client-only)
+    function cancelPendingCard(){
+      if(!pendingCard) return;
+      pendingCard = null;
+      clearTargetHighlights();
+      log('Pending card selection annulée');
+      // remove pendingNote if present
+      const note = document.getElementById('pendingNote'); if(note) note.remove();
     }
 
     // build grid with independent square elements and data-square attributes
@@ -503,7 +630,17 @@
         function emitPlay(){
           if(!socket) return;
           const cid = cardEl.dataset.cardId;
-          socket.emit('card:play', { roomId, playerId: myPlayerId, cardId: cid, payload: {} }, (resp)=>{
+          const requireType = cardRequiresTarget(cid);
+          if(requireType){
+            // enter pending target mode: next square click will send the card with payload.targetSquare
+            pendingCard = { cardId: cid, cardUuid: cardEl.dataset.cardUuid || '', requireType };
+            highlightTargets(requireType);
+            log('Pending card selection for', cid, '-> select target');
+            return;
+          }
+          // immediate-play card (no target required)
+          const payload = {};
+          socket.emit('card:play', { roomId, playerId: myPlayerId, cardId: cid, payload }, (resp)=>{
             if(resp && resp.error){ log('card:play error', resp); alert(resp.error); }
             else { log('card played', resp); }
           });

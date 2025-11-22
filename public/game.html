@@ -98,8 +98,17 @@
       renderBoardFromState(data.boardState);
       updateTurnBanner(data.boardState);
     }
-    // render hands: server now sends private hands as `handsOwn` and public counts as `handCounts`
-    if(data.handsOwn || data.handCounts) renderHands(data.handsOwn || [], data.handCounts || {});
+    // render hands: prefer new private `handsOwn` + `handCounts`.
+    // If server (or older code) mistakenly sends a full `hands` object, only show the current player's own hand and public counts — never reveal other players' cards.
+    if(data.hands){
+      // legacy: full hands object mapping playerId -> array
+      const own = (data.hands && data.hands[myPlayerId]) ? data.hands[myPlayerId] : [];
+      const counts = {};
+      Object.entries(data.hands || {}).forEach(([pid, arr])=>{ counts[pid] = (arr && arr.length) || 0; });
+      renderHands(own, counts);
+    } else if(data.handsOwn || data.handCounts){
+      renderHands(data.handsOwn || [], data.handCounts || {});
+    }
       });
   socket.on('game:over', (data)=>{ log('game:over', data); if(data.boardState){ renderBoardFromState(data.boardState); updateTurnBanner(data.boardState); } });
   socket.on('game:started', (data)=>{ log('game:started', data); if(data.boardState){ renderBoardFromState(data.boardState); updateTurnBanner(data.boardState); } });
@@ -457,19 +466,6 @@
       });
       wrap.appendChild(list);
       handsEl.appendChild(wrap);
-
-      // show counts for other players
-      Object.entries(handCounts || {}).forEach(([pid, count]) => {
-        if(pid === myPlayerId) return;
-        const other = document.createElement('div');
-        other.className = 'player-hand';
-        const t = document.createElement('div');
-        t.style.fontWeight = '700';
-        t.style.marginBottom = '6px';
-        t.textContent = `Main de ${pid} — ${count} carte(s)`;
-        other.appendChild(t);
-        handsEl.appendChild(other);
-      });
     }
 
     function showCardDrawnNotification(evt){

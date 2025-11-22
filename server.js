@@ -99,7 +99,12 @@ function buildDefaultDeck(){
     // ['doppelganger','Choisis une pièce. À partir de maintenant, devient chacune des pièces qu elle capture.'],
     // ['kurby','Choisis une pièce. À sa prochaine capture, récupère les mouvements de la pièce capturée.']
   ];
-  return cards.map(([title,desc])=>({ id: uuidv4().slice(0,8), cardId: title.replace(/[^a-z0-9]+/gi,'_').toLowerCase(), title: title, description: desc }));
+  function cap(s){ if(!s) return s; s = String(s).trim(); return s.charAt(0).toUpperCase() + s.slice(1); }
+  return cards.map(([title,desc])=>{
+    const normalized = (title||'').toString().trim();
+    const cardId = normalized.replace(/[^a-z0-9]+/gi,'_').toLowerCase();
+    return { id: uuidv4().slice(0,8), cardId, title: cap(normalized), description: desc };
+  });
 }
 
 // draw a random card from room.deck and assign to player hand (respect max hand size 5)
@@ -122,6 +127,11 @@ function drawCardForPlayer(room, playerId){
   // pick random index
   const idx = Math.floor(Math.random() * room.deck.length);
   const card = room.deck.splice(idx,1)[0];
+  // normalize title capitalization just in case this deck was created earlier with inconsistent casing
+  if(card && card.title){
+    card.title = String(card.title).trim();
+    card.title = card.title.charAt(0).toUpperCase() + card.title.slice(1);
+  }
   room.hands[playerId] = room.hands[playerId] || [];
   room.hands[playerId].push(card);
   if(boardVersion !== null) room._lastDrawForPlayer[playerId] = boardVersion;
@@ -356,11 +366,14 @@ io.on('connection', (socket) => {
     sendRoomUpdate(room);
 
     // If the game is already playing and it's this player's turn, attempt to draw (useful on reconnect)
+    // Only draw if the player's hand is currently empty to avoid double-drawing (e.g. initial granted cards)
     try{
       if(room.status === 'playing' && room.boardState && room.boardState.turn){
-        const myShort = (room.players.find(p => p.id === assignedId).color || '')[0];
+        const myPlayer = room.players.find(p => p.id === assignedId);
+        const myShort = (myPlayer && myPlayer.color || '')[0];
         if(myShort === room.boardState.turn){
-          drawCardForPlayer(room, assignedId);
+          const hasHand = room.hands && room.hands[assignedId] && room.hands[assignedId].length > 0;
+          if(!hasHand) drawCardForPlayer(room, assignedId);
         }
       }
     }catch(e){ console.error('post-join draw error', e); }
@@ -411,24 +424,25 @@ io.on('connection', (socket) => {
       board.version = (board.version || 0) + 1;
       board.turn = (board.turn === 'w') ? 'b' : 'w';
 
-      // broadcast move and new board state
+      // at this point the board has been updated and the turn flipped
+      // determine next player and perform their draw BEFORE broadcasting the move, so the draw happens at the start of their turn
       const moved = { playerId: senderId, from, to, boardState: board };
-      io.to(roomId).emit('move:moved', moved);
-
-      // after flipping turn, draw a card for the next player (beginning of their turn)
       try{
         const nextColor = board.turn; // 'w' or 'b'
         const nextPlayer = room.players.find(p => (p.color && p.color[0]) === nextColor);
         if(nextPlayer){
-          // attempt to draw a card for them; drawCardForPlayer will emit updated room state if a card was drawn
+          // draw for next player (this will emit card:drawn privately and send personalized room:update)
           drawCardForPlayer(room, nextPlayer.id);
         } else {
-          // still emit updated room state (no draw occurred)
+          // ensure room state is broadcast
           sendRoomUpdate(room);
         }
       }catch(e){
-        console.error('draw after move error', e);
+        console.error('draw-at-start-of-turn error', e);
       }
+
+      // now broadcast the move to all clients (move event separate from room:update)
+      io.to(roomId).emit('move:moved', moved);
 
       return cb && cb({ ok: true, moved });
     }catch(err){
@@ -454,12 +468,14 @@ io.on('connection', (socket) => {
     sendRoomUpdate(room);
 
     // draw initial card for the player to move (beginning of their turn)
+    // If the player already has a card (for instance the special starter card), skip the automatic draw
     try{
       if(room.boardState && room.boardState.turn){
         const firstColor = room.boardState.turn; // 'w' or 'b'
         const firstPlayer = room.players.find(p => (p.color && p.color[0]) === firstColor);
         if(firstPlayer){
-          drawCardForPlayer(room, firstPlayer.id);
+          const hasHand = room.hands && room.hands[firstPlayer.id] && room.hands[firstPlayer.id].length > 0;
+          if(!hasHand) drawCardForPlayer(room, firstPlayer.id);
         }
       }
     }catch(e){

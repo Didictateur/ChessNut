@@ -52,11 +52,11 @@ function buildDefaultDeck(){
     // ['tronquer le plateau','Tronque au maximum le plateau sans supprimer de pièce'],
     ['rebondir sur les bords','Les déplacements en diagonales de la pièce sélectionnée peuvent rebondir une fois sur les bords'],
     ['agrandir le plateau','Rajoute une rangée dans toutes les directions'],
-  ['adoubement','La pièce sélectionnée peut maintenant faire les déplacements du cavalier en plus'],
-  ['folie','La pièce sélectionnée peut maintenant faire les déplacements du fou en plus'],
-  ['fortification','La pièce sélectionnée peut maintenant faire les déplacements de la tour en plus'],
+    ['adoubement','La pièce sélectionnée peut maintenant faire les déplacements du cavalier en plus'],
+    ['folie','La pièce sélectionnée peut maintenant faire les déplacements du fou en plus'],
     ['fortification','La pièce sélectionnée peut maintenant faire les déplacements de la tour en plus'],
-    // ["l'anneau","Le plateau devient un anneau pendant un tour"],
+    ['fortification','La pièce sélectionnée peut maintenant faire les déplacements de la tour en plus'],
+    ["l'anneau","Le plateau devient un anneau pendant un tour"],
     // ['brouillard de guerre','Les joueur ne peuvent voir que au alentour de leurs pièces pendant X tours'],
     // ['changer la pièce à capturer','Le joueur choisie la nouvelle pièce jouant le rôle de roi sans la révéler'],
     // ['trou de ver','Deux cases du plateau deviennent maintenant la même'],
@@ -228,8 +228,8 @@ function computeLegalMoves(room, square){
     const deltas = [[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]];
     deltas.forEach(([dx,dy])=>{
       const tx = x + dx, ty = y + dy;
-      if(!isInside(tx,ty)) return;
-      const tsq = coordToSquare(tx,ty);
+      const tsq = resolveSquareWithAnneau(tx, ty);
+      if(!tsq) return;
       // avoid duplicates
       if(moves.some(m => m.to === tsq)) return;
       const occ = getPieceAt(tsq);
@@ -242,14 +242,45 @@ function computeLegalMoves(room, square){
   // detect if this specific piece has a permanent fortification effect (grants rook moves)
   const hasFortification = (room.activeCardEffects || []).some(e => e.type === 'fortification' && ((e.pieceId && e.pieceId === piece.id) || e.pieceSquare === square));
 
+  // detect if the owner of this piece currently has an active 'anneau' effect
+  const anneauPlayers = (room.activeCardEffects || []).filter(e => e.type === 'anneau').map(e => e.playerId);
+  const ownerPlayer = (room.players || []).find(p => (p.color && p.color[0]) === piece.color);
+  const hasAnneau = ownerPlayer && anneauPlayers.indexOf(ownerPlayer.id) !== -1;
+
+  // helper to resolve a target square, allowing horizontal wrap when anneau is active for this piece
+  function resolveSquareWithAnneau(tx, ty){
+    // inside bounds
+    if(isInside(tx, ty)) return coordToSquare(tx, ty);
+    // allow only horizontal wrap (left/right) when anneau is active for this piece's owner
+    if(!hasAnneau) return null;
+    if(ty < 0 || ty >= height) return null; // no vertical wrapping
+    if(tx < 0 || tx >= width){
+      const wx = ((tx % width) + width) % width;
+      return coordToSquare(wx, ty);
+    }
+    return null;
+  }
+
   // helper to add diagonal sliding moves when a piece has been "folié"
   function addFolieMoves(){
     if(!hasFolie) return;
     const dirs = [[1,1],[1,-1],[-1,1],[-1,-1]];
     dirs.forEach(([dx,dy])=>{
       let tx = x + dx, ty = y + dy;
-      while(isInside(tx,ty)){
-        const tsq = coordToSquare(tx,ty);
+      let wrapped = false;
+      while(true){
+        // resolve target square with anneau
+        let tsq = null;
+        if(isInside(tx,ty)){
+          tsq = coordToSquare(tx,ty);
+        } else if(hasAnneau && (tx < 0 || tx >= width) && ty >= 0 && ty < height && !wrapped){
+          const wx = ((tx % width) + width) % width;
+          tsq = coordToSquare(wx, ty);
+          tx = wx;
+          wrapped = true;
+        } else {
+          break;
+        }
         // avoid duplicates
         if(!moves.some(m => m.to === tsq)){
           const occ = getPieceAt(tsq);
@@ -270,8 +301,19 @@ function computeLegalMoves(room, square){
     const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
     dirs.forEach(([dx,dy])=>{
       let tx = x + dx, ty = y + dy;
-      while(isInside(tx,ty)){
-        const tsq = coordToSquare(tx,ty);
+      let wrapped = false;
+      while(true){
+        let tsq = null;
+        if(isInside(tx,ty)){
+          tsq = coordToSquare(tx,ty);
+        } else if(hasAnneau && (tx < 0 || tx >= width) && ty >= 0 && ty < height && !wrapped){
+          const wx = ((tx % width) + width) % width;
+          tsq = coordToSquare(wx, ty);
+          tx = wx;
+          wrapped = true;
+        } else {
+          break;
+        }
         if(!moves.some(m => m.to === tsq)){
           const occ = getPieceAt(tsq);
           if(!occ){ moves.push({ from: square, to: tsq }); }
@@ -301,8 +343,8 @@ function computeLegalMoves(room, square){
     }
     // captures
     [[x-1, y+forward],[x+1, y+forward]].forEach(([tx,ty])=>{
-      if(!isInside(tx,ty)) return;
-      const tsq = coordToSquare(tx,ty);
+      const tsq = resolveSquareWithAnneau(tx, ty);
+      if(!tsq) return;
       const occ = getPieceAt(tsq);
       if(occ && occ.color !== color) moves.push({ from: square, to: tsq });
     });
@@ -314,8 +356,8 @@ function computeLegalMoves(room, square){
     const deltas = [[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]];
     deltas.forEach(([dx,dy])=>{
       const tx = x + dx, ty = y + dy;
-      if(!isInside(tx,ty)) return;
-      const tsq = coordToSquare(tx,ty);
+      const tsq = resolveSquareWithAnneau(tx, ty);
+      if(!tsq) return;
       const occ = getPieceAt(tsq);
       if(!occ || occ.color !== color) moves.push({ from: square, to: tsq });
     });
@@ -333,12 +375,34 @@ function computeLegalMoves(room, square){
 
     directions.forEach(([dx0,dy0])=>{
       if(!hasRebond){
-        // standard sliding behavior
+        // standard sliding behavior, with optional single horizontal wrap when anneau is active
         let tx = x + dx0, ty = y + dy0;
-        while(isInside(tx,ty)){
-          const cont = pushIfEmptyOrCapture(tx,ty);
-          if(!cont) break;
-          tx += dx0; ty += dy0;
+        let wrapped = false;
+        while(true){
+          // resolve target taking anneau into account
+          let tsq = null;
+          if(isInside(tx,ty)){
+            tsq = coordToSquare(tx,ty);
+          } else if(hasAnneau && (tx < 0 || tx >= width) && ty >= 0 && ty < height && !wrapped){
+            const wx = ((tx % width) + width) % width;
+            tsq = coordToSquare(wx, ty);
+            // set tx to wrapped coordinate so further increments continue correctly
+            tx = wx;
+            wrapped = true;
+          } else {
+            break;
+          }
+
+          const occ = getPieceAt(tsq);
+          if(!occ){
+            moves.push({ from: square, to: tsq });
+            // advance current position along the direction
+            tx += dx0; ty += dy0;
+            continue;
+          }
+          // occupied
+          if(occ.color !== color) moves.push({ from: square, to: tsq });
+          break;
         }
       } else {
         // sliding with a single bounce on edges (mirror reflection once)
@@ -379,8 +443,8 @@ function computeLegalMoves(room, square){
     for(let dx=-1; dx<=1; dx++) for(let dy=-1; dy<=1; dy++){
       if(dx === 0 && dy === 0) continue;
       const tx = x + dx, ty = y + dy;
-      if(!isInside(tx,ty)) continue;
-      const tsq = coordToSquare(tx,ty);
+      const tsq = resolveSquareWithAnneau(tx, ty);
+      if(!tsq) continue;
       const occ = getPieceAt(tsq);
       if(!occ || occ.color !== color) moves.push({ from: square, to: tsq });
     }
@@ -562,6 +626,11 @@ io.on('connection', (socket) => {
       // advance version and flip turn
       board.version = (board.version || 0) + 1;
       board.turn = (board.turn === 'w') ? 'b' : 'w';
+
+      // remove any anneau effects that belonged to the player who just finished their turn
+      try{
+        room.activeCardEffects = (room.activeCardEffects || []).filter(e => !(e.type === 'anneau' && e.playerId === senderId));
+      }catch(e){ console.error('clearing anneau effects error', e); }
 
       // at this point the board has been updated and the turn flipped
       // determine next player and perform their draw BEFORE broadcasting the move, so the draw happens at the start of their turn
@@ -902,7 +971,16 @@ io.on('connection', (socket) => {
           room.activeCardEffects.push({ id: played.id, type: 'fortification', pieceId: targetPiece.id, pieceSquare: target, playerId: senderId });
           played.payload = Object.assign({}, payload, { applied: 'fortification', appliedTo: target });
         }catch(e){ console.error('fortification effect error', e); }
-      }
+        }
+        // anneau: make the board horizontally wrap for the playing player's pieces for this turn
+        else if(cardId === 'anneau' || (typeof cardId === 'string' && cardId.indexOf('anneau') !== -1)){
+          try{
+            // record an anneau effect scoped to the player so their pieces gain wrap behavior
+            room.activeCardEffects = room.activeCardEffects || [];
+            room.activeCardEffects.push({ id: played.id, type: 'anneau', playerId: senderId, ts: Date.now() });
+            played.payload = Object.assign({}, payload, { applied: 'anneau' });
+          }catch(e){ console.error('anneau effect error', e); }
+        }
       // rebondir: grant a one-time bounce ability to a specific piece (targetSquare required in payload)
       else if(cardId === 'rebondir_sur_les_bords' || cardId === 'rebondir' || (typeof cardId === 'string' && cardId.indexOf('rebondir') !== -1)){
         try{

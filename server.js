@@ -52,7 +52,7 @@ function buildDefaultDeck(){
     // ['tronquer le plateau','Tronque au maximum le plateau sans supprimer de pièce'],
     ['rebondir sur les bords','Les déplacements en diagonales de la pièce sélectionnée peuvent rebondir une fois sur les bords'],
     ['agrandir le plateau','Rajoute une rangée dans toutes les directions'],
-    // ['adoubement','La pièce sélectionnée peut maintenant faire les déplacements du cavalier en plus'],
+    ['adoubement','La pièce sélectionnée peut maintenant faire les déplacements du cavalier en plus'],
     // ['folie','La pièce sélectionnée peut maintenant faire les déplacements du fou en plus'],
     // ['fortification','La pièce sélectionnée peut maintenant faire les déplacements de la tour en plus'],
     // ["l'anneau","Le plateau devient un anneau pendant un tour"],
@@ -216,8 +216,24 @@ function computeLegalMoves(room, square){
   }
 
   const x = fromCoord.x, y = fromCoord.y;
-
   const type = (piece.type || '').toUpperCase();
+  // detect if this specific piece has a permanent adoubement effect (grants knight moves)
+  const hasAdoubement = (room.activeCardEffects || []).some(e => e.type === 'adoubement' && e.pieceSquare === square);
+
+  // helper to add knight (N) deltas when a piece has been adoubé
+  function addAdoubementMoves(){
+    if(!hasAdoubement) return;
+    const deltas = [[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]];
+    deltas.forEach(([dx,dy])=>{
+      const tx = x + dx, ty = y + dy;
+      if(!isInside(tx,ty)) return;
+      const tsq = coordToSquare(tx,ty);
+      // avoid duplicates
+      if(moves.some(m => m.to === tsq)) return;
+      const occ = getPieceAt(tsq);
+      if(!occ || occ.color !== color) moves.push({ from: square, to: tsq });
+    });
+  }
   if(type === 'P'){
     // pawn
     const forward = (color === 'w') ? 1 : -1;
@@ -240,6 +256,7 @@ function computeLegalMoves(room, square){
       const occ = getPieceAt(tsq);
       if(occ && occ.color !== color) moves.push({ from: square, to: tsq });
     });
+    addAdoubementMoves();
     return moves;
   }
 
@@ -252,6 +269,7 @@ function computeLegalMoves(room, square){
       const occ = getPieceAt(tsq);
       if(!occ || occ.color !== color) moves.push({ from: square, to: tsq });
     });
+    addAdoubementMoves();
     return moves;
   }
 
@@ -303,6 +321,7 @@ function computeLegalMoves(room, square){
         }
       }
     });
+    addAdoubementMoves();
     return moves;
   }
 
@@ -315,9 +334,11 @@ function computeLegalMoves(room, square){
       const occ = getPieceAt(tsq);
       if(!occ || occ.color !== color) moves.push({ from: square, to: tsq });
     }
+    addAdoubementMoves();
     return moves;
   }
 
+  addAdoubementMoves();
   return moves;
 }
 
@@ -648,11 +669,12 @@ io.on('connection', (socket) => {
     const played = { id: uuidv4().slice(0,8), playerId: senderId, cardId, payload, ts: Date.now() };
     room.playedCards = room.playedCards || [];
 
-    // Pre-check for rebondir: if the card is rebondir and there is no explicit target
-    // then require that the socket has a lastSelectedSquare which belongs to the player.
+    // Pre-check for targetted cards (rebondir, adoubement): require a selected target owned by the player
     try{
       const isRebond = (typeof cardId === 'string') && (cardId.indexOf('rebondir') !== -1 || cardId.indexOf('rebond') !== -1);
-      if(isRebond){
+      const isAdoub = (typeof cardId === 'string') && (cardId.indexOf('adoub') !== -1 || cardId.indexOf('adoubement') !== -1);
+      const isTargetCard = isRebond || isAdoub;
+      if(isTargetCard){
         const board = room.boardState;
         let targetCandidate = payload && payload.targetSquare;
         if(!targetCandidate){ try{ targetCandidate = socket.data && socket.data.lastSelectedSquare; }catch(e){ targetCandidate = null; } }
@@ -668,7 +690,7 @@ io.on('connection', (socket) => {
         payload.targetSquare = targetCandidate;
         played.payload = Object.assign({}, payload);
       }
-    }catch(e){ console.error('rebondir pre-check error', e); }
+    }catch(e){ console.error('target card pre-check error', e); }
 
     // remove the played card from the player's hand and move it to discard
     try{
@@ -734,6 +756,33 @@ io.on('connection', (socket) => {
         // Historically this code computed the occupied bounding box and rewrote board.pieces/width/height.
         // That behavior caused unintended piece removals in some edge cases, so trimming is commented out for now.
         played.payload = Object.assign({}, payload, { applied: 'tronquer_plateau', note: 'disabled - trimming commented out by developer' });
+      }
+      // adoubement: grant a permanent knight-move ability to the targeted piece
+      else if(cardId === 'adoubement' || (typeof cardId === 'string' && cardId.indexOf('adoub') !== -1)){
+        try{
+          const board = room.boardState;
+          let target = payload && payload.targetSquare;
+          if(!target){ try{ target = socket.data && socket.data.lastSelectedSquare; }catch(e){ target = null; } }
+          // validate target exists and belongs to the player
+          const roomPlayer = room.players.find(p => p.id === senderId);
+          const playerColorShort = (roomPlayer && roomPlayer.color && roomPlayer.color[0]) || null;
+          const targetPiece = (board && board.pieces || []).find(p => p.square === target);
+          if(!board || !target || !targetPiece || targetPiece.color !== playerColorShort){
+            // restore removed card to hand and remove from discard if necessary
+            try{
+              room.hands = room.hands || {};
+              room.hands[senderId] = room.hands[senderId] || [];
+              if(removed) room.hands[senderId].push(removed);
+              room.discard = room.discard || [];
+              for(let i = room.discard.length - 1; i >= 0; i--){ if(room.discard[i] && room.discard[i].id === (removed && removed.id)){ room.discard.splice(i,1); break; } }
+            }catch(e){ console.error('restore removed card error', e); }
+            return cb && cb({ error: 'no valid target' });
+          }
+          // apply permanent adoubement effect
+          room.activeCardEffects = room.activeCardEffects || [];
+          room.activeCardEffects.push({ id: played.id, type: 'adoubement', pieceSquare: target, playerId: senderId });
+          played.payload = Object.assign({}, payload, { applied: 'adoubement', appliedTo: target });
+        }catch(e){ console.error('adoubement effect error', e); }
       }
       // rebondir: grant a one-time bounce ability to a specific piece (targetSquare required in payload)
       else if(cardId === 'rebondir_sur_les_bords' || cardId === 'rebondir' || (typeof cardId === 'string' && cardId.indexOf('rebondir') !== -1)){

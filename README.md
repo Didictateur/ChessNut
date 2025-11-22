@@ -38,7 +38,7 @@ Le joueur place une mine sur une case vide sans la révéler au joueur adverse. 
 ### Vole d'une pièce
 Désigne une pièce non roi qui change de camp
 ### Promotion
-Un pion au choix est promu reine
+Un pion au choix est promu
 ### Vole d'une carte
 Vole une carte aléatoirement au joueur adverse
 ### Resurection

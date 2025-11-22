@@ -108,7 +108,7 @@ function buildDefaultDeck(){
     // ['annulation d une carte','Annule l effet d une carte qui est jouée par l adversaire'],
     ['placement de mines','Le joueur place une mine sur une case vide sans la révéler au joueur adverse. Une pièce qui se pose dessus explose et est capturée par le joueur ayant placé la mine'],
     ['vole d une pièce','Désigne une pièce non roi qui change de camp'],
-    // ['promotion','Un pion au choix est promu reine'],
+    ['promotion','Un pion au choix est promu reine'],
     // ['vole d une carte','Vole une carte aléatoirement au joueur adverse'],
     // ['resurection','Choisie une pièce capturée pour la ressuciter dans son camp'],
     // ['carte sans effet','N a aucun effet'],
@@ -1123,6 +1123,40 @@ io.on('connection', (socket) => {
           room.activeCardEffects.push({ id: played.id, type: 'fortification', pieceId: targetPiece.id, pieceSquare: target, playerId: senderId });
           played.payload = Object.assign({}, payload, { applied: 'fortification', appliedTo: target });
         }catch(e){ console.error('fortification effect error', e); }
+        }
+        // promotion: promote one of your pawns to a queen
+        else if(cardId === 'promotion' || cardId === 'promote' || (typeof cardId === 'string' && (cardId.indexOf('promotion') !== -1 || cardId.indexOf('promot') !== -1 || cardId.indexOf('promouvoir') !== -1))){
+          try{
+            const board = room.boardState;
+            let target = payload && payload.targetSquare;
+            if(!target){ try{ target = socket.data && socket.data.lastSelectedSquare; }catch(e){ target = null; } }
+            const roomPlayer = room.players.find(p => p.id === senderId);
+            const playerColorShort = (roomPlayer && roomPlayer.color && roomPlayer.color[0]) || null;
+            const targetPiece = (board && board.pieces || []).find(p => p.square === target);
+            // validate target exists and belongs to the player and is a pawn
+            if(!board || !target || !targetPiece || targetPiece.color !== playerColorShort || (targetPiece.type && String(targetPiece.type).toLowerCase() !== 'p')){
+              // Invalid target: consume the card and notify owner (promotion failed)
+              played.payload = Object.assign({}, payload, { applied: 'promotion_failed', attemptedTo: target });
+              try{ const owner = (room.players || []).find(p => p.id === senderId); if(owner && owner.socketId) io.to(owner.socketId).emit('card:effect:applied', { roomId: room.id, effect: { id: played.id, type: 'promotion_failed', playerId: senderId, square: target, ts: Date.now() } }); }catch(_){ }
+            } else {
+              // mutate the piece: promote to chosen piece (default to queen)
+              const oldType = targetPiece.type;
+              const chosen = (payload && (payload.promotion || payload.targetPromotion || payload.promoteTo)) || 'q';
+              const mapping = { q: 'q', r: 'r', b: 'b', n: 'n' };
+              const toType = mapping[String(chosen).toLowerCase()] || 'q';
+              targetPiece.type = toType;
+              // optional flag to indicate promotion
+              targetPiece.promoted = true;
+              // emit applied effect for clients to show special UI if desired
+              try{
+                const effect = { id: played.id, type: 'promotion', pieceId: targetPiece.id, pieceSquare: target, playerId: senderId, ts: Date.now() };
+                room.activeCardEffects = room.activeCardEffects || [];
+                room.activeCardEffects.push(effect);
+                try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect }); }catch(_){ }
+              }catch(_){ }
+              played.payload = Object.assign({}, payload, { applied: 'promotion', appliedTo: target, fromType: oldType, toType: targetPiece.type });
+            }
+          }catch(e){ console.error('promotion effect error', e); }
         }
         // brouillard de guerre: target a player so their board is fogged (they only see adjacent squares)
         else if(cardId === 'brouillard_de_guerre' || (typeof cardId === 'string' && cardId.indexOf('brouillard') !== -1)){

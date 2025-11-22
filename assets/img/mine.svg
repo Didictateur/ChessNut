@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Bomb</title>
+  <g fill="none" stroke="none">
+    <circle cx="30" cy="34" r="16" fill="#111" />
+    <rect x="38" y="14" width="12" height="8" rx="2" ry="2" fill="#333" transform="rotate(-15 44 18)" />
+    <path d="M44 12c0-3 6-6 6-6" stroke="#f5d742" stroke-width="3" stroke-linecap="round" fill="none" />
+    <circle cx="30" cy="34" r="2" fill="#fff" opacity="0.06" />
+  </g>
+</svg>

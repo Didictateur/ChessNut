@@ -77,6 +77,8 @@
       if(id.indexOf('adoub') !== -1) return 'owned';
       if(id.indexOf('folie') !== -1 || id.indexOf('fou') !== -1) return 'owned';
       if(id.indexOf('fortif') !== -1 || id.indexOf('fortification') !== -1) return 'owned';
+      // promotion targets one of your pawns (special handling client-side to show promotion choice)
+      if(id.indexOf('promotion') !== -1 || id.indexOf('promot') !== -1 || id.indexOf('promouvoir') !== -1) return 'owned_pawn';
       // steal/vol card targets an enemy piece
       if(id.indexOf('vol') !== -1 || id.indexOf('vole') !== -1 || id.indexOf('steal') !== -1) return 'enemy';
       return null;
@@ -161,6 +163,20 @@
             }
           }
         }catch(e){ console.warn('card:played handler error', e); }
+      });
+      // show card effect notifications (both public and private) so owners get feedback on failed placements/promotions
+      socket.on('card:effect:applied', (data) => {
+        try{
+          const effect = data && data.effect ? data.effect : data;
+          if(!effect) return;
+          // if this is a private or public effect relating to this player, show a small note
+          if(effect.playerId && effect.playerId === myPlayerId){
+            showEffectNotification(effect);
+          } else if(effect.type && (effect.type === 'promotion' || effect.type === 'steal' || effect.type === 'mine')){
+            // public notable effects
+            showEffectNotification(effect);
+          }
+        }catch(e){ console.warn('card:effect:applied handler error', e); }
       });
       // selection events (include moves) broadcasted by server
       socket.on('game:select', (data) => {
@@ -394,24 +410,53 @@
 
         // If we're in a pending card-targeting mode, handle target selection and do NOT attempt moves
         if(pendingCard){
-          const req = pendingCard.requireType; // 'empty' or 'owned'
+          const req = pendingCard.requireType; // 'empty' | 'owned' | 'owned_pawn' | 'enemy'
+          const myShort = (myColor && myColor[0]) || '';
           if(req === 'empty'){
             const occupied = currentBoardState && Array.isArray(currentBoardState.pieces) && currentBoardState.pieces.find(p => p.square === square);
             if(occupied){ log('square not empty for mine placement'); return; }
+            // send mine placement
+            socket.emit('card:play', { roomId, playerId: myPlayerId, cardId: pendingCard.cardId, payload: { targetSquare: square } }, (resp)=>{
+              if(resp && resp.error){ log('card:play error', resp); alert(resp.error); }
+              else { log('card played with target', resp); }
+            });
+            pendingCard = null; clearTargetHighlights(); return;
           } else if(req === 'owned'){
             const piece = currentBoardState && Array.isArray(currentBoardState.pieces) && currentBoardState.pieces.find(p => p.square === square);
-            const myShort = (myColor && myColor[0]) || '';
             if(!piece || piece.color !== myShort){ log('select one of your pieces'); return; }
+            socket.emit('card:play', { roomId, playerId: myPlayerId, cardId: pendingCard.cardId, payload: { targetSquare: square } }, (resp)=>{
+              if(resp && resp.error){ log('card:play error', resp); alert(resp.error); }
+              else { log('card played with target', resp); }
+            });
+            pendingCard = null; clearTargetHighlights(); return;
+          } else if(req === 'owned_pawn'){
+            // must be one of your pawns — show promotion choice modal before sending
+            const piece = currentBoardState && Array.isArray(currentBoardState.pieces) && currentBoardState.pieces.find(p => p.square === square);
+            if(!piece || piece.color !== myShort || !piece.type || piece.type.toLowerCase() !== 'p'){
+              log('select one of your pawns for promotion'); return;
+            }
+            // show promotion UI; when the player picks a piece type, emit the card:play with payload.promotion
+            showPromotionModal(square, (promotionChoice)=>{
+              if(!promotionChoice) {
+                // canceled
+                pendingCard = null; clearTargetHighlights(); return;
+              }
+              socket.emit('card:play', { roomId, playerId: myPlayerId, cardId: pendingCard.cardId, payload: { targetSquare: square, promotion: promotionChoice } }, (resp)=>{
+                if(resp && resp.error){ log('card:play error', resp); alert(resp.error); }
+                else { log('card played with promotion', resp); }
+              });
+              pendingCard = null; clearTargetHighlights();
+            });
+            return;
+          } else if(req === 'enemy'){
+            const occ = currentBoardState && Array.isArray(currentBoardState.pieces) && currentBoardState.pieces.find(p => p.square === square);
+            if(!occ || occ.color === myShort){ log('select an enemy piece'); return; }
+            socket.emit('card:play', { roomId, playerId: myPlayerId, cardId: pendingCard.cardId, payload: { targetSquare: square } }, (resp)=>{
+              if(resp && resp.error){ log('card:play error', resp); alert(resp.error); }
+              else { log('card played with target', resp); }
+            });
+            pendingCard = null; clearTargetHighlights(); return;
           }
-          // send card:play with targetSquare
-          socket.emit('card:play', { roomId, playerId: myPlayerId, cardId: pendingCard.cardId, payload: { targetSquare: square } }, (resp)=>{
-            if(resp && resp.error){ log('card:play error', resp); alert(resp.error); }
-            else { log('card played with target', resp); }
-          });
-          // clear pending state and highlights
-          pendingCard = null;
-          clearTargetHighlights();
-          return;
         }
 
         // If this square contains a move-marker (either clicked marker or square area), attempt the move.
@@ -511,7 +556,12 @@
         const img = document.createElement('img');
         img.className = 'mine-img';
         // use a project asset (SVG) that has a transparent background
-        img.src = '/assets/img/bomb.jpg';
+          img.src = '/assets/img/mine.svg';
+          img.alt = 'mine';
+          img.onerror = function(){
+            try{ if(this.src && this.src.indexOf('bomb.jpg') === -1) this.src = '/assets/img/bomb.jpg'; }
+            catch(e){}
+          };
         img.draggable = false;
         // ensure container is positioned so absolute centering works
         if(!el.style.position) el.style.position = 'relative';
@@ -586,6 +636,9 @@
         } else if(type === 'owned'){
           const occ = (currentBoardState.pieces||[]).find(p=>p.square===sq);
           if(occ && occ.color === myShort) sqEl.classList.add('targetable');
+        } else if(type === 'owned_pawn'){
+          const occ = (currentBoardState.pieces||[]).find(p=>p.square===sq);
+          if(occ && occ.color === myShort && occ.type && occ.type.toLowerCase() === 'p') sqEl.classList.add('targetable');
         } else if(type === 'enemy'){
           const occ = (currentBoardState.pieces||[]).find(p=>p.square===sq);
           if(occ && occ.color && occ.color !== myShort) sqEl.classList.add('targetable');
@@ -740,6 +793,73 @@
         handsEl.prepend(note);
         setTimeout(()=> note.remove(), 5000);
       }catch(e){ console.warn('showCardDrawnNotification error', e); }
+    }
+
+    function showEffectNotification(effect){
+      try{
+        const handsEl = document.getElementById('hands');
+        if(!handsEl) return;
+        const note = document.createElement('div');
+        note.className = 'card-draw-note';
+        if(effect.type === 'promotion_failed') note.textContent = 'Promotion échouée — la carte est consommée';
+        else if(effect.type === 'promotion') note.textContent = 'Promotion réussie !';
+        else if(effect.type === 'mine_failed') note.textContent = 'Placement de mine échoué — carte consommée';
+        else if(effect.type === 'steal_failed') note.textContent = 'Vol échoué — carte consommée';
+        else note.textContent = `Effet: ${effect.type}`;
+        note.style.padding = '6px 8px'; note.style.border = '1px solid #ccc'; note.style.background = '#fff8e1'; note.style.marginTop = '8px';
+        handsEl.prepend(note);
+        setTimeout(()=> note.remove(), 6000);
+      }catch(e){ console.warn('showEffectNotification error', e); }
+    }
+
+    // show a simple promotion choice modal. callback receives one of 'q','r','b','n' or null if cancelled
+    function showPromotionModal(square, callback){
+      try{
+        if(document.getElementById('promotionModal')) return;
+        const modal = document.createElement('div');
+        modal.id = 'promotionModal';
+        modal.style.position = 'fixed';
+        modal.style.left = '0'; modal.style.top = '0'; modal.style.right = '0'; modal.style.bottom = '0';
+        modal.style.display = 'flex'; modal.style.alignItems = 'center'; modal.style.justifyContent = 'center';
+        modal.style.background = 'rgba(0,0,0,0.45)'; modal.style.zIndex = '9999';
+
+        const box = document.createElement('div');
+        box.style.background = '#fff'; box.style.padding = '16px'; box.style.borderRadius = '8px'; box.style.minWidth = '320px'; box.style.textAlign = 'center';
+        const title = document.createElement('div'); title.textContent = 'Choisir la promotion'; title.style.fontWeight = '700'; title.style.marginBottom = '8px';
+        box.appendChild(title);
+
+        const desc = document.createElement('div'); desc.textContent = `Promouvoir le pion en:`; desc.style.marginBottom = '12px'; box.appendChild(desc);
+
+        const btnRow = document.createElement('div'); btnRow.style.display = 'flex'; btnRow.style.gap = '12px'; btnRow.style.justifyContent = 'center'; btnRow.style.marginBottom = '8px';
+
+        // determine the piece color at the square (should be a pawn)
+        const piece = currentBoardState && Array.isArray(currentBoardState.pieces) && currentBoardState.pieces.find(p=>p.square===square);
+        const colorPrefix = (piece && piece.color) ? (piece.color === 'w' ? 'w' : 'b') : ((myColor && myColor[0]) || 'w');
+        const promoTypes = [ ['q','Dame'], ['r','Tour'], ['b','Fou'], ['n','Cavalier'] ];
+        promoTypes.forEach(([code,label]) => {
+          const btn = document.createElement('button'); btn.type = 'button';
+          btn.style.padding = '6px'; btn.style.border = '1px solid #ccc'; btn.style.background = '#fff'; btn.style.cursor = 'pointer'; btn.style.display = 'flex'; btn.style.flexDirection = 'column'; btn.style.alignItems = 'center'; btn.style.gap = '6px';
+          // image
+          const letter = code.toUpperCase();
+          const img = document.createElement('img');
+          img.src = `${pieceSetPath}/${colorPrefix}${letter}.svg`;
+          img.alt = label; img.style.width = '48px'; img.style.height = '48px'; img.style.display = 'block';
+          // if image fails, show text label
+          img.addEventListener('error', ()=>{ img.style.display = 'none'; });
+          const lbl = document.createElement('div'); lbl.textContent = label; lbl.style.fontSize = '12px';
+          btn.appendChild(img); btn.appendChild(lbl);
+          btn.addEventListener('click', (ev)=>{ ev.stopPropagation(); try{ modal.remove(); }catch(_){ } callback(code); });
+          btnRow.appendChild(btn);
+        });
+        box.appendChild(btnRow);
+
+        const cancel = document.createElement('button'); cancel.type = 'button'; cancel.textContent = 'Annuler'; cancel.style.marginTop = '6px'; cancel.style.padding = '8px 12px';
+        cancel.addEventListener('click', (ev)=>{ ev.stopPropagation(); try{ modal.remove(); }catch(_){ } callback(null); });
+        box.appendChild(cancel);
+
+        modal.appendChild(box);
+        document.body.appendChild(modal);
+      }catch(e){ console.warn('showPromotionModal error', e); callback(null); }
     }
   </script>
 </body>

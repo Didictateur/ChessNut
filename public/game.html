@@ -50,6 +50,8 @@
   const remoteSelections = {};
   // track remote moves: { playerId: [moves] }
   const remoteMoves = {};
+  // current boardState cached locally
+  let currentBoardState = null;
 
     // safe logger: prefer on-page log if present, otherwise console
     function log(...args){
@@ -132,6 +134,16 @@
             }
           }
         }catch(e){ console.warn('game:select handler error', e); }
+      });
+
+      socket.on('move:moved', (data) => {
+        try{
+          log('recv move:moved', data && { from: data.from, to: data.to });
+          // clear any local selection (move completed) before re-render
+          clearSelection(false);
+          if(data && data.boardState) renderBoardFromState(data.boardState);
+          if(data && data.boardState) updateTurnBanner(data.boardState);
+        }catch(e){ console.warn('move:moved handler error', e); }
       });
 
       socket.emit('room:join', { roomId, playerId }, (resp)=>{
@@ -296,6 +308,27 @@
         const square = sqEl.getAttribute('data-square');
         if(!square) return;
 
+        // If this square contains a move-marker (either clicked marker or square area), attempt the move.
+        // Prefer the actual clicked marker if present, otherwise look for a marker element inside the square.
+        const clickedMarker = ev.target.closest && ev.target.closest('.move-marker');
+        const marker = clickedMarker || sqEl.querySelector('.move-marker');
+        if(marker){
+          // ignore remote player's markers
+          const remoteBy = marker.dataset && marker.dataset.remoteBy;
+          if(remoteBy && remoteBy !== myPlayerId){ log('marker belongs to remote player, ignoring'); return; }
+          const to = marker.dataset && marker.dataset.to;
+          const from = marker.dataset && marker.dataset.from ? marker.dataset.from : selectedSquare;
+          if(!to || !from){ log('invalid marker metadata', { from, to }); return; }
+          // only allow if it's our turn
+          const myShort = (myColor && myColor[0]) || '';
+          if(!currentBoardState || currentBoardState.turn !== myShort){ log('not your turn'); return; }
+          socket.emit('game:move', { roomId, from, to }, (resp)=>{
+            if(resp && resp.error){ log('move error', resp); alert(resp.error); }
+            else { log('move sent', resp); }
+          });
+          return;
+        }
+
         // clicked a piece -> select it (no legal moves requested)
         const pieceImg = ev.target.closest && ev.target.closest('img.piece');
         if(pieceImg){
@@ -316,6 +349,8 @@
 
     function renderBoardFromState(boardState){
       if(!boardState) return;
+      // cache boardState for client-side checks (turn etc.)
+      currentBoardState = boardState;
       // clear existing pieces but keep squares if present
       const squares = boardEl.querySelectorAll('.square');
       squares.forEach(s=> s.innerHTML = '');

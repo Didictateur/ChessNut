@@ -237,11 +237,64 @@ io.on('connection', (socket) => {
   socket.on('game:move', ({ roomId, from, to, promotion }, cb) => {
     const room = rooms.get(roomId);
     if (!room) return cb && cb({ error: 'room not found' });
+    // Basic move handling: validate turn, validate piece ownership, validate target is one of computeLegalMoves,
+    // apply the move to room.boardState, handle captures, flip turn and broadcast the updated board.
+    try{
+      const senderId = socket.data.playerId;
+      if(!senderId) return cb && cb({ error: 'not joined' });
+      const roomPlayer = room.players.find(p => p.id === senderId);
+      if(!roomPlayer) return cb && cb({ error: 'player not in room' });
+      if(!room.boardState) return cb && cb({ error: 'no board state' });
 
-    // Move handling/validation is intentionally not implemented here.
-    // Implement a function to validate & apply moves on the room.boardState and
-    // then emit 'move:moved' with move details and updated room.boardState.
-    return cb && cb({ error: 'move handling not implemented on server; implement custom engine' });
+      const board = room.boardState;
+      // determine player's color short form ('w'|'b')
+      const playerColorShort = (roomPlayer.color && roomPlayer.color[0]) || null;
+      if(!playerColorShort) return cb && cb({ error: 'invalid player color' });
+
+      // must be player's turn
+      if(board.turn !== playerColorShort) return cb && cb({ error: 'not your turn' });
+
+      // find piece at 'from'
+      const pieces = board.pieces || [];
+      const moving = pieces.find(p => p.square === from);
+      if(!moving) return cb && cb({ error: 'no piece at source' });
+      if(moving.color !== playerColorShort) return cb && cb({ error: 'not your piece' });
+
+      // validate that 'to' is among legal moves
+      const legal = computeLegalMoves(room, from) || [];
+      const ok = legal.some(m => m.to === to);
+      if(!ok) return cb && cb({ error: 'illegal move' });
+
+      // apply move: remove any piece on target (capture)
+      const targetIndex = pieces.findIndex(p => p.square === to);
+      if(targetIndex >= 0){
+        // remove captured piece
+        pieces.splice(targetIndex, 1);
+      }
+      // move the piece
+      moving.square = to;
+
+      // advance version and flip turn
+      board.version = (board.version || 0) + 1;
+      board.turn = (board.turn === 'w') ? 'b' : 'w';
+
+      // broadcast move and new board state
+      const moved = { playerId: senderId, from, to, boardState: board };
+      io.to(roomId).emit('move:moved', moved);
+      io.to(roomId).emit('room:update', {
+        boardState: board,
+        players: room.players.map(p => ({ id: p.id, color: p.color })),
+        status: room.status,
+        hostId: room.hostId,
+        size: room.size,
+        cards: Object.keys(room.cards || {})
+      });
+
+      return cb && cb({ ok: true, moved });
+    }catch(err){
+      console.error('game:move error', err);
+      return cb && cb({ error: 'server error' });
+    }
   });
 
   // Host can start the game explicitly

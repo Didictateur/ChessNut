@@ -6,6 +6,7 @@
 - choix de la couleur
 - selection des cartes
 - avec/sans timer
+- nombre max de carte
 
 ## Liste des cartes
 

@@ -125,7 +125,7 @@ button:hover{transform:translateY(-3px);transition:all 180ms ease}
 /* card hand UI */
 .player-hand{border:1px solid rgba(11,18,32,0.06);padding:8px;border-radius:8px;background:#fff}
 .card-item{display:flex;gap:8px;align-items:flex-start;background:#f8fafc;padding:8px;border-radius:8px;border:1px solid rgba(11,18,32,0.04)}
-.card-art{width:64px;height:48px;background:linear-gradient(180deg,#eef2ff,#ffffff);display:flex;align-items:center;justify-content:center;color:#475569;border-radius:6px;font-size:12px}
+.card-art{width:64px;height:60px;background:linear-gradient(180deg,#eef2ff,#ffffff);display:flex;align-items:center;justify-content:center;color:#475569;border-radius:6px;font-size:12px}
 .card-meta{display:flex;flex-direction:column}
 .card-title{font-weight:700;color:#0b1220}
 .card-desc{color:#475569;font-size:13px}
@@ -137,7 +137,7 @@ button:hover{transform:translateY(-3px);transition:all 180ms ease}
 .pokemon-hand-counts{display:flex;gap:6px;align-items:center}
 .opponent-count{background:rgba(11,18,32,0.03);padding:4px 8px;border-radius:8px;font-size:12px}
 .cards-row{display:flex;gap:12px;overflow-x:auto;padding-bottom:6px}
-.pokemon-card{flex:0 0 180px;height:260px;border-radius:12px;background:linear-gradient(180deg,#fff,#f6f8ff);box-shadow:0 10px 24px rgba(11,18,32,0.06);border:1px solid rgba(11,18,32,0.04);display:flex;flex-direction:column;cursor:pointer}
+.pokemon-card{flex:0 0 180px;height:300px;border-radius:12px;background:linear-gradient(180deg,#fff,#f6f8ff);box-shadow:0 10px 24px rgba(11,18,32,0.06);border:1px solid rgba(11,18,32,0.04);display:flex;flex-direction:column;cursor:pointer}
 .pokemon-card-top{flex:0 0 120px;padding:8px}
 .pokemon-card-art{width:100%;height:100%;background:linear-gradient(135deg,#f0f9ff,#eef2ff);border-radius:8px;display:flex;align-items:center;justify-content:center;color:#475569;font-weight:700}
 .pokemon-card-mid{padding:8px;flex:1 1 auto;display:flex;flex-direction:column;gap:6px}

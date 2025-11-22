@@ -49,13 +49,13 @@ function sendRoomUpdate(room){
 // Build a default deck from README list. Each card has a unique id, cardId (slug), title and description.
 function buildDefaultDeck(){
   const cards = [
-  ['tronquer le plateau','Tronque au maximum le plateau sans supprimer de pièce'],
-  ['agrandir le plateau','Rajoute une rangée dans toutes les directions'],
-    // ['rebondir sur les bords','Les déplacements en diagonales de la pièce séléctionées peuvent rebondir une fois sur les bords'],
+    // ['tronquer le plateau','Tronque au maximum le plateau sans supprimer de pièce'],
+    ['rebondir sur les bords','Les déplacements en diagonales de la pièce sélectionnée peuvent rebondir une fois sur les bords'],
+    ['agrandir le plateau','Rajoute une rangée dans toutes les directions'],
     // ['adoubement','La pièce sélectionnée peut maintenant faire les déplacements du cavalier en plus'],
     // ['folie','La pièce sélectionnée peut maintenant faire les déplacements du fou en plus'],
     // ['fortification','La pièce sélectionnée peut maintenant faire les déplacements de la tour en plus'],
-    // ['l anneau','Le plateau devient un anneau pendant un tour'],
+    // ["l'anneau","Le plateau devient un anneau pendant un tour"],
     // ['brouillard de guerre','Les joueur ne peuvent voir que au alentour de leurs pièces pendant X tours'],
     // ['changer la pièce à capturer','Le joueur choisie la nouvelle pièce jouant le rôle de roi sans la révéler'],
     // ['trou de ver','Deux cases du plateau deviennent maintenant la même'],
@@ -161,9 +161,11 @@ function computeLegalMoves(room, square){
 
   // helpers
   function squareToCoord(sq){
-    if(!/^[a-z][1-9][0-9]*$/i.test(sq)) return null;
-    const file = sq.charCodeAt(0) - 'a'.charCodeAt(0);
-    const rank = parseInt(sq.slice(1),10) - 1; // 0-indexed
+    if(!sq) return null;
+    const s = String(sq).trim().toLowerCase();
+    if(!/^[a-z][1-9][0-9]*$/.test(s)) return null;
+    const file = s.charCodeAt(0) - 'a'.charCodeAt(0);
+    const rank = parseInt(s.slice(1),10) - 1; // 0-indexed
     return { x: file, y: rank };
   }
   function coordToSquare(x,y){
@@ -243,12 +245,48 @@ function computeLegalMoves(room, square){
     const directions = [];
     if(type === 'B' || type === 'Q') directions.push([1,1],[1,-1],[-1,1],[-1,-1]);
     if(type === 'R' || type === 'Q') directions.push([1,0],[-1,0],[0,1],[0,-1]);
-    directions.forEach(([dx,dy])=>{
-      let tx = x + dx, ty = y + dy;
-      while(isInside(tx,ty)){
-        const cont = pushIfEmptyOrCapture(tx,ty);
-        if(!cont) break;
-        tx += dx; ty += dy;
+
+    // detect if this specific piece has an active rebondir effect
+    const hasRebond = (room.activeCardEffects || []).some(e => e.type === 'rebondir' && e.pieceSquare === square);
+
+    directions.forEach(([dx0,dy0])=>{
+      if(!hasRebond){
+        // standard sliding behavior
+        let tx = x + dx0, ty = y + dy0;
+        while(isInside(tx,ty)){
+          const cont = pushIfEmptyOrCapture(tx,ty);
+          if(!cont) break;
+          tx += dx0; ty += dy0;
+        }
+      } else {
+        // sliding with a single bounce on edges (mirror reflection once)
+        let dx = dx0, dy = dy0;
+        let cx = x, cy = y; // current position while sliding
+        let bounced = false;
+        while(true){
+          let tx = cx + dx, ty = cy + dy;
+          if(!isInside(tx,ty)){
+            if(bounced) break; // already used bounce
+            // reflect the direction components that would go out of bounds
+            if(tx < 0 || tx >= width) dx = -dx;
+            if(ty < 0 || ty >= height) dy = -dy;
+            bounced = true;
+            // recompute the next square after reflection from current position
+            tx = cx + dx; ty = cy + dy;
+            if(!isInside(tx,ty)) break; // still invalid after reflection
+          }
+          const tsq = coordToSquare(tx,ty);
+          const occ = getPieceAt(tsq);
+          if(!occ){
+            moves.push({ from: square, to: tsq });
+            // advance current position along the (possibly reflected) direction
+            cx = tx; cy = ty;
+            continue;
+          }
+          // occupied
+          if(occ.color !== color) moves.push({ from: square, to: tsq });
+          break;
+        }
       }
     });
     return moves;
@@ -421,6 +459,12 @@ io.on('connection', (socket) => {
       // move the piece
       moving.square = to;
 
+      // consume any active card effects bound to this piece (they apply to the piece once and are then removed)
+      try{
+        room.activeCardEffects = room.activeCardEffects || [];
+        room.activeCardEffects = room.activeCardEffects.filter(e => !(e.type === 'rebondir' && e.pieceSquare === from));
+      }catch(e){ console.error('consuming card effects error', e); }
+
       // advance version and flip turn
       board.version = (board.version || 0) + 1;
       board.turn = (board.turn === 'w') ? 'b' : 'w';
@@ -536,6 +580,8 @@ io.on('connection', (socket) => {
     const room = rooms.get(roomId);
     if(!room) return cb && cb({ error: 'room not found' });
     const playerId = socket.data.playerId || null;
+    // remember last selected square for this socket so cards that need a target can use it
+    try{ socket.data.lastSelectedSquare = square || null; }catch(e){}
     // compute legal moves for the selected square (allow capturing king)
     let moves = [];
     try{
@@ -548,6 +594,7 @@ io.on('connection', (socket) => {
     try{
       // send to selecting socket (include moves)
       socket.emit('game:select', { playerId, square, moves });
+      // (pending-target flow removed) — server no longer auto-applies pending card targets on selection
       // notify other sockets in the room about the selection but without revealing the legal moves
       socket.to(roomId).emit('game:select', { playerId, square, moves: [] });
     }catch(e){
@@ -578,6 +625,28 @@ io.on('connection', (socket) => {
     // store played card and apply card effects when applicable
     const played = { id: uuidv4().slice(0,8), playerId: senderId, cardId, payload, ts: Date.now() };
     room.playedCards = room.playedCards || [];
+
+    // Pre-check for rebondir: if the card is rebondir and there is no explicit target
+    // then require that the socket has a lastSelectedSquare which belongs to the player.
+    try{
+      const isRebond = (typeof cardId === 'string') && (cardId.indexOf('rebondir') !== -1 || cardId.indexOf('rebond') !== -1);
+      if(isRebond){
+        const board = room.boardState;
+        let targetCandidate = payload && payload.targetSquare;
+        if(!targetCandidate){ try{ targetCandidate = socket.data && socket.data.lastSelectedSquare; }catch(e){ targetCandidate = null; } }
+        const roomPlayer = room.players.find(p => p.id === senderId);
+        const playerColorShort = (roomPlayer && roomPlayer.color && roomPlayer.color[0]) || null;
+        const targetPiece = (board && board.pieces || []).find(p => p.square === targetCandidate);
+        if(!board || !targetCandidate || !targetPiece || targetPiece.color !== playerColorShort){
+          // nothing should happen if there's no selected piece or the selected piece isn't owned by the player
+          return cb && cb({ error: 'no valid target' });
+        }
+        // ensure the payload has the resolved target for downstream handling
+        payload = payload || {};
+        payload.targetSquare = targetCandidate;
+        played.payload = Object.assign({}, payload);
+      }
+    }catch(e){ console.error('rebondir pre-check error', e); }
 
     // remove the played card from the player's hand and move it to discard
     try{
@@ -611,9 +680,11 @@ io.on('connection', (socket) => {
 
           // helper: parse square -> coords (0-indexed)
           function squareToCoord(sq){
-            if(!sq || typeof sq !== 'string') return null;
-            const file = sq.charCodeAt(0) - 'a'.charCodeAt(0);
-            const rank = parseInt(sq.slice(1),10) - 1;
+            if(!sq) return null;
+            const s = String(sq).trim().toLowerCase();
+            if(!/^[a-z][1-9][0-9]*$/.test(s)) return null;
+            const file = s.charCodeAt(0) - 'a'.charCodeAt(0);
+            const rank = parseInt(s.slice(1),10) - 1;
             return { x: file, y: rank };
           }
           function coordToSquare(x,y){
@@ -637,68 +708,29 @@ io.on('connection', (socket) => {
           played.payload = Object.assign({}, payload, { applied: 'agrandir_plateau', oldWidth: oldW, oldHeight: oldH, newWidth: newW, newHeight: newH });
         }
       } else if(cardId === 'tronquer_plateau' || cardId === 'tronquer_le_plateau' || (typeof cardId === 'string' && cardId.indexOf('tronquer') !== -1)){
-        // Shrink the board by trimming empty outer files/ranks as much as possible without removing any piece.
-        const board = room.boardState;
-        if(board && board.width && board.height){
-          const oldW = board.width;
-          const oldH = board.height;
-          let width = oldW;
-          let height = oldH;
-
-          // helper: parse square -> coords (0-indexed)
-          function squareToCoord(sq){
-            if(!sq || typeof sq !== 'string') return null;
-            const file = sq.charCodeAt(0) - 'a'.charCodeAt(0);
-            const rank = parseInt(sq.slice(1),10) - 1;
-            return { x: file, y: rank };
+        // Tronquer (trim) is currently disabled: record the play but do not modify the board.
+        // Historically this code computed the occupied bounding box and rewrote board.pieces/width/height.
+        // That behavior caused unintended piece removals in some edge cases, so trimming is commented out for now.
+        played.payload = Object.assign({}, payload, { applied: 'tronquer_plateau', note: 'disabled - trimming commented out by developer' });
+      }
+      // rebondir: grant a one-time bounce ability to a specific piece (targetSquare required in payload)
+      else if(cardId === 'rebondir_sur_les_bords' || cardId === 'rebondir' || (typeof cardId === 'string' && cardId.indexOf('rebondir') !== -1)){
+        try{
+          const board = room.boardState;
+          // allow the client to either provide payload.targetSquare or rely on the last selected square
+          let target = payload && payload.targetSquare;
+          if(!target){
+            try{ target = socket.data && socket.data.lastSelectedSquare; }catch(e){ target = null; }
           }
-          function coordToSquare(x,y){
-            return String.fromCharCode('a'.charCodeAt(0) + x) + (y+1);
+          if(!board) {
+            played.payload = Object.assign({}, payload, { applied: 'rebondir', appliedTo: null, note: 'no board state' });
+          } else {
+            room.activeCardEffects = room.activeCardEffects || [];
+            // effect: type, pieceSquare, playerId, expiresOnMoveVersion (optional)
+            room.activeCardEffects.push({ id: played.id, type: 'rebondir', pieceSquare: target, playerId: senderId });
+            played.payload = Object.assign({}, payload, { applied: 'rebondir', appliedTo: target });
           }
-
-          function colHasPiece(x){
-            return (board.pieces || []).some(p => { const c = squareToCoord(p.square); return c && c.x === x; });
-          }
-          function rowHasPiece(y){
-            return (board.pieces || []).some(p => { const c = squareToCoord(p.square); return c && c.y === y; });
-          }
-
-          // trim left columns that are empty
-          while(width > 1 && !colHasPiece(0)){
-            // shift all pieces left by 1
-            (board.pieces || []).forEach(p => {
-              const c = squareToCoord(p.square);
-              if(!c) return;
-              p.square = coordToSquare(c.x - 1, c.y);
-            });
-            width -= 1;
-          }
-          // trim right columns that are empty
-          while(width > 1 && !colHasPiece(width - 1)){
-            // no shift needed for trimming right
-            width -= 1;
-          }
-          // trim bottom ranks that are empty
-          while(height > 1 && !rowHasPiece(0)){
-            // shift all pieces down by 1 (y-1)
-            (board.pieces || []).forEach(p => {
-              const c = squareToCoord(p.square);
-              if(!c) return;
-              p.square = coordToSquare(c.x, c.y - 1);
-            });
-            height -= 1;
-          }
-          // trim top ranks that are empty
-          while(height > 1 && !rowHasPiece(height - 1)){
-            height -= 1;
-          }
-
-          board.width = width;
-          board.height = height;
-          board.version = (board.version || 0) + 1;
-
-          played.payload = Object.assign({}, payload, { applied: 'tronquer_plateau', oldWidth: oldW, oldHeight: oldH, newWidth: width, newHeight: height });
-        }
+        }catch(e){ console.error('rebondir effect error', e); }
       }
     }catch(e){
       console.error('card:play effect error', e);

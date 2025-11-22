@@ -40,10 +40,49 @@ function sendRoomUpdate(room){
       handsOwn: (room.hands && room.hands[p.id]) ? room.hands[p.id] : [],
       handCounts
     });
+    // attach visible squares for this recipient (fog of war)
+    try{
+      payload.visibleSquares = Array.from(visibleSquaresForPlayer(room, p.id) || []);
+    }catch(e){ payload.visibleSquares = []; }
     if(p.socketId){
       io.to(p.socketId).emit('room:update', payload);
     }
   });
+}
+
+// Compute the set of squares visible to a given player (adjacent to any of their pieces).
+// Returns a Set of square strings (e.g., 'e4').
+function visibleSquaresForPlayer(room, playerId){
+  const out = new Set();
+  if(!room || !room.boardState || !playerId) return out;
+  const state = room.boardState;
+  const width = state.width || 8;
+  const height = state.height || 8;
+  function squareToCoord(sq){
+    if(!sq) return null;
+    const s = String(sq).trim().toLowerCase();
+    if(!/^[a-z][1-9][0-9]*$/.test(s)) return null;
+    const file = s.charCodeAt(0) - 'a'.charCodeAt(0);
+    const rank = parseInt(s.slice(1),10) - 1; // 0-indexed
+    return { x: file, y: rank };
+  }
+  function coordToSquare(x,y){ if(x<0||y<0||x>=width||y>=height) return null; return String.fromCharCode('a'.charCodeAt(0) + x) + (y+1); }
+  // find the player color for playerId
+  const player = (room.players || []).find(p => p.id === playerId);
+  if(!player) return out;
+  const colorShort = (player.color && player.color[0]) || null;
+  // iterate pieces belonging to player
+  (state.pieces || []).forEach(piece => {
+    if(piece.color !== colorShort) return;
+    const c = squareToCoord(piece.square);
+    if(!c) return;
+    for(let dx=-1; dx<=1; dx++) for(let dy=-1; dy<=1; dy++){
+      const nx = c.x + dx, ny = c.y + dy;
+      const sq = coordToSquare(nx, ny);
+      if(sq) out.add(sq);
+    }
+  });
+  return out;
 }
 
 // Build a default deck from README list. Each card has a unique id, cardId (slug), title and description.
@@ -57,7 +96,7 @@ function buildDefaultDeck(){
     ['fortification','La pièce sélectionnée peut maintenant faire les déplacements de la tour en plus'],
     ['fortification','La pièce sélectionnée peut maintenant faire les déplacements de la tour en plus'],
     ["l'anneau","Le plateau devient un anneau pendant un tour"],
-    // ['brouillard de guerre','Les joueur ne peuvent voir que au alentour de leurs pièces pendant X tours'],
+    // ['brouillard de guerre','Les joueur ne peuvent voir que au alentour de leurs pièces pendant 4 tours'],
     // ['changer la pièce à capturer','Le joueur choisie la nouvelle pièce jouant le rôle de roi sans la révéler'],
     // ['trou de ver','Deux cases du plateau deviennent maintenant la même'],
     // ['jouer deux fois','Le joueur peut déplacer deux pièces'],
@@ -261,6 +300,18 @@ function computeLegalMoves(room, square){
     return null;
   }
 
+  // filter moves according to brouillard (fog of war) if it is active for the owner of this piece
+  function filterMovesByFog(moves){
+    try{
+      const owner = ownerPlayer;
+      if(!owner) return moves;
+      const hasBrouillard = (room.activeCardEffects || []).some(e => e.type === 'brouillard' && e.playerId === owner.id);
+      if(!hasBrouillard) return moves;
+      const vis = visibleSquaresForPlayer(room, owner.id);
+      return (moves || []).filter(m => vis.has(m.to));
+    }catch(e){ return moves; }
+  }
+
   // helper to add diagonal sliding moves when a piece has been "folié"
   function addFolieMoves(){
     if(!hasFolie) return;
@@ -349,7 +400,7 @@ function computeLegalMoves(room, square){
       if(occ && occ.color !== color) moves.push({ from: square, to: tsq });
     });
     addAdoubementMoves(); addFolieMoves(); addFortificationMoves();
-    return moves;
+    return filterMovesByFog(moves);
   }
 
   if(type === 'N'){
@@ -362,7 +413,7 @@ function computeLegalMoves(room, square){
       if(!occ || occ.color !== color) moves.push({ from: square, to: tsq });
     });
     addAdoubementMoves(); addFolieMoves(); addFortificationMoves();
-    return moves;
+    return filterMovesByFog(moves);
   }
 
   if(type === 'B' || type === 'Q' || type === 'R'){
@@ -436,7 +487,7 @@ function computeLegalMoves(room, square){
       }
     });
     addAdoubementMoves(); addFolieMoves(); addFortificationMoves();
-    return moves;
+    return filterMovesByFog(moves);
   }
 
   if(type === 'K'){
@@ -449,11 +500,11 @@ function computeLegalMoves(room, square){
       if(!occ || occ.color !== color) moves.push({ from: square, to: tsq });
     }
     addAdoubementMoves(); addFolieMoves();
-    return moves;
+    return filterMovesByFog(moves);
   }
 
   addAdoubementMoves(); addFolieMoves(); addFortificationMoves();
-  return moves;
+  return filterMovesByFog(moves);
 }
 
 function startingBoardState8(){
@@ -594,6 +645,14 @@ io.on('connection', (socket) => {
       const legal = computeLegalMoves(room, from) || [];
       const ok = legal.some(m => m.to === to);
       if(!ok) return cb && cb({ error: 'illegal move' });
+      // additionally, do not allow moving into a fogged square if brouillard is active for this player
+      try{
+        const hasBrouillardForPlayer = (room.activeCardEffects || []).some(e => e.type === 'brouillard' && e.playerId === senderId);
+        if(hasBrouillardForPlayer){
+          const vis = visibleSquaresForPlayer(room, senderId);
+          if(!vis.has(to)) return cb && cb({ error: 'destination not visible (fog of war)' });
+        }
+      }catch(e){ /* ignore */ }
 
       // apply move: remove any piece on target (capture)
       const targetIndex = pieces.findIndex(p => p.square === to);
@@ -627,10 +686,23 @@ io.on('connection', (socket) => {
       board.version = (board.version || 0) + 1;
       board.turn = (board.turn === 'w') ? 'b' : 'w';
 
-      // remove any anneau effects that belonged to the player who just finished their turn
+      // decrement remainingTurns for any time-limited effects that belong to the player who just finished their turn
       try{
-        room.activeCardEffects = (room.activeCardEffects || []).filter(e => !(e.type === 'anneau' && e.playerId === senderId));
-      }catch(e){ console.error('clearing anneau effects error', e); }
+        room.activeCardEffects = room.activeCardEffects || [];
+        for(let i = room.activeCardEffects.length - 1; i >= 0; i--){
+          const e = room.activeCardEffects[i];
+          if(e.playerId === senderId && typeof e.remainingTurns === 'number'){
+            e.remainingTurns = e.remainingTurns - 1;
+            // emit informative event when effect is decremented/removed
+            try{ io.to(room.id).emit('card:effect:updated', { roomId: room.id, effect: e }); }catch(_){}
+            if(e.remainingTurns <= 0){
+              // remove expired effect
+              room.activeCardEffects.splice(i,1);
+              try{ io.to(room.id).emit('card:effect:removed', { roomId: room.id, effectId: e.id, type: e.type, playerId: e.playerId }); }catch(_){}
+            }
+          }
+        }
+      }catch(e){ console.error('updating temporary effects error', e); }
 
       // at this point the board has been updated and the turn flipped
       // determine next player and perform their draw BEFORE broadcasting the move, so the draw happens at the start of their turn
@@ -841,6 +913,8 @@ io.on('connection', (socket) => {
       room.discard.push(removed);
       // attach the removed card object to the played record for informational broadcast
       played.card = removed;
+  // normalize cardId to the card's slug when the client passed an instance id
+  cardId = (removed && removed.cardId) || cardId;
     }catch(e){
       console.error('card removal error', e);
     }
@@ -972,12 +1046,38 @@ io.on('connection', (socket) => {
           played.payload = Object.assign({}, payload, { applied: 'fortification', appliedTo: target });
         }catch(e){ console.error('fortification effect error', e); }
         }
+        // brouillard de guerre: target a player so their board is fogged (they only see adjacent squares)
+        else if(cardId === 'brouillard_de_guerre' || (typeof cardId === 'string' && cardId.indexOf('brouillard') !== -1)){
+          try{
+            const board = room.boardState;
+            // determine target player id: payload.targetPlayerId or the opponent
+            let targetPlayerId = payload && payload.targetPlayerId;
+            if(!targetPlayerId){
+              const opp = (room.players || []).find(p => p.id !== senderId);
+              targetPlayerId = opp && opp.id;
+            }
+            const targetPlayer = (room.players || []).find(p => p.id === targetPlayerId);
+            if(!board || !targetPlayer || targetPlayer.id === senderId){
+              // restore removed card to hand and abort
+              try{ room.hands = room.hands || {}; room.hands[senderId] = room.hands[senderId] || []; if(removed) room.hands[senderId].push(removed); room.discard = room.discard || []; for(let i = room.discard.length-1;i>=0;i--){ if(room.discard[i] && room.discard[i].id === (removed && removed.id)){ room.discard.splice(i,1); break; } } }catch(e){}
+              return cb && cb({ error: 'no valid target player' });
+            }
+            // record brouillard effect for target player
+            room.activeCardEffects = room.activeCardEffects || [];
+            const effect = { id: played.id, type: 'brouillard', playerId: targetPlayer.id, ts: Date.now(), remainingTurns: (payload && payload.turns) || 4 };
+            room.activeCardEffects.push(effect);
+            try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect }); }catch(_){}
+            played.payload = Object.assign({}, payload, { applied: 'brouillard', appliedToPlayer: targetPlayer.id });
+          }catch(e){ console.error('brouillard effect error', e); }
+        }
         // anneau: make the board horizontally wrap for the playing player's pieces for this turn
         else if(cardId === 'anneau' || (typeof cardId === 'string' && cardId.indexOf('anneau') !== -1)){
           try{
             // record an anneau effect scoped to the player so their pieces gain wrap behavior
             room.activeCardEffects = room.activeCardEffects || [];
-            room.activeCardEffects.push({ id: played.id, type: 'anneau', playerId: senderId, ts: Date.now() });
+            const effect = { id: played.id, type: 'anneau', playerId: senderId, ts: Date.now(), remainingTurns: (payload && payload.turns) || 1 };
+            room.activeCardEffects.push(effect);
+            try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect }); }catch(_){}
             played.payload = Object.assign({}, payload, { applied: 'anneau' });
           }catch(e){ console.error('anneau effect error', e); }
         }

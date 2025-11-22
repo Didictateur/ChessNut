@@ -687,39 +687,79 @@ io.on('connection', (socket) => {
         }
       }catch(e){ console.error('consuming card effects error', e); }
 
-      // advance version and flip turn
+      // advance board version
       board.version = (board.version || 0) + 1;
-      board.turn = (board.turn === 'w') ? 'b' : 'w';
 
-      // decrement remainingTurns for any time-limited effects that belong to the player who just finished their turn
+      // Attempt to consume a double-move effect for the moving player. If present, this allows the player
+      // to make an additional move without flipping the turn. We represent that effect as:
+      // { type: 'double_move', playerId, remainingMoves }
+      let consumedDoubleMove = false;
       try{
         room.activeCardEffects = room.activeCardEffects || [];
         for(let i = room.activeCardEffects.length - 1; i >= 0; i--){
           const e = room.activeCardEffects[i];
-          if(e.playerId === senderId && typeof e.remainingTurns === 'number'){
-            e.remainingTurns = e.remainingTurns - 1;
-            // emit informative event when effect is decremented/removed
-            try{ io.to(room.id).emit('card:effect:updated', { roomId: room.id, effect: e }); }catch(_){}
-            if(e.remainingTurns <= 0){
-              // remove expired effect
-              room.activeCardEffects.splice(i,1);
-              try{ io.to(room.id).emit('card:effect:removed', { roomId: room.id, effectId: e.id, type: e.type, playerId: e.playerId }); }catch(_){}
+          if(e.type === 'double_move' && e.playerId === senderId){
+            // compute remaining moves after consuming one
+            const newRemaining = (typeof e.remainingMoves === 'number') ? (e.remainingMoves - 1) : ((e.remainingMoves || 2) - 1);
+            // update or remove depending on remaining count
+            if(newRemaining > 0){
+              e.remainingMoves = newRemaining;
+              consumedDoubleMove = true; // still have extra moves, so don't flip the turn
+              try{ io.to(room.id).emit('card:effect:updated', { roomId: room.id, effect: e }); }catch(_){ }
+            } else {
+              // used up: remove the effect and emit removal
+              try{
+                room.activeCardEffects.splice(i,1);
+              }catch(_){ }
+              try{ io.to(room.id).emit('card:effect:removed', { roomId: room.id, effectId: e.id, type: e.type, playerId: e.playerId }); }catch(_){ }
             }
+            break;
           }
         }
-      }catch(e){ console.error('updating temporary effects error', e); }
+      }catch(err){ console.error('double_move consume error', err); }
 
-      // at this point the board has been updated and the turn flipped
+      // If the player didn't consume a double-move effect, flip turn and decrement per-turn effects
+      if(!consumedDoubleMove){
+        board.turn = (board.turn === 'w') ? 'b' : 'w';
+
+        // decrement remainingTurns for any time-limited effects that belong to the player who just finished their turn
+        try{
+          room.activeCardEffects = room.activeCardEffects || [];
+          for(let i = room.activeCardEffects.length - 1; i >= 0; i--){
+            const e = room.activeCardEffects[i];
+            if(e.playerId === senderId && typeof e.remainingTurns === 'number'){
+              e.remainingTurns = e.remainingTurns - 1;
+              // emit informative event when effect is decremented/removed
+              try{ io.to(room.id).emit('card:effect:updated', { roomId: room.id, effect: e }); }catch(_){ }
+              if(e.remainingTurns <= 0){
+                // remove expired effect
+                room.activeCardEffects.splice(i,1);
+                try{ io.to(room.id).emit('card:effect:removed', { roomId: room.id, effectId: e.id, type: e.type, playerId: e.playerId }); }catch(_){ }
+              }
+            }
+          }
+        }catch(e){ console.error('updating temporary effects error', e); }
+
+        // reset per-turn card-play flags because turn changed
+        try{ room._cardPlayedThisTurn = {}; }catch(_){}
+      }
+
+      // at this point the board has been updated (and possibly the turn flipped)
       // determine next player and perform their draw BEFORE broadcasting the move, so the draw happens at the start of their turn
       const moved = { playerId: senderId, from, to, boardState: board };
       try{
-        const nextColor = board.turn; // 'w' or 'b'
-        const nextPlayer = room.players.find(p => (p.color && p.color[0]) === nextColor);
-        if(nextPlayer){
-          // draw for next player (this will emit card:drawn privately and send personalized room:update)
-          drawCardForPlayer(room, nextPlayer.id);
+        if(!consumedDoubleMove){
+          const nextColor = board.turn; // 'w' or 'b'
+          const nextPlayer = room.players.find(p => (p.color && p.color[0]) === nextColor);
+          if(nextPlayer){
+            // draw for next player (this will emit card:drawn privately and send personalized room:update)
+            drawCardForPlayer(room, nextPlayer.id);
+          } else {
+            // ensure room state is broadcast
+            sendRoomUpdate(room);
+          }
         } else {
-          // ensure room state is broadcast
+          // the same player still has an extra move; do not draw a new card now — just broadcast the updated room state
           sendRoomUpdate(room);
         }
       }catch(e){
@@ -870,8 +910,9 @@ io.on('connection', (socket) => {
         const playerColorShort = (roomPlayer && roomPlayer.color && roomPlayer.color[0]) || null;
         // only allow playing a card on your turn
         if(board.turn !== playerColorShort) return cb && cb({ error: 'not your turn' });
-        room._cardPlayedForVersion = room._cardPlayedForVersion || {};
-        if(room._cardPlayedForVersion[senderId] === board.version) return cb && cb({ error: 'card_already_played_this_turn' });
+        // track card plays per turn (not per board version) so effects like "double move" don't allow extra card plays
+        room._cardPlayedThisTurn = room._cardPlayedThisTurn || {};
+        if(room._cardPlayedThisTurn[senderId]) return cb && cb({ error: 'card_already_played_this_turn' });
       }
     }catch(e){ console.error('card play pre-check error', e); }
     // store played card and apply card effects when applicable
@@ -1086,6 +1127,17 @@ io.on('connection', (socket) => {
             played.payload = Object.assign({}, payload, { applied: 'anneau' });
           }catch(e){ console.error('anneau effect error', e); }
         }
+        // jouer deux fois: grant the playing player one extra move this turn (does not allow another card play)
+        else if(cardId === 'jouer_deux_fois' || (typeof cardId === 'string' && cardId.indexOf('jouer') !== -1 && cardId.indexOf('deux') !== -1)){
+          try{
+            // record double-move effect scoped to the player
+            room.activeCardEffects = room.activeCardEffects || [];
+            const effect = { id: played.id, type: 'double_move', playerId: senderId, ts: Date.now(), remainingMoves: (payload && payload.moves) || 2 };
+            room.activeCardEffects.push(effect);
+            try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect }); }catch(_){ }
+            played.payload = Object.assign({}, payload, { applied: 'double_move', moves: effect.remainingMoves });
+          }catch(e){ console.error('double_move effect error', e); }
+        }
       // rebondir: grant a one-time bounce ability to a specific piece (targetSquare required in payload)
       else if(cardId === 'rebondir_sur_les_bords' || cardId === 'rebondir' || (typeof cardId === 'string' && cardId.indexOf('rebondir') !== -1)){
         try{
@@ -1123,11 +1175,11 @@ io.on('connection', (socket) => {
 
   room.playedCards.push(played);
   // mark that this player has played a card for this board version (prevents multiple cards per turn)
-  try{
+    try{
     const board = room.boardState;
     if(room.status === 'playing' && board){
-      room._cardPlayedForVersion = room._cardPlayedForVersion || {};
-      room._cardPlayedForVersion[played.playerId] = board.version;
+      room._cardPlayedThisTurn = room._cardPlayedThisTurn || {};
+      room._cardPlayedThisTurn[played.playerId] = true;
     }
   }catch(e){ console.error('mark card played error', e); }
   // emit card played to entire room (informational)

@@ -9,6 +9,11 @@
 - nombre max de carte
 - avec/sans remise des cartes
 
+## Variantes
+
+- toutes les pièces invisibles
+- brouillard de guerre
+
 ## Liste des cartes
 
 ### Rétrécir le plateau

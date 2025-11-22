@@ -622,6 +622,18 @@ io.on('connection', (socket) => {
     // enforce sender identity from socket (don't trust client-supplied playerId)
     const senderId = socket.data.playerId;
     if(!senderId) return cb && cb({ error: 'not joined' });
+    // enforce one card per player per turn when the game is playing
+    try{
+      const board = room.boardState;
+      if(room.status === 'playing' && board){
+        const roomPlayer = room.players.find(p => p.id === senderId);
+        const playerColorShort = (roomPlayer && roomPlayer.color && roomPlayer.color[0]) || null;
+        // only allow playing a card on your turn
+        if(board.turn !== playerColorShort) return cb && cb({ error: 'not your turn' });
+        room._cardPlayedForVersion = room._cardPlayedForVersion || {};
+        if(room._cardPlayedForVersion[senderId] === board.version) return cb && cb({ error: 'card_already_played_this_turn' });
+      }
+    }catch(e){ console.error('card play pre-check error', e); }
     // store played card and apply card effects when applicable
     const played = { id: uuidv4().slice(0,8), playerId: senderId, cardId, payload, ts: Date.now() };
     room.playedCards = room.playedCards || [];
@@ -737,6 +749,14 @@ io.on('connection', (socket) => {
     }
 
   room.playedCards.push(played);
+  // mark that this player has played a card for this board version (prevents multiple cards per turn)
+  try{
+    const board = room.boardState;
+    if(room.status === 'playing' && board){
+      room._cardPlayedForVersion = room._cardPlayedForVersion || {};
+      room._cardPlayedForVersion[played.playerId] = board.version;
+    }
+  }catch(e){ console.error('mark card played error', e); }
   // emit card played to entire room (informational)
   io.to(roomId).emit('card:played', played);
   // send personalized room updates (will include updated hands and discardCount)

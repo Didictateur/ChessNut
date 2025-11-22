@@ -151,7 +151,7 @@ function buildDefaultDeck(){
     ['invisible','Une des pièces devient invisible pour l adversaire'],
     // ['épidémie','Toutes les pièces sur le territoire enemie est est capturée'],
     // ['glue','Toutes les pièces autour de la pièce désignée ne peuvent pas bouger tant que cette dernière ne bouge pas'],
-    // ['coin coin','Possibilité de se téléporter depuis  un coin vers n importe quel autre coin'],
+    ["coin coin","Possibilité de se téléporter depuis un coin vers n'importe quel autre coin"],
     // ['téléportation','Téléporte n importe quelle pièce de son camp sur une case vide'],
     // ['changement de camp','On retourne le plateau'],
     // ['ça tangue','Toutes les pièces se décale du même côté'],
@@ -298,6 +298,21 @@ function computeLegalMoves(room, square){
 
   const x = fromCoord.x, y = fromCoord.y;
   const type = (piece.type || '').toUpperCase();
+  // If this piece has been granted corner-teleport moves by 'coincoin', include those allowed squares
+  try{
+    const coin = (room.activeCardEffects || []).find(e => e && e.type === 'coincoin' && ((e.pieceId && e.pieceId === piece.id) || e.pieceSquare === square));
+    if(coin && Array.isArray(coin.allowedSquares) && coin.allowedSquares.length > 0){
+      coin.allowedSquares.forEach(sq => {
+        try{
+          // only add empty corner squares (do not allow capture via coincoin)
+          if(!moves.some(m => m.to === sq)){
+            const occ = getPieceAt(sq);
+            if(!occ) moves.push({ from: square, to: sq });
+          }
+        }catch(_){ }
+      });
+    }
+  }catch(_){ }
   // detect if this specific piece has a permanent adoubement effect (grants knight moves)
   // effects may be bound either to the piece's current square or to the piece id (preferred)
   const hasAdoubement = (room.activeCardEffects || []).some(e => e.type === 'adoubement' && ((e.pieceId && e.pieceId === piece.id) || e.pieceSquare === square));
@@ -1306,6 +1321,59 @@ io.on('connection', (socket) => {
               }
             }catch(_){ }
           }catch(e){ console.error('kamikaz effect error', e); }
+        }
+        // coin coin: teleport one of your pieces from a corner to another empty corner
+        else if((typeof cardId === 'string' && (cardId.indexOf('coin') !== -1 || cardId.indexOf('coincoin') !== -1)) || cardId === 'coin_coin'){
+          try{
+            const board = room.boardState;
+            let source = payload && payload.targetSquare;
+            if(!source){ try{ source = socket.data && socket.data.lastSelectedSquare; }catch(e){ source = null; } }
+            const roomPlayer = room.players.find(p => p.id === senderId);
+            const playerColorShort = (roomPlayer && roomPlayer.color && roomPlayer.color[0]) || null;
+            const piece = (board && board.pieces || []).find(p => p.square === source);
+            // determine corner squares for the current board
+            const w = (board && board.width) || 8;
+            const h = (board && board.height) || 8;
+            const left = 'a';
+            const right = String.fromCharCode('a'.charCodeAt(0) + (w - 1));
+            const corners = [ left + '1', left + String(h), right + '1', right + String(h) ];
+            // validate source exists, belongs to the player and is on a corner
+            if(!board || !source || !piece || piece.color !== playerColorShort || corners.indexOf(source) === -1){
+              // invalid target: restore card to hand and abort
+              try{
+                room.hands = room.hands || {};
+                room.hands[senderId] = room.hands[senderId] || [];
+                if(removed) room.hands[senderId].push(removed);
+                room.discard = room.discard || [];
+                for(let i = room.discard.length - 1; i >= 0; i--){ if(room.discard[i] && room.discard[i].id === (removed && removed.id)){ room.discard.splice(i,1); break; } }
+              }catch(e){ console.error('restore removed card error', e); }
+              return cb && cb({ error: 'no valid corner piece selected' });
+            }
+            // find available destination corners (empty)
+            const emptyCorners = corners.filter(c => { return !(board.pieces || []).some(p => p.square === c); });
+            // remove the source corner from choices
+            const destChoices = emptyCorners.filter(c => c !== source);
+            if(!destChoices || destChoices.length === 0){
+              // nothing to teleport to: restore card
+              try{
+                room.hands = room.hands || {};
+                room.hands[senderId] = room.hands[senderId] || [];
+                if(removed) room.hands[senderId].push(removed);
+                room.discard = room.discard || [];
+                for(let i = room.discard.length - 1; i >= 0; i--){ if(room.discard[i] && room.discard[i].id === (removed && removed.id)){ room.discard.splice(i,1); break; } }
+              }catch(e){ console.error('restore removed card error', e); }
+              return cb && cb({ error: 'no empty destination corner available' });
+            }
+            // instead of teleporting immediately, record an effect that grants this piece the ability
+            // to move to any of the available corner squares for one turn
+            const effect = { id: played.id, type: 'coincoin', playerId: senderId, pieceId: piece.id, pieceSquare: source, allowedSquares: destChoices.slice(0), remainingTurns: 1, ts: Date.now() };
+            room.activeCardEffects = room.activeCardEffects || [];
+            room.activeCardEffects.push(effect);
+            // bump version so clients refresh legal moves when they request them
+            board.version = (board.version || 0) + 1;
+            try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect }); }catch(_){ }
+            played.payload = Object.assign({}, payload, { applied: 'coincoin', from: source, allowed: destChoices.slice(0) });
+          }catch(e){ console.error('coincoin effect error', e); }
         }
         // invisible: make one of your pieces invisible to the opponent for a number of turns
         else if(cardId === 'invisible' || (typeof cardId === 'string' && cardId.indexOf('invis') !== -1)){

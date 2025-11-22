@@ -72,21 +72,22 @@
     function cardRequiresTarget(cardId){
       if(!cardId) return null;
       const id = String(cardId).toLowerCase();
-  if(id.indexOf('mine') !== -1) return 'empty';
-  // kamikaz targets one of your pieces (play card, then choose a piece)
-  if(id.indexOf('kamikaz') !== -1) return 'owned';
-  if(id.indexOf('invis') !== -1 || id.indexOf('invisible') !== -1) return 'owned';
-      if(id.indexOf('rebond') !== -1) return 'owned';
-      if(id.indexOf('adoub') !== -1) return 'owned';
-      if(id.indexOf('folie') !== -1 || id.indexOf('fou') !== -1) return 'owned';
-      if(id.indexOf('fortif') !== -1 || id.indexOf('fortification') !== -1) return 'owned';
-      // promotion targets one of your pawns (special handling client-side to show promotion choice)
-      if(id.indexOf('promotion') !== -1 || id.indexOf('promot') !== -1 || id.indexOf('promouvoir') !== -1) return 'owned_pawn';
-      // steal a card (target a player) if the card mentions 'carte'/'card' — otherwise a 'vol' often targets a piece
-      if(id.indexOf('vol') !== -1 || id.indexOf('vole') !== -1 || id.indexOf('steal') !== -1){
-        if(id.indexOf('carte') !== -1 || id.indexOf('card') !== -1) return 'player';
-        return 'enemy';
-      }
+    if(id.indexOf('mine') !== -1) return 'empty';
+    // kamikaz targets one of your pieces (play card, then choose a piece)
+    if(id.indexOf('kamikaz') !== -1) return 'owned';
+    if(id.indexOf('invis') !== -1 || id.indexOf('invisible') !== -1) return 'owned';
+    if(id.indexOf('rebond') !== -1) return 'owned';
+    if(id.indexOf('adoub') !== -1) return 'owned';
+    if(id.indexOf('folie') !== -1 || id.indexOf('fou') !== -1) return 'owned';
+    if(id.indexOf('fortif') !== -1 || id.indexOf('fortification') !== -1) return 'owned';
+    // promotion targets one of your pawns (special handling client-side to show promotion choice)
+    if(id.indexOf('promotion') !== -1 || id.indexOf('promot') !== -1 || id.indexOf('promouvoir') !== -1) return 'owned_pawn';
+    // steal a card (target a player) if the card mentions 'carte'/'card' — otherwise a 'vol' often targets a piece
+    if(id.indexOf('vol') !== -1 || id.indexOf('vole') !== -1 || id.indexOf('steal') !== -1){
+      if(id.indexOf('carte') !== -1 || id.indexOf('card') !== -1) return 'player';
+      return 'enemy';
+    }
+    if(id.indexOf('coin') !== -1 || id === 'coin_coin') return 'owned';
       return null;
     }
 

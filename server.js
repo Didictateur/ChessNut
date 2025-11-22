@@ -732,11 +732,13 @@ io.on('connection', (socket) => {
     const played = { id: uuidv4().slice(0,8), playerId: senderId, cardId, payload, ts: Date.now() };
     room.playedCards = room.playedCards || [];
 
-    // Pre-check for targetted cards (rebondir, adoubement): require a selected target owned by the player
+    // Pre-check for targetted cards (rebondir, adoubement, folie, fortification): require a selected target owned by the player
     try{
       const isRebond = (typeof cardId === 'string') && (cardId.indexOf('rebondir') !== -1 || cardId.indexOf('rebond') !== -1);
       const isAdoub = (typeof cardId === 'string') && (cardId.indexOf('adoub') !== -1 || cardId.indexOf('adoubement') !== -1);
-      const isTargetCard = isRebond || isAdoub;
+      const isFolie = (typeof cardId === 'string') && (cardId.indexOf('folie') !== -1 || cardId.indexOf('fou') !== -1);
+      const isFort = (typeof cardId === 'string') && (cardId.indexOf('fortification') !== -1 || cardId.indexOf('fortif') !== -1);
+      const isTargetCard = isRebond || isAdoub || isFolie || isFort;
       if(isTargetCard){
         const board = room.boardState;
         let targetCandidate = payload && payload.targetSquare;

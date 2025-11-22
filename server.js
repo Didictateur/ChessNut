@@ -53,7 +53,7 @@ function buildDefaultDeck(){
     ['rebondir sur les bords','Les déplacements en diagonales de la pièce sélectionnée peuvent rebondir une fois sur les bords'],
     ['agrandir le plateau','Rajoute une rangée dans toutes les directions'],
     ['adoubement','La pièce sélectionnée peut maintenant faire les déplacements du cavalier en plus'],
-    // ['folie','La pièce sélectionnée peut maintenant faire les déplacements du fou en plus'],
+    ['folie','La pièce sélectionnée peut maintenant faire les déplacements du fou en plus'],
     // ['fortification','La pièce sélectionnée peut maintenant faire les déplacements de la tour en plus'],
     // ["l'anneau","Le plateau devient un anneau pendant un tour"],
     // ['brouillard de guerre','Les joueur ne peuvent voir que au alentour de leurs pièces pendant X tours'],
@@ -235,6 +235,31 @@ function computeLegalMoves(room, square){
       if(!occ || occ.color !== color) moves.push({ from: square, to: tsq });
     });
   }
+  // detect if this specific piece has a permanent folie effect (grants bishop moves)
+  const hasFolie = (room.activeCardEffects || []).some(e => e.type === 'folie' && ((e.pieceId && e.pieceId === piece.id) || e.pieceSquare === square));
+
+  // helper to add diagonal sliding moves when a piece has been "folié"
+  function addFolieMoves(){
+    if(!hasFolie) return;
+    const dirs = [[1,1],[1,-1],[-1,1],[-1,-1]];
+    dirs.forEach(([dx,dy])=>{
+      let tx = x + dx, ty = y + dy;
+      while(isInside(tx,ty)){
+        const tsq = coordToSquare(tx,ty);
+        // avoid duplicates
+        if(!moves.some(m => m.to === tsq)){
+          const occ = getPieceAt(tsq);
+          if(!occ){ moves.push({ from: square, to: tsq }); }
+          else { if(occ.color !== color) moves.push({ from: square, to: tsq }); break; }
+        } else {
+          // if duplicate found, still need to stop sliding if occupied
+          const occ = getPieceAt(tsq);
+          if(occ) break;
+        }
+        tx += dx; ty += dy;
+      }
+    });
+  }
   if(type === 'P'){
     // pawn
     const forward = (color === 'w') ? 1 : -1;
@@ -257,7 +282,7 @@ function computeLegalMoves(room, square){
       const occ = getPieceAt(tsq);
       if(occ && occ.color !== color) moves.push({ from: square, to: tsq });
     });
-    addAdoubementMoves();
+    addAdoubementMoves(); addFolieMoves();
     return moves;
   }
 
@@ -270,7 +295,7 @@ function computeLegalMoves(room, square){
       const occ = getPieceAt(tsq);
       if(!occ || occ.color !== color) moves.push({ from: square, to: tsq });
     });
-    addAdoubementMoves();
+    addAdoubementMoves(); addFolieMoves();
     return moves;
   }
 
@@ -322,7 +347,7 @@ function computeLegalMoves(room, square){
         }
       }
     });
-    addAdoubementMoves();
+    addAdoubementMoves(); addFolieMoves();
     return moves;
   }
 
@@ -335,11 +360,11 @@ function computeLegalMoves(room, square){
       const occ = getPieceAt(tsq);
       if(!occ || occ.color !== color) moves.push({ from: square, to: tsq });
     }
-    addAdoubementMoves();
+    addAdoubementMoves(); addFolieMoves();
     return moves;
   }
 
-  addAdoubementMoves();
+  addAdoubementMoves(); addFolieMoves();
   return moves;
 }
 
@@ -797,6 +822,33 @@ io.on('connection', (socket) => {
           room.activeCardEffects.push({ id: played.id, type: 'adoubement', pieceId: targetPiece.id, pieceSquare: target, playerId: senderId });
           played.payload = Object.assign({}, payload, { applied: 'adoubement', appliedTo: target });
         }catch(e){ console.error('adoubement effect error', e); }
+          }
+          // folie: grant permanent bishop-move ability to the targeted piece
+          else if(cardId === 'folie' || (typeof cardId === 'string' && cardId.indexOf('folie') !== -1)){
+            try{
+              const board = room.boardState;
+              let target = payload && payload.targetSquare;
+              if(!target){ try{ target = socket.data && socket.data.lastSelectedSquare; }catch(e){ target = null; } }
+              // validate target exists and belongs to the player
+              const roomPlayer = room.players.find(p => p.id === senderId);
+              const playerColorShort = (roomPlayer && roomPlayer.color && roomPlayer.color[0]) || null;
+              const targetPiece = (board && board.pieces || []).find(p => p.square === target);
+              if(!board || !target || !targetPiece || targetPiece.color !== playerColorShort){
+                // restore removed card to hand and remove from discard if necessary
+                try{
+                  room.hands = room.hands || {};
+                  room.hands[senderId] = room.hands[senderId] || [];
+                  if(removed) room.hands[senderId].push(removed);
+                  room.discard = room.discard || [];
+                  for(let i = room.discard.length - 1; i >= 0; i--){ if(room.discard[i] && room.discard[i].id === (removed && removed.id)){ room.discard.splice(i,1); break; } }
+                }catch(e){ console.error('restore removed card error', e); }
+                return cb && cb({ error: 'no valid target' });
+              }
+              // apply permanent folie effect (bind to piece id so it persists when the piece moves)
+              room.activeCardEffects = room.activeCardEffects || [];
+              room.activeCardEffects.push({ id: played.id, type: 'folie', pieceId: targetPiece.id, pieceSquare: target, playerId: senderId });
+              played.payload = Object.assign({}, payload, { applied: 'folie', appliedTo: target });
+            }catch(e){ console.error('folie effect error', e); }
       }
       // rebondir: grant a one-time bounce ability to a specific piece (targetSquare required in payload)
       else if(cardId === 'rebondir_sur_les_bords' || cardId === 'rebondir' || (typeof cardId === 'string' && cardId.indexOf('rebondir') !== -1)){

@@ -1282,6 +1282,16 @@ io.on('connection', (socket) => {
             try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect }); }catch(_){ }
 
             played.payload = Object.assign({}, payload, { applied: 'steal', appliedTo: target, fromColor: oldColor });
+            // after performing a piece-theft, the playing player immediately loses their turn
+            try{
+              if(board){
+                board.turn = (board.turn === 'w') ? 'b' : 'w';
+                // draw for the next player at the start of their turn
+                const nextColor = board.turn;
+                const nextPlayer = (room.players || []).find(p => (p.color && p.color[0]) === nextColor);
+                if(nextPlayer){ try{ drawCardForPlayer(room, nextPlayer.id); }catch(_){ } }
+              }
+            }catch(_){ }
             }
           }catch(e){ console.error('steal effect error', e); }
         }

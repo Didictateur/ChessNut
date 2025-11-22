@@ -200,16 +200,16 @@ io.on('connection', (socket) => {
   });
 
   // delegates to `computeLegalMoves` which is a stub you should implement.
-  socket.on('game:legalMoves', ({ roomId, square }, cb) => {
+  // legalMoves API removed (movement UI disabled)
+
+  // propagate selection made by one client to the other clients in the same room
+  socket.on('game:select', ({ roomId, square }, cb) => {
     const room = rooms.get(roomId);
-    if (!room) return cb && cb({ error: 'room not found' });
-    try{
-      const moves = computeLegalMoves(room, square) || [];
-      return cb && cb({ ok: true, moves });
-    }catch(e){
-      console.error('game:legalMoves error', e);
-      return cb && cb({ error: 'invalid square', moves: [] });
-    }
+    if(!room) return cb && cb({ error: 'room not found' });
+    const playerId = socket.data.playerId || null;
+    // broadcast to other sockets in the room (exclude sender)
+    socket.to(roomId).emit('game:select', { playerId, square });
+    cb && cb({ ok: true });
   });
 
   // Simple cards API via sockets: list/play

@@ -17,10 +17,7 @@
       <section class="card" style="margin-top:12px">
         <div><strong>Outils / Logs</strong></div>
         <div style="margin-top:8px">
-          <input id="from" placeholder="from (e2)" style="width:90px" />
-          <input id="to" placeholder="to (e4)" style="width:90px" />
-          <input id="promo" placeholder="promo (q,r)" style="width:80px" />
-          <button id="move">Envoyer</button>
+          <!-- movement controls removed as requested -->
         </div>
         <pre id="log" style="margin-top:8px;height:160px;overflow:auto">logs...</pre>
       </section>
@@ -44,6 +41,12 @@
   const myColorEl = document.getElementById('myColor');
   let socket = null;
   let myColor = null;
+  // selection state for this client
+  let selectedSquare = null; // algebraic name like 'e2'
+  let selectedSquareEl = null;
+  let myPlayerId = playerId || null;
+  // track remote selections: { playerId: square }
+  const remoteSelections = {};
 
     // safe logger: prefer on-page log if present, otherwise console
     function log(...args){
@@ -84,15 +87,31 @@
         }
     if(data.boardState) renderBoardFromState(data.boardState);
       });
-  socket.on('move:moved', (data)=>{ log('move:moved', data); if(data.boardState) renderBoardFromState(data.boardState); });
   socket.on('game:over', (data)=>{ log('game:over', data); if(data.boardState) renderBoardFromState(data.boardState); });
   socket.on('game:started', (data)=>{ log('game:started', data); if(data.boardState) renderBoardFromState(data.boardState); });
+      // selection events broadcasted by other clients
+      socket.on('game:select', (data) => {
+        try{
+          const pid = data && data.playerId;
+          const square = data && data.square;
+          // ignore our own (some transports might echo)
+          if(pid === myPlayerId) return;
+          if(!pid) return;
+          if(!square){
+            // clear remote selection for that player
+            clearRemoteSelection(pid);
+            return;
+          }
+          setRemoteSelection(pid, square);
+        }catch(e){ console.warn('game:select handler error', e); }
+      });
 
       socket.emit('room:join', { roomId, playerId }, (resp)=>{
         if(resp && resp.error){ log('join error', resp); alert(resp.error); return; }
         log('Rejoint room', resp);
         // remember assigned id/color from server
         if(resp.playerId){
+          myPlayerId = resp.playerId;
           if(playerIdEl) playerIdEl.textContent = resp.playerId;
         }
         if(resp.color){
@@ -109,26 +128,59 @@
 
     connectAndJoin();
 
-    // show markers for legal moves when clicking any square (any piece color)
-    function clearLegalMarkers(){
-      const prev = boardEl.querySelectorAll('.move-marker');
-      prev.forEach(p=>p.remove());
+    // movement UI removed: legalMoves and move markers are disabled
+
+    // selection helpers (client-side)
+    function clearSelection(emit = true){
+      if(selectedSquareEl){
+        selectedSquareEl.classList.remove('selected');
+      }
+      selectedSquare = null;
+      selectedSquareEl = null;
+      const fromEl = document.getElementById('from');
+      if(fromEl) fromEl.value = '';
+      // notify others that we cleared selection
+      if(emit && socket && myPlayerId){
+        socket.emit('game:select', { roomId, square: null }, ()=>{});
+      }
     }
 
-    function showLegalMoves(moves){
-      clearLegalMarkers();
-      (moves||[]).forEach(m => {
-        const to = m.to || (m.move && m.move.to);
-        if(!to) return;
-        const target = boardEl.querySelector(`.square[data-square="${to}"]`);
-        if(!target) return;
-        const marker = document.createElement('div');
-        marker.className = 'move-marker';
-        // store metadata if needed later
-        marker.dataset.from = m.from || '';
-        marker.dataset.to = to;
-        target.appendChild(marker);
-      });
+    function setSelection(squareName, emit = true){
+      if(!squareName) return clearSelection(emit);
+      if(selectedSquareEl) selectedSquareEl.classList.remove('selected');
+      const sqEl = boardEl.querySelector(`.square[data-square="${squareName}"]`);
+      if(!sqEl){ selectedSquare = null; selectedSquareEl = null; return; }
+      selectedSquare = squareName;
+      selectedSquareEl = sqEl;
+      sqEl.classList.add('selected');
+      const fromEl = document.getElementById('from');
+      if(fromEl) fromEl.value = squareName;
+      // notify others of our selection
+      if(emit && socket && myPlayerId){
+        socket.emit('game:select', { roomId, square: squareName }, ()=>{});
+      }
+    }
+
+    // remote selection helpers: mark a square as selected by another player
+    function setRemoteSelection(playerId, squareName){
+      // clear previous for that player
+      clearRemoteSelection(playerId);
+      const sqEl = boardEl.querySelector(`.square[data-square="${squareName}"]`);
+      if(!sqEl) return;
+      remoteSelections[playerId] = squareName;
+      sqEl.classList.add('selected-remote');
+      sqEl.dataset.selectedBy = playerId;
+    }
+
+    function clearRemoteSelection(playerId){
+      const prev = remoteSelections[playerId];
+      if(!prev) return;
+      const prevEl = boardEl.querySelector(`.square[data-square="${prev}"]`);
+      if(prevEl){
+        prevEl.classList.remove('selected-remote');
+        delete prevEl.dataset.selectedBy;
+      }
+      delete remoteSelections[playerId];
     }
 
     if(boardEl){
@@ -137,32 +189,20 @@
         if(!sqEl) return;
         const square = sqEl.getAttribute('data-square');
         if(!square) return;
-        if(socket){
-          socket.emit('game:legalMoves', { roomId, square }, (resp)=>{
-            if(resp && resp.error){ log('legalMoves error', resp); clearLegalMarkers(); return; }
-            log('legalMoves for', square, resp.moves || resp);
-            showLegalMoves(resp.moves || []);
-          });
+
+        // clicked a piece -> select it (no legal moves requested)
+        const pieceImg = ev.target.closest && ev.target.closest('img.piece');
+        if(pieceImg){
+          setSelection(square);
+          return;
         }
+
+        // default: clicked empty square -> clear selection
+        clearSelection();
       });
     }
 
-    const moveBtn = document.getElementById('move');
-    if(moveBtn){
-      moveBtn.addEventListener('click', ()=>{
-        if(!socket){ alert('non connecté'); return; }
-        const fromEl = document.getElementById('from');
-        const toEl = document.getElementById('to');
-        const promoEl = document.getElementById('promo');
-        const from = fromEl ? fromEl.value.trim() : '';
-        const to = toEl ? toEl.value.trim() : '';
-        const promotion = promoEl ? promoEl.value.trim() || undefined : undefined;
-        socket.emit('game:move', { roomId, from, to, promotion }, (resp)=>{
-          if(resp && resp.error) { log('move error', resp); alert(resp.error); return; }
-          log('move accepted', resp);
-        });
-      });
-    }
+    // move button removed
 
     // Board rendering using provided SVG assets and `boardState` JSON.
     const pieceSetPath = '/assets/chess-pieces/chess_maestro_bw';
@@ -186,6 +226,17 @@
         img.src = `${pieceSetPath}/${filename}`;
         img.className = 'piece';
         sqEl.appendChild(img);
+      });
+
+      // re-apply selection if the previously selected square still exists
+      if(selectedSquare){
+        // re-apply local selection without re-emitting
+        setSelection(selectedSquare, false);
+      }
+      // re-apply remote selections
+      Object.entries(remoteSelections).forEach(([pid, sq]) => {
+        const el = boardEl.querySelector(`.square[data-square="${sq}"]`);
+        if(el) el.classList.add('selected-remote');
       });
     }
 

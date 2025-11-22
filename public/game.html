@@ -68,7 +68,7 @@
       }
     }
 
-    // helper: decide if a card requires a target selected after clicking 'Jouer'
+      // helper: decide if a card requires a target selected after clicking 'Jouer'
     function cardRequiresTarget(cardId){
       if(!cardId) return null;
       const id = String(cardId).toLowerCase();
@@ -79,8 +79,11 @@
       if(id.indexOf('fortif') !== -1 || id.indexOf('fortification') !== -1) return 'owned';
       // promotion targets one of your pawns (special handling client-side to show promotion choice)
       if(id.indexOf('promotion') !== -1 || id.indexOf('promot') !== -1 || id.indexOf('promouvoir') !== -1) return 'owned_pawn';
-      // steal/vol card targets an enemy piece
-      if(id.indexOf('vol') !== -1 || id.indexOf('vole') !== -1 || id.indexOf('steal') !== -1) return 'enemy';
+      // steal a card (target a player) if the card mentions 'carte'/'card' — otherwise a 'vol' often targets a piece
+      if(id.indexOf('vol') !== -1 || id.indexOf('vole') !== -1 || id.indexOf('steal') !== -1){
+        if(id.indexOf('carte') !== -1 || id.indexOf('card') !== -1) return 'player';
+        return 'enemy';
+      }
       return null;
     }
 
@@ -177,6 +180,22 @@
             showEffectNotification(effect);
           }
         }catch(e){ console.warn('card:effect:applied handler error', e); }
+      });
+      // when the server sends the stolen card to the stealer (private)
+      socket.on('card:stolen', (data) => {
+        try{
+          log('recv card:stolen', data);
+          // show notification and a small highlight in hands
+          const handsEl = document.getElementById('hands');
+          if(handsEl){
+            const note = document.createElement('div'); note.className = 'card-draw-note';
+            note.textContent = data && data.card ? `Vous avez volé : ${data.card.title || data.card.cardId || 'une carte'}` : 'Vous avez volé une carte';
+            handsEl.prepend(note); setTimeout(()=> note.remove(), 6000);
+          }
+        }catch(e){ console.warn('card:stolen handler error', e); }
+      });
+      socket.on('card:lost', (data) => {
+        try{ log('recv card:lost', data); showEffectNotification({ type: 'card_lost' }); }catch(e){ }
       });
       // selection events (include moves) broadcasted by server
       socket.on('game:select', (data) => {
@@ -756,6 +775,27 @@
           const cid = cardEl.dataset.cardId;
           const requireType = cardRequiresTarget(cid);
           if(requireType){
+            if(requireType === 'player'){
+              // If there's only one opponent, auto-select them (no modal needed). Otherwise show modal.
+              const opponents = Object.keys(handCounts || {}).filter(pid => pid !== myPlayerId);
+              if(opponents.length === 1){
+                const targetPlayerId = opponents[0];
+                socket.emit('card:play', { roomId, playerId: myPlayerId, cardId: cid, payload: { targetPlayerId } }, (resp)=>{
+                  if(resp && resp.error){ log('card:play error', resp); alert(resp.error); }
+                  else { log('card played (steal card)', resp); }
+                });
+                return;
+              }
+              // show modal to pick which player to steal from
+              showStealModal(handCounts, (targetPlayerId)=>{
+                if(!targetPlayerId) return; // canceled
+                socket.emit('card:play', { roomId, playerId: myPlayerId, cardId: cid, payload: { targetPlayerId } }, (resp)=>{
+                  if(resp && resp.error){ log('card:play error', resp); alert(resp.error); }
+                  else { log('card played (steal card)', resp); }
+                });
+              });
+              return;
+            }
             // enter pending target mode: next square click will send the card with payload.targetSquare
             pendingCard = { cardId: cid, cardUuid: cardEl.dataset.cardUuid || '', requireType };
             highlightTargets(requireType);
@@ -805,6 +845,7 @@
         else if(effect.type === 'promotion') note.textContent = 'Promotion réussie !';
         else if(effect.type === 'mine_failed') note.textContent = 'Placement de mine échoué — carte consommée';
         else if(effect.type === 'steal_failed') note.textContent = 'Vol échoué — carte consommée';
+        else if(effect.type === 'card_lost') note.textContent = 'Une de vos cartes a été volée';
         else note.textContent = `Effet: ${effect.type}`;
         note.style.padding = '6px 8px'; note.style.border = '1px solid #ccc'; note.style.background = '#fff8e1'; note.style.marginTop = '8px';
         handsEl.prepend(note);
@@ -860,6 +901,31 @@
         modal.appendChild(box);
         document.body.appendChild(modal);
       }catch(e){ console.warn('showPromotionModal error', e); callback(null); }
+    }
+
+    // show a modal to pick a player to steal from. handCounts is an object mapping playerId -> count
+    function showStealModal(handCounts, callback){
+      try{
+        if(document.getElementById('stealModal')) return;
+        const modal = document.createElement('div'); modal.id = 'stealModal';
+        modal.style.position = 'fixed'; modal.style.left='0'; modal.style.top='0'; modal.style.right='0'; modal.style.bottom='0';
+        modal.style.display='flex'; modal.style.alignItems='center'; modal.style.justifyContent='center'; modal.style.background='rgba(0,0,0,0.45)'; modal.style.zIndex='9999';
+        const box = document.createElement('div'); box.style.background='#fff'; box.style.padding='12px'; box.style.borderRadius='8px'; box.style.minWidth='320px';
+        const title = document.createElement('div'); title.textContent = 'Choisir le joueur à voler'; title.style.fontWeight='700'; title.style.marginBottom='8px'; box.appendChild(title);
+        const list = document.createElement('div'); list.style.display='flex'; list.style.flexDirection='column'; list.style.gap='8px'; list.style.marginBottom='8px';
+        Object.entries(handCounts || {}).forEach(([pid, count])=>{
+          if(pid === myPlayerId) return; // skip self
+          const row = document.createElement('div'); row.style.display='flex'; row.style.justifyContent='space-between'; row.style.alignItems='center';
+          const label = document.createElement('div'); label.textContent = `${pid} — ${count} carte(s)`; label.style.fontWeight='600';
+          const btn = document.createElement('button'); btn.type='button'; btn.textContent = 'Voler'; btn.style.padding='6px 10px';
+          btn.addEventListener('click', (ev)=>{ ev.stopPropagation(); try{ modal.remove(); }catch(_){ } callback(pid); });
+          row.appendChild(label); row.appendChild(btn); list.appendChild(row);
+        });
+        box.appendChild(list);
+        const cancel = document.createElement('button'); cancel.type='button'; cancel.textContent='Annuler'; cancel.style.padding='8px 10px'; cancel.addEventListener('click',(ev)=>{ ev.stopPropagation(); try{ modal.remove(); }catch(_){ } callback(null); });
+        box.appendChild(cancel);
+        modal.appendChild(box); document.body.appendChild(modal);
+      }catch(e){ console.warn('showStealModal error', e); callback(null); }
     }
   </script>
 </body>

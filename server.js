@@ -108,7 +108,8 @@ function buildDefaultDeck(){
     // ['annulation d une carte','Annule l effet d une carte qui est jouée par l adversaire'],
     ['placement de mines','Le joueur place une mine sur une case vide sans la révéler au joueur adverse. Une pièce qui se pose dessus explose et est capturée par le joueur ayant placé la mine'],
     ['vole d une pièce','Désigne une pièce non roi qui change de camp'],
-    ['promotion','Un pion au choix est promu reine'],
+    ['promotion','Un pion au choix est promu'],
+    ['vole d une carte','Vole une carte aléatoirement au joueur adverse'],
     // ['vole d une carte','Vole une carte aléatoirement au joueur adverse'],
     // ['resurection','Choisie une pièce capturée pour la ressuciter dans son camp'],
     // ['carte sans effet','N a aucun effet'],
@@ -1234,8 +1235,9 @@ io.on('connection', (socket) => {
             played.payload = Object.assign({}, payload, { applied: 'double_move', moves: effect.remainingMoves });
           }catch(e){ console.error('double_move effect error', e); }
         }
-        // vol de pièce: transfer ownership of a targeted enemy piece to the playing player
-        else if((typeof cardId === 'string' && (cardId.indexOf('vol') !== -1 || cardId.indexOf('vole') !== -1 || cardId.indexOf('steal') !== -1))){
+  // vol de pièce: transfer ownership of a targeted enemy piece to the playing player
+  // Note: do NOT handle "vole ... carte" here (steal-a-card) — that is handled by a separate branch below.
+  else if((typeof cardId === 'string' && (cardId.indexOf('vol') !== -1 || cardId.indexOf('vole') !== -1 || cardId.indexOf('steal') !== -1) && !(cardId.indexOf('carte') !== -1 || cardId.indexOf('card') !== -1))){
           try{
             const board = room.boardState;
             let target = payload && payload.targetSquare;
@@ -1265,6 +1267,40 @@ io.on('connection', (socket) => {
             played.payload = Object.assign({}, payload, { applied: 'steal', appliedTo: target, fromColor: oldColor });
             }
           }catch(e){ console.error('steal effect error', e); }
+        }
+        // vole d'une carte: steal one random card from the target player's hand
+        else if((typeof cardId === 'string' && cardId.indexOf('vole') !== -1 && (cardId.indexOf('carte') !== -1 || cardId.indexOf('card') !== -1))){
+          try{
+            // determine target player id: payload.targetPlayerId or pick the opponent
+            let targetPlayerId = payload && payload.targetPlayerId;
+            if(!targetPlayerId){ const opp = (room.players || []).find(p => p.id !== senderId); targetPlayerId = opp && opp.id; }
+            const targetPlayer = (room.players || []).find(p => p.id === targetPlayerId);
+            if(!targetPlayer || targetPlayer.id === senderId){
+              // invalid target: consume card and notify owner
+              played.payload = Object.assign({}, payload, { applied: 'steal_card_failed', attemptedTo: targetPlayerId });
+              try{ const owner = (room.players || []).find(p => p.id === senderId); if(owner && owner.socketId) io.to(owner.socketId).emit('card:effect:applied', { roomId: room.id, effect: { id: played.id, type: 'steal_card_failed', playerId: senderId, targetPlayerId, ts: Date.now() } }); }catch(_){ }
+            } else {
+              room.hands = room.hands || {};
+              const victimHand = room.hands[targetPlayerId] || [];
+              if(!victimHand || victimHand.length === 0){
+                // nothing to steal
+                played.payload = Object.assign({}, payload, { applied: 'steal_card_failed_empty', attemptedTo: targetPlayerId });
+                try{ const owner = (room.players || []).find(p => p.id === senderId); if(owner && owner.socketId) io.to(owner.socketId).emit('card:effect:applied', { roomId: room.id, effect: { id: played.id, type: 'steal_card_failed_empty', playerId: senderId, targetPlayerId, ts: Date.now() } }); }catch(_){ }
+              } else {
+                // pick random card from victim
+                const idx = Math.floor(Math.random() * victimHand.length);
+                const stolen = victimHand.splice(idx,1)[0];
+                // give to stealer
+                room.hands[senderId] = room.hands[senderId] || [];
+                room.hands[senderId].push(stolen);
+                played.payload = Object.assign({}, payload, { applied: 'steal_card', stolenFrom: targetPlayerId, stolenCardId: stolen.cardId || stolen.id });
+                // inform the stealer privately about the stolen card details
+                try{ const stealer = (room.players || []).find(p => p.id === senderId); if(stealer && stealer.socketId) io.to(stealer.socketId).emit('card:stolen', { roomId: room.id, from: targetPlayerId, card: stolen }); }catch(_){ }
+                // inform the victim privately that they lost a card (do not reveal which)
+                try{ const victim = (room.players || []).find(p => p.id === targetPlayerId); if(victim && victim.socketId) io.to(victim.socketId).emit('card:lost', { roomId: room.id, lostCount: 1 }); }catch(_){ }
+              }
+            }
+          }catch(e){ console.error('steal-card effect error', e); }
         }
       // rebondir: grant a one-time bounce ability to a specific piece (targetSquare required in payload)
       else if(cardId === 'rebondir_sur_les_bords' || cardId === 'rebondir' || (typeof cardId === 'string' && cardId.indexOf('rebondir') !== -1)){

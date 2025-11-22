@@ -120,5 +120,13 @@ button:hover{transform:translateY(-3px);transition:all 180ms ease}
 
 /* players area */
 .players-list{list-style:none;padding-left:0;margin:0;display:flex;gap:10px}
-.players-list li{background:rgba(255,255,255,0.02);padding:6px 10px;border-radius:8px}
+.players-list li{background:rgba(11,18,32,0.03);padding:6px 10px;border-radius:8px}
+
+/* card hand UI */
+.player-hand{border:1px solid rgba(11,18,32,0.06);padding:8px;border-radius:8px;background:#fff}
+.card-item{display:flex;gap:8px;align-items:flex-start;background:#f8fafc;padding:8px;border-radius:8px;border:1px solid rgba(11,18,32,0.04)}
+.card-art{width:64px;height:48px;background:linear-gradient(180deg,#eef2ff,#ffffff);display:flex;align-items:center;justify-content:center;color:#475569;border-radius:6px;font-size:12px}
+.card-meta{display:flex;flex-direction:column}
+.card-title{font-weight:700;color:#0b1220}
+.card-desc{color:#475569;font-size:13px}
 

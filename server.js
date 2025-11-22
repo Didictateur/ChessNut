@@ -17,6 +17,124 @@ app.use('/assets', express.static(path.join(__dirname, 'assets')));
 // room = { id, boardState: object|null, players: [{id, socketId, color}], status, size }
 const rooms = new Map();
 
+// Send a room:update payload to each player individually so hands remain private.
+function sendRoomUpdate(room){
+  if(!room) return;
+  const base = {
+    boardState: room.boardState || null,
+    players: (room.players || []).map(p => ({ id: p.id, color: p.color })),
+    status: room.status,
+    hostId: room.hostId,
+    size: (room.boardState && room.boardState.width) || room.size,
+    cards: Object.keys(room.cards || {}),
+    deckCount: (room.deck && room.deck.length) || 0
+  };
+
+  const handCounts = {};
+  (room.players || []).forEach(p => { handCounts[p.id] = (room.hands && room.hands[p.id] ? room.hands[p.id].length : 0); });
+
+  (room.players || []).forEach(p => {
+    const payload = Object.assign({}, base, {
+      // expose only the recipient's own hand
+      handsOwn: (room.hands && room.hands[p.id]) ? room.hands[p.id] : [],
+      handCounts
+    });
+    if(p.socketId){
+      io.to(p.socketId).emit('room:update', payload);
+    }
+  });
+}
+
+// Build a default deck from README list. Each card has a unique id, cardId (slug), title and description.
+function buildDefaultDeck(){
+  const cards = [
+    // ['rétrécir le plateau','Tronque au maximum le plateau sans supprimer de pièce'],
+    ['agrandir le plateau','Rajoute une rangée dans toutes les directions'],
+    // ['rebondir sur les bords','Les déplacements en diagonales de la pièce séléctionées peuvent rebondir une fois sur les bords'],
+    // ['adoubement','La pièce sélectionnée peut maintenant faire les déplacements du cavalier en plus'],
+    // ['folie','La pièce sélectionnée peut maintenant faire les déplacements du fou en plus'],
+    // ['fortification','La pièce sélectionnée peut maintenant faire les déplacements de la tour en plus'],
+    // ['l anneau','Le plateau devient un anneau pendant un tour'],
+    // ['brouillard de guerre','Les joueur ne peuvent voir que au alentour de leurs pièces pendant X tours'],
+    // ['changer la pièce à capturer','Le joueur choisie la nouvelle pièce jouant le rôle de roi sans la révéler'],
+    // ['trou de ver','Deux cases du plateau deviennent maintenant la même'],
+    // ['jouer deux fois','Le joueur peut déplacer deux pièces'],
+    // ['annulation d une carte','Annule l effet d une carte qui est jouée par l adversaire'],
+    // ['placement de mines','Le joueur place une mine sur une case vide sans la révéler au joueur adverse. Une pièce qui se pose dessus explose et est capturée par le joueur ayant placé la mine'],
+    // ['vole d une pièce','Désigne une pièce non roi qui change de camp'],
+    // ['promotion','Un pion au choix est promu reine'],
+    // ['vole d une carte','Vole une carte aléatoirement au joueur adverse'],
+    // ['resurection','Choisie une pièce capturée pour la ressuciter dans son camp'],
+    // ['carte sans effet','N a aucun effet'],
+    // ['défausse','Le joueur adverse défausse une carte de son choix'],
+    // ['immunité à la capture','Désigne une pièce qui ne pourra pas être capturée au prochain tour'],
+    // ['kamikaz','Détruit une de ses pièces, détruisant toutes les pièces adjacentes'],
+    // ['retour à la case départ','Désigne une pièce qui retourne à sa position initiale'],
+    // ['glissade','La pièce désignée ne peut plus s arrêter si elle se déplace en diagonale ou en ligne droite. Soit elle percute une pièce et la capture, soit elle tombe du plateau et est capturée'],
+    // ['invisible','Une des pièces devient invisible pour l adversaire'],
+    // ['épidémie','Toutes les pièces sur le territoire enemie est est capturée'],
+    // ['glue','Toutes les pièces autour de la pièce désignée ne peuvent pas bouger tant que cette dernière ne bouge pas'],
+    // ['coin coin','Possibilité de se téléporter depuis  un coin vers n importe quel autre coin'],
+    // ['téléportation','Téléporte n importe quelle pièce de son camp sur une case vide'],
+    // ['changement de camp','On retourne le plateau'],
+    // ['ça tangue','Toutes les pièces se décale du même côté'],
+    // ['réinitialisation','Toutes les pièces reviennent à leur position initiale. S il y a des pièces supplémenaires, se rangent devant les pions'],
+    // ['toucher c est jouer','Toucher une pièce adverse qu il sera obligé de jouer si elle existe encore lors de son tour'],
+    // ['marécage','Pendant X tours, toutes les pièces ne peuvent se déplacer que comme un roi'],
+    // ['sniper','Capturer une pièce sans avoir à bouger la pièce capturante'],
+    // ['inversion','Échange la position d une pièce avec une pièce adverse'],
+    // ['jeu des 7 différences','Déplace une pièce du plateau pendant que le joueur adverse à les yeux fermés. S il la retrouve, elle est capturée, laissée sinon'],
+    // ['punching ball','Replace le roi dans sa position initiale, et place un nouveau pion à l ancienne position du roi'],
+    // ['reversi','Si deux pions encadrent parfaitement une pièce adverse, cette dernière change de camp'],
+    // ['plus on est de fous','Si le joueur possède deux fous dans la même diagonale, alors toutes les pièces adverses encadrées par ces deux fous sont capturés'],
+    // ['cluster','Désigne 4 pions formant un rectangle. Tant que ces pions ne bougent pas, aucune pièce ne peut sortir ou rentrer dans ce rectangle.'],
+    // ['vacances','Choisie une pièce qui sort du plateau pendant deux tours. Ce après quoi elle tente de revenir: si la case est occupée, alors la pièce vacancière est capturée par la pièce occupant la case.'],
+    // ['mélange','La position de toutes les pièces sont échangées aléatoirement.'],
+    // ['la parrure','Une reine est dégradée en pion'],
+    // ['tricherie','Regarde les trois prochaines cartes de la pioche.'],
+    // ['tout ou rien','Une pièce choisie ne peut maintenant se déplacer que si elle capture.'],
+    // ['tous les mêmes','Au yeux de l ennemie, toutes les pièces se ressemblent pendant 2 tours.'],
+    // ['petit pion','Le joueur choisit un pion. À partir du prochain tour, il est promu en reine dès qu il capture un pièce non pion.'],
+    // ['révolution','Tous les pions sont aléatoirement changés en Cavalier, Fou ou Tour et les Cavaliers, Fous et Tours sont changés en pions.'],
+    // ['doppelganger','Choisis une pièce. À partir de maintenant, devient chacune des pièces qu elle capture.'],
+    // ['kurby','Choisis une pièce. À sa prochaine capture, récupère les mouvements de la pièce capturée.']
+  ];
+  return cards.map(([title,desc])=>({ id: uuidv4().slice(0,8), cardId: title.replace(/[^a-z0-9]+/gi,'_').toLowerCase(), title: title, description: desc }));
+}
+
+// draw a random card from room.deck and assign to player hand (respect max hand size 5)
+function drawCardForPlayer(room, playerId){
+  if(!room) return null;
+  // ensure deck exists for legacy rooms
+  room.deck = room.deck || buildDefaultDeck();
+  room.hands = room.hands || {};
+  room.deck = room.deck || [];
+  const hand = room.hands[playerId] || [];
+  // avoid drawing more than once for the same board version
+  room._lastDrawForPlayer = room._lastDrawForPlayer || {};
+  const boardVersion = (room.boardState && room.boardState.version) || null;
+  if(boardVersion !== null && room._lastDrawForPlayer[playerId] === boardVersion){
+    // already drew for this version
+    return null;
+  }
+  if(hand.length >= 5) return null; // hand full
+  if(room.deck.length === 0) return null; // no cards
+  // pick random index
+  const idx = Math.floor(Math.random() * room.deck.length);
+  const card = room.deck.splice(idx,1)[0];
+  room.hands[playerId] = room.hands[playerId] || [];
+  room.hands[playerId].push(card);
+  if(boardVersion !== null) room._lastDrawForPlayer[playerId] = boardVersion;
+  // emit card drawn and updated room state
+  // send card:drawn only to the recipient
+  const recipient = (room.players || []).find(p => p.id === playerId);
+  if(recipient && recipient.socketId){
+    io.to(recipient.socketId).emit('card:drawn', { playerId, card });
+  }
+  // send personalized room updates to all players
+  sendRoomUpdate(room);
+  return card;
+}
 // Placeholder: compute legal moves for a square in the given room.
 // `boardState` is the canonical JSON representation of the board for this server.
 // Example boardState: { width:8, height:8, turn:'w', version:1, pieces: [{ square:'e2', type:'P', color:'w', id:'w_p1' }, ... ] }
@@ -178,15 +296,18 @@ app.post('/rooms', (req, res) => {
   // For standard 8x8 we initialize a boardState JSON as the canonical board state.
   const boardState = size === 8 ? startingBoardState8() : null;
   // hostId will be set when the first player joins
-  rooms.set(id, { id, boardState, players: [], status: 'waiting', hostId: null, size, cards: {}, playedCards: [], removalTimers: new Map() });
+  // initialize a deck for this room
+  const deck = buildDefaultDeck();
+  rooms.set(id, { id, boardState, players: [], status: 'waiting', hostId: null, size, cards: {}, playedCards: [], removalTimers: new Map(), deck, hands: {} });
   res.json({ roomId: id, size });
 });
 
 app.get('/rooms/:id', (req, res) => {
   const room = rooms.get(req.params.id);
   if (!room) return res.status(404).json({ error: 'room not found' });
-  const boardState = room.boardState || null;
-  res.json({ id: room.id, boardState, size: room.size, players: room.players.map(p => ({ id: p.id, color: p.color })), status: room.status, hostId: room.hostId, cards: Object.keys(room.cards || {}) });
+    const boardState = room.boardState || null;
+    const size = (room.boardState && room.boardState.width) || room.size;
+  res.json({ id: room.id, boardState, size: size, players: room.players.map(p => ({ id: p.id, color: p.color })), status: room.status, hostId: room.hostId, cards: Object.keys(room.cards || {}) });
 });
 
 io.on('connection', (socket) => {
@@ -214,6 +335,16 @@ io.on('connection', (socket) => {
       color = room.players.length === 0 ? 'white' : 'black';
       room.players.push({ id: assignedId, socketId: socket.id, color });
     }
+    // ensure hands map exists
+    room.hands = room.hands || {};
+    // ensure deck exists for legacy rooms
+    if(!room.deck) room.deck = buildDefaultDeck();
+    // if this is the first player joining the room, give them the 'agrandir_plateau' card
+    if(!existing && room.players.length === 1){
+      // single unique exemplar
+      room.hands[assignedId] = room.hands[assignedId] || [];
+      room.hands[assignedId].push({ id: 'card_agrandir_1', cardId: 'agrandir_plateau', title: 'Agrandir le plateau', description: 'Rajoute une rangée dans toutes les directions' });
+    }
     socket.join(roomId);
     socket.data.roomId = roomId;
     socket.data.playerId = assignedId;
@@ -222,15 +353,17 @@ io.on('connection', (socket) => {
     if (!room.hostId) room.hostId = assignedId;
 
 
-    io.to(roomId).emit('room:update', {
-      boardState: room.boardState || null,
-      players: room.players.map(p => ({ id: p.id, color: p.color })),
-      status: room.status,
-      hostId: room.hostId,
-      size: room.size,
-      cards: Object.keys(room.cards || {})
-    });
+    sendRoomUpdate(room);
 
+    // If the game is already playing and it's this player's turn, attempt to draw (useful on reconnect)
+    try{
+      if(room.status === 'playing' && room.boardState && room.boardState.turn){
+        const myShort = (room.players.find(p => p.id === assignedId).color || '')[0];
+        if(myShort === room.boardState.turn){
+          drawCardForPlayer(room, assignedId);
+        }
+      }
+    }catch(e){ console.error('post-join draw error', e); }
     cb && cb({ ok: true, color, roomId, playerId: assignedId, hostId: room.hostId });
   });
 
@@ -281,14 +414,21 @@ io.on('connection', (socket) => {
       // broadcast move and new board state
       const moved = { playerId: senderId, from, to, boardState: board };
       io.to(roomId).emit('move:moved', moved);
-      io.to(roomId).emit('room:update', {
-        boardState: board,
-        players: room.players.map(p => ({ id: p.id, color: p.color })),
-        status: room.status,
-        hostId: room.hostId,
-        size: room.size,
-        cards: Object.keys(room.cards || {})
-      });
+
+      // after flipping turn, draw a card for the next player (beginning of their turn)
+      try{
+        const nextColor = board.turn; // 'w' or 'b'
+        const nextPlayer = room.players.find(p => (p.color && p.color[0]) === nextColor);
+        if(nextPlayer){
+          // attempt to draw a card for them; drawCardForPlayer will emit updated room state if a card was drawn
+          drawCardForPlayer(room, nextPlayer.id);
+        } else {
+          // still emit updated room state (no draw occurred)
+          sendRoomUpdate(room);
+        }
+      }catch(e){
+        console.error('draw after move error', e);
+      }
 
       return cb && cb({ ok: true, moved });
     }catch(err){
@@ -311,14 +451,20 @@ io.on('connection', (socket) => {
 
     room.status = 'playing';
     io.to(roomId).emit('game:started', { roomId, boardState: room.boardState });
-    io.to(roomId).emit('room:update', {
-      boardState: room.boardState || null,
-      players: room.players.map(p => ({ id: p.id, color: p.color })),
-      status: room.status,
-      hostId: room.hostId,
-      size: room.size,
-      cards: Object.keys(room.cards || {})
-    });
+    sendRoomUpdate(room);
+
+    // draw initial card for the player to move (beginning of their turn)
+    try{
+      if(room.boardState && room.boardState.turn){
+        const firstColor = room.boardState.turn; // 'w' or 'b'
+        const firstPlayer = room.players.find(p => (p.color && p.color[0]) === firstColor);
+        if(firstPlayer){
+          drawCardForPlayer(room, firstPlayer.id);
+        }
+      }
+    }catch(e){
+      console.error('initial draw error', e);
+    }
 
     cb && cb({ ok: true });
   });
@@ -332,20 +478,13 @@ io.on('connection', (socket) => {
     const playerId = socket.data.playerId;
     if(playerId && room.removalTimers){
       const t = setTimeout(()=>{
-          room.players = room.players.filter(p => p.id !== playerId);
+        room.players = room.players.filter(p => p.id !== playerId);
         // if the host left, promote the next player to host (or null)
         if (room.hostId && !room.players.find(p => p.id === room.hostId)) {
           room.hostId = room.players[0] ? room.players[0].id : null;
         }
         if (room.players.length < 2 && room.status === 'playing') room.status = 'waiting';
-        io.to(roomId).emit('room:update', {
-          boardState: room.boardState || null,
-          players: room.players.map(p => ({ id: p.id, color: p.color })),
-          status: room.status,
-          hostId: room.hostId,
-          size: room.size,
-          cards: Object.keys(room.cards || {})
-        });
+        sendRoomUpdate(room);
         room.removalTimers.delete(playerId);
       }, 5000);
       room.removalTimers.set(playerId, t);
@@ -356,14 +495,7 @@ io.on('connection', (socket) => {
       if (room.hostId && !room.players.find(p => p.id === room.hostId)) {
         room.hostId = room.players[0] ? room.players[0].id : null;
       }
-      io.to(roomId).emit('room:update', {
-        boardState: room.boardState || null,
-        players: room.players.map(p => ({ id: p.id, color: p.color })),
-        status: room.status,
-        hostId: room.hostId,
-        size: room.size,
-        cards: Object.keys(room.cards || {})
-      });
+      sendRoomUpdate(room);
     }
   });
 
@@ -415,11 +547,59 @@ io.on('connection', (socket) => {
   socket.on('card:play', ({ roomId, playerId, cardId, payload }, cb) => {
     const room = rooms.get(roomId);
     if(!room) return cb && cb({ error: 'room not found' });
-    // store played card (placeholder behaviour) and broadcast
+    // store played card and apply card effects when applicable
     const played = { id: uuidv4().slice(0,8), playerId, cardId, payload, ts: Date.now() };
     room.playedCards = room.playedCards || [];
+
+    // Implement specific card effects here
+    try{
+      if(cardId === 'agrandir_plateau' || cardId === 'expand_board'){
+        // Expand the board by adding one file/column on the left and right and one rank on top and bottom.
+        const board = room.boardState;
+        if(board && board.width && board.height){
+          const oldW = board.width;
+          const oldH = board.height;
+          const newW = oldW + 2;
+          const newH = oldH + 2;
+
+          // helper: parse square -> coords (0-indexed)
+          function squareToCoord(sq){
+            if(!sq || typeof sq !== 'string') return null;
+            const file = sq.charCodeAt(0) - 'a'.charCodeAt(0);
+            const rank = parseInt(sq.slice(1),10) - 1;
+            return { x: file, y: rank };
+          }
+          function coordToSquare(x,y){
+            return String.fromCharCode('a'.charCodeAt(0) + x) + (y+1);
+          }
+
+          // shift every piece by +1 file and +1 rank
+          (board.pieces || []).forEach(p => {
+            const c = squareToCoord(p.square);
+            if(!c) return;
+            const nx = c.x + 1;
+            const ny = c.y + 1;
+            p.square = coordToSquare(nx, ny);
+          });
+
+          board.width = newW;
+          board.height = newH;
+          board.version = (board.version || 0) + 1;
+
+          // record effect details on payload for clients
+          played.payload = Object.assign({}, payload, { applied: 'agrandir_plateau', oldWidth: oldW, oldHeight: oldH, newWidth: newW, newHeight: newH });
+        }
+      }
+    }catch(e){
+      console.error('card:play effect error', e);
+    }
+
     room.playedCards.push(played);
+    // emit card played to entire room (informational)
     io.to(roomId).emit('card:played', played);
+    // send personalized room updates
+    sendRoomUpdate(room);
+
     cb && cb({ ok: true, played });
   });
 });

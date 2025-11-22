@@ -22,6 +22,10 @@
         </div>
         <pre id="log" style="margin-top:8px;height:160px;overflow:auto">logs...</pre>
       </section>
+      <section class="card" id="handsSection" style="margin-top:12px">
+        <div><strong>Cartes du joueur</strong></div>
+        <div id="hands" style="margin-top:8px;display:flex;flex-direction:column;gap:8px"></div>
+      </section>
     </aside>
   </div>
 
@@ -94,9 +98,19 @@
       renderBoardFromState(data.boardState);
       updateTurnBanner(data.boardState);
     }
+    // render hands: server now sends private hands as `handsOwn` and public counts as `handCounts`
+    if(data.handsOwn || data.handCounts) renderHands(data.handsOwn || [], data.handCounts || {});
       });
   socket.on('game:over', (data)=>{ log('game:over', data); if(data.boardState){ renderBoardFromState(data.boardState); updateTurnBanner(data.boardState); } });
   socket.on('game:started', (data)=>{ log('game:started', data); if(data.boardState){ renderBoardFromState(data.boardState); updateTurnBanner(data.boardState); } });
+      // card drawn notification from server
+      socket.on('card:drawn', (data) => {
+        try{
+          log('recv card:drawn', data);
+          // show a small inline notification in the hands section
+          showCardDrawnNotification(data);
+        }catch(e){ console.warn('card:drawn handler error', e); }
+      });
       // selection events (include moves) broadcasted by server
       socket.on('game:select', (data) => {
         try{
@@ -407,6 +421,71 @@
           boardEl.appendChild(sq);
         }
       }
+    }
+
+    // render player's own hand and public counts for others
+    function renderHands(handsOwn, handCounts){
+      const handsEl = document.getElementById('hands');
+      if(!handsEl) return;
+      handsEl.innerHTML = '';
+      // show our own hand
+      const wrap = document.createElement('div');
+      wrap.className = 'player-hand';
+      const title = document.createElement('div');
+      title.style.fontWeight = '700';
+      title.style.marginBottom = '6px';
+      title.textContent = 'Votre main';
+      wrap.appendChild(title);
+      const list = document.createElement('div');
+      list.style.display = 'flex';
+      list.style.flexDirection = 'column';
+      list.style.gap = '6px';
+      (handsOwn || []).slice(0,5).forEach(c => {
+        const cardEl = document.createElement('div');
+        cardEl.className = 'card-item';
+        const img = document.createElement('div');
+        img.className = 'card-art';
+        img.textContent = 'Illustration';
+        const meta = document.createElement('div');
+        meta.className = 'card-meta';
+        const h = document.createElement('div'); h.className = 'card-title'; h.textContent = c.title || c.cardId || 'Carte';
+        const p = document.createElement('div'); p.className = 'card-desc'; p.textContent = c.description || '';
+        meta.appendChild(h); meta.appendChild(p);
+        cardEl.appendChild(img);
+        cardEl.appendChild(meta);
+        list.appendChild(cardEl);
+      });
+      wrap.appendChild(list);
+      handsEl.appendChild(wrap);
+
+      // show counts for other players
+      Object.entries(handCounts || {}).forEach(([pid, count]) => {
+        if(pid === myPlayerId) return;
+        const other = document.createElement('div');
+        other.className = 'player-hand';
+        const t = document.createElement('div');
+        t.style.fontWeight = '700';
+        t.style.marginBottom = '6px';
+        t.textContent = `Main de ${pid} — ${count} carte(s)`;
+        other.appendChild(t);
+        handsEl.appendChild(other);
+      });
+    }
+
+    function showCardDrawnNotification(evt){
+      try{
+        const handsEl = document.getElementById('hands');
+        if(!handsEl) return;
+        const note = document.createElement('div');
+        note.className = 'card-draw-note';
+        note.textContent = evt && evt.card ? `Pioché: ${evt.card.title || evt.card.cardId}` : 'Carte piochée';
+        note.style.padding = '6px 8px';
+        note.style.border = '1px solid #ccc';
+        note.style.background = '#fff8e1';
+        note.style.marginTop = '8px';
+        handsEl.prepend(note);
+        setTimeout(()=> note.remove(), 5000);
+      }catch(e){ console.warn('showCardDrawnNotification error', e); }
     }
   </script>
 </body>

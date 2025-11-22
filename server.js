@@ -1295,6 +1295,16 @@ io.on('connection', (socket) => {
             // reuse the mine detonation animation on clients for kamikaz: show the same explosion visual
             try{ io.to(room.id).emit('mine:detonated', { roomId: room.id, square: target }); }catch(_){ }
             played.payload = Object.assign({}, payload, { applied: 'kamikaz', appliedTo: target, affected: affected, removedCount: removedPieces.length });
+            // After playing kamikaz the player immediately loses their turn (same behavior as steal-piece)
+            try{
+              if(board){
+                board.turn = (board.turn === 'w') ? 'b' : 'w';
+                // draw for the next player at the start of their turn
+                const nextColor = board.turn;
+                const nextPlayer = (room.players || []).find(p => (p.color && p.color[0]) === nextColor);
+                if(nextPlayer){ try{ drawCardForPlayer(room, nextPlayer.id); }catch(_){ } }
+              }
+            }catch(_){ }
           }catch(e){ console.error('kamikaz effect error', e); }
         }
         // invisible: make one of your pieces invisible to the opponent for a number of turns

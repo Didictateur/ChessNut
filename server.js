@@ -527,8 +527,16 @@ io.on('connection', (socket) => {
       console.error('computeLegalMoves error', e);
       moves = [];
     }
-    // broadcast selection + moves to ALL clients in the room (including sender)
-    io.to(roomId).emit('game:select', { playerId, square, moves });
+    // send selection to the selecting client WITH moves, but broadcast selection WITHOUT moves to other clients
+    try{
+      // send to selecting socket (include moves)
+      socket.emit('game:select', { playerId, square, moves });
+      // notify other sockets in the room about the selection but without revealing the legal moves
+      socket.to(roomId).emit('game:select', { playerId, square, moves: [] });
+    }catch(e){
+      // fallback: broadcast to all (shouldn't normally happen)
+      io.to(roomId).emit('game:select', { playerId, square, moves: [] });
+    }
     cb && cb({ ok: true });
   });
 

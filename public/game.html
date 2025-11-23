@@ -71,7 +71,14 @@
       // helper: decide if a card requires a target selected after clicking 'Jouer'
     function cardRequiresTarget(cardId){
       if(!cardId) return null;
-      const id = String(cardId).toLowerCase();
+      // normalize and strip diacritics so titles like "Téléportation" become "teleportation"
+      let id = String(cardId).toLowerCase();
+      try{
+        id = id.normalize('NFD').replace(/\p{Diacritic}/gu, '');
+      }catch(e){
+        // fallback: remove non-ascii characters
+        id = id.replace(/[^\x00-\x7F]/g, '');
+      }
     if(id.indexOf('mine') !== -1) return 'empty';
     // kamikaz targets one of your pieces (play card, then choose a piece)
     if(id.indexOf('kamikaz') !== -1) return 'owned';
@@ -88,6 +95,8 @@
       return 'enemy';
     }
     if(id.indexOf('coin') !== -1 || id === 'coin_coin') return 'owned';
+    // teleportation: require selecting one of your pieces first (like promotion)
+    if(id.indexOf('teleport') !== -1 || id.indexOf('tele') !== -1 || id.indexOf('t_l_portation') !== -1) return 'owned';
       return null;
     }
 
@@ -777,7 +786,8 @@
         function emitPlay(){
           if(!socket) return;
           const cid = cardEl.dataset.cardId;
-          const requireType = cardRequiresTarget(cid);
+          // try cardId first, then fall back to the human title (helps with accented ids like "Téléportation")
+          const requireType = cardRequiresTarget(cid) || cardRequiresTarget(c.title || '');
           if(requireType){
             if(requireType === 'player'){
               // If there's only one opponent, auto-select them (no modal needed). Otherwise show modal.

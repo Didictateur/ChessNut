@@ -225,3 +225,12 @@ button:hover{transform:translateY(-3px);transition:all 180ms ease}
   .pokemon-card{flex:0 0 140px;height:220px}
 }
 
+/* shuffle animation: quick jitter + opacity pulse to emphasize randomization */
+#board.shuffle-play{
+  transition: transform 700ms cubic-bezier(.2,.9,.2,1), opacity 700ms ease;
+  transform: translateY(-6px) rotate(-1deg) scale(0.995);
+  opacity: 0.9;
+}
+#board.shuffle-play .square img{ transition: transform 700ms cubic-bezier(.2,.9,.2,1); transform: rotate(2deg) scale(0.995); filter: drop-shadow(0 6px 18px rgba(0,0,0,0.06)); }
+
+

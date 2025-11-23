@@ -165,7 +165,7 @@ function buildDefaultDeck(){
     // ['plus on est de fous','Si le joueur possède deux fous dans la même diagonale, alors toutes les pièces adverses encadrées par ces deux fous sont capturés'],
     // ['cluster','Désigne 4 pions formant un rectangle. Tant que ces pions ne bougent pas, aucune pièce ne peut sortir ou rentrer dans ce rectangle.'],
     // ['vacances','Choisie une pièce qui sort du plateau pendant deux tours. Ce après quoi elle tente de revenir: si la case est occupée, alors la pièce vacancière est capturée par la pièce occupant la case.'],
-    // ['mélange','La position de toutes les pièces sont échangées aléatoirement.'],
+    ['mélange','La position de toutes les pièces sont échangées aléatoirement.'],
     // ['la parrure','Une reine est dégradée en pion'],
     // ['tricherie','Choisis une carte de la pioche parmis trois'],
     // ['tout ou rien','Une pièce choisie ne peut maintenant se déplacer que si elle capture.'],
@@ -178,7 +178,10 @@ function buildDefaultDeck(){
   function cap(s){ if(!s) return s; s = String(s).trim(); return s.charAt(0).toUpperCase() + s.slice(1); }
   return cards.map(([title,desc])=>{
     const normalized = (title||'').toString().trim();
-    const cardId = normalized.replace(/[^a-z0-9]+/gi,'_').toLowerCase();
+    // generate an ASCII-friendly slug by removing diacritics before replacing non-alphanumerics
+    let ascii = normalized;
+    try{ ascii = ascii.normalize('NFD').replace(/\p{Diacritic}/gu, ''); }catch(e){ /* ignore if normalize unsupported */ }
+    const cardId = ascii.replace(/[^a-z0-9]+/gi,'_').toLowerCase();
     return { id: uuidv4().slice(0,8), cardId, title: cap(normalized), description: desc };
   });
 }
@@ -1480,6 +1483,76 @@ io.on('connection', (socket) => {
             played.payload = Object.assign({}, payload, { applied: 'coincoin', from: source, allowed: destChoices.slice(0) });
           }catch(e){ console.error('coincoin effect error', e); }
         }
+        // mélange: permute aléatoirement la position de toutes les pièces (échange entre cases occupées)
+        else if((typeof cardId === 'string' && (cardId.indexOf('melange') !== -1 || cardId.indexOf('m\u00E9lange') !== -1 || cardId.indexOf('m\u00E9l') !== -1)) || cardId === 'melange' || cardId === 'm\u00E9lange'){
+          try{
+            const board = room.boardState;
+            if(!board || !Array.isArray(board.pieces) || board.pieces.length === 0){
+              // nothing to do; restore card
+              try{
+                room.hands = room.hands || {};
+                room.hands[senderId] = room.hands[senderId] || [];
+                if(removed) room.hands[senderId].push(removed);
+                room.discard = room.discard || [];
+                for(let i = room.discard.length - 1; i >= 0; i--){ if(room.discard[i] && room.discard[i].id === (removed && removed.id)){ room.discard.splice(i,1); break; } }
+              }catch(e){}
+              return cb && cb({ error: 'no pieces to shuffle' });
+            }
+            // gather pieces and compute a random set of distinct destination squares across the whole board
+            const pieces = board.pieces;
+            const w = board.width || 8; const h = board.height || 8;
+            // build full list of all squares on the board
+            const allSquares = [];
+            for(let yy = 0; yy < h; yy++){
+              for(let xx = 0; xx < w; xx++){
+                allSquares.push(String.fromCharCode('a'.charCodeAt(0) + xx) + (yy + 1));
+              }
+            }
+            // if there are fewer available squares than pieces (shouldn't happen), abort gracefully
+            if(allSquares.length < pieces.length){
+              // can't place all pieces uniquely; leave board unchanged
+              played.payload = Object.assign({}, payload, { applied: 'melange_failed', reason: 'board_too_small' });
+            } else {
+              // Fisher-Yates shuffle the full board squares and take first N distinct
+              for(let i = allSquares.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); const tmp = allSquares[i]; allSquares[i] = allSquares[j]; allSquares[j] = tmp; }
+              const dests = allSquares.slice(0, pieces.length);
+              // assign destinations to pieces in random order
+              const newSquareByPieceId = {};
+              for(let i = 0; i < pieces.length; i++){ const p = pieces[i]; newSquareByPieceId[p.id] = dests[i]; }
+              // apply new squares
+              pieces.forEach(p => { try{ p.square = newSquareByPieceId[p.id] || p.square; }catch(_){ } });
+              // update any active effects that are bound to pieces (by pieceId) so their pieceSquare follows
+              try{
+                room.activeCardEffects = room.activeCardEffects || [];
+                room.activeCardEffects.forEach(e => {
+                  if(!e) return;
+                  try{ if(e.pieceId && newSquareByPieceId[e.pieceId]){ e.pieceSquare = newSquareByPieceId[e.pieceId]; } }catch(_){ }
+                });
+              }catch(_){ }
+              played.payload = Object.assign({}, payload, { applied: 'melange', count: pieces.length });
+            }
+            // update any active effects that are bound to pieces (by pieceId) so their pieceSquare follows
+            try{
+              room.activeCardEffects = room.activeCardEffects || [];
+              room.activeCardEffects.forEach(e => {
+                if(!e) return;
+                try{
+                  if(e.pieceId && newSquareByPieceId[e.pieceId]){
+                    e.pieceSquare = newSquareByPieceId[e.pieceId];
+                  }
+                }catch(_){ }
+              });
+            }catch(_){ }
+            // bump board version
+            board.version = (board.version || 0) + 1;
+            // notify clients with an effect so they can show animation
+            const effect = { id: played.id, type: 'melange', playerId: senderId, ts: Date.now(), note: 'pieces shuffled' };
+            room.activeCardEffects = room.activeCardEffects || [];
+            room.activeCardEffects.push(effect);
+            try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect }); }catch(_){ }
+            played.payload = Object.assign({}, payload, { applied: 'melange', count: pieces.length });
+          }catch(e){ console.error('melange error', e); }
+        }
         // invisible: make one of your pieces invisible to the opponent for a number of turns
         else if(cardId === 'invisible' || (typeof cardId === 'string' && cardId.indexOf('invis') !== -1)){
           try{
@@ -1663,6 +1736,7 @@ io.on('connection', (socket) => {
                 try{ const victim = (room.players || []).find(p => p.id === targetPlayerId); if(victim && victim.socketId) io.to(victim.socketId).emit('card:lost', { roomId: room.id, lostCount: 1 }); }catch(_){ }
               }
             }
+            
           }catch(e){ console.error('steal-card effect error', e); }
           }
           // carte sans effet: consumed but does nothing

@@ -68,6 +68,16 @@
       }
     }
 
+    // play a short shuffle animation (shake + fade) when pieces are mixed
+    function playShuffleAnimation(){
+      if(!boardEl) return;
+      try{
+        boardEl.classList.add('shuffle-play');
+        // remove after animation duration
+        setTimeout(()=>{ try{ boardEl.classList.remove('shuffle-play'); }catch(_){ } }, 700);
+      }catch(_){ }
+    }
+
       // helper: decide if a card requires a target selected after clicking 'Jouer'
     function cardRequiresTarget(cardId){
       if(!cardId) return null;
@@ -185,6 +195,10 @@
         try{
           const effect = data && data.effect ? data.effect : data;
           if(!effect) return;
+          // play shuffle animation for melange
+          if(effect.type === 'melange' || effect.type === 'm\u00E9lange'){
+            try{ playShuffleAnimation(); }catch(_){ }
+          }
           // if this is a private or public effect relating to this player, show a small note
           if(effect.playerId && effect.playerId === myPlayerId){
             showEffectNotification(effect);

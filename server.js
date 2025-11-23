@@ -214,7 +214,7 @@ function buildDefaultDeck(){
     // ['réinitialisation','Toutes les pièces reviennent à leur position initiale. S il y a des pièces supplémenaires, se rangent devant les pions'],
     ["toucher c'est jouer","Toucher une pièce adverse qu'il sera obligé de jouer"],
     // ['marécage','Pendant X tours, toutes les pièces ne peuvent se déplacer que comme un roi'],
-    // ['sniper','Capturer une pièce sans avoir à bouger la pièce capturante'],
+    ['sniper','Capturer une pièce sans avoir à bouger la pièce capturante'],
     ['inversion',"Échange la position d'une pièce avec une pièce adverse.\n\nCompte comme un mouvement"],
     // ['jeu des 7 différences','Déplace une pièce du plateau pendant que le joueur adverse à les yeux fermés. S il la retrouve, elle est capturée, laissée sinon'],
     // ['punching ball','Replace le roi dans sa position initiale, et place un nouveau pion à l ancienne position du roi'],
@@ -827,34 +827,69 @@ io.on('connection', (socket) => {
 
       // apply move: remove any piece on target (capture)
       const targetIndex = pieces.findIndex(p => p.square === to);
+      // sniper: special-case capture without moving when an active sniper effect is bound to the moving piece
+      let sniperTriggered = false;
       if(targetIndex >= 0){
-        // remove captured piece and record it for potential resurrection
-        const capturedPiece = pieces.splice(targetIndex, 1)[0];
-        try{
-          room.captured = room.captured || [];
-          const originalOwner = (room.players || []).find(p => (p.color && p.color[0]) === capturedPiece.color);
-          room.captured.push({ id: uuidv4().slice(0,8), piece: capturedPiece, originalOwnerId: (originalOwner && originalOwner.id) || null, capturedBy: senderId, ts: Date.now() });
-          // ensure the captured piece object no longer carries the 'invisible' flag so it won't
-          // incorrectly reappear invisible if resurrected or inspected elsewhere
-          try{ if(capturedPiece && capturedPiece.invisible) delete capturedPiece.invisible; }catch(_){ }
-        }catch(_){ /* ignore bookkeeping errors */ }
-        // If there were any 'invisible' effects targeting the captured piece or its square,
-        // remove them so the square does not remain hidden for non-owners when another piece arrives.
+        // check for sniper effect bound to the moving piece for this player
         try{
           room.activeCardEffects = room.activeCardEffects || [];
-          for(let ei = room.activeCardEffects.length - 1; ei >= 0; ei--){
-            const ev = room.activeCardEffects[ei];
-            if(!ev) continue;
-            if(ev.type === 'invisible' && (ev.pieceId === capturedPiece.id || ev.pieceSquare === capturedPiece.square)){
-              // remove effect and notify clients
-              try{ room.activeCardEffects.splice(ei,1); }catch(_){ }
-              try{ io.to(room.id).emit('card:effect:removed', { roomId: room.id, effectId: ev.id, type: ev.type, playerId: ev.playerId }); }catch(_){ }
-            }
+          const sniperIdx = room.activeCardEffects.findIndex(e => e && e.type === 'sniper' && e.pieceId === moving.id && e.playerId === senderId);
+          if(sniperIdx !== -1){
+            // perform sniper capture: remove target piece and record it for potential resurrection
+            const capturedPiece = pieces.splice(targetIndex, 1)[0];
+            try{
+              room.captured = room.captured || [];
+              const originalOwner = (room.players || []).find(p => (p.color && p.color[0]) === capturedPiece.color);
+              room.captured.push({ id: uuidv4().slice(0,8), piece: capturedPiece, originalOwnerId: (originalOwner && originalOwner.id) || null, capturedBy: senderId, ts: Date.now() });
+              try{ if(capturedPiece && capturedPiece.invisible) delete capturedPiece.invisible; }catch(_){ }
+            }catch(_){ /* ignore bookkeeping errors */ }
+            // remove any invisible effects targeting the captured piece/square
+            try{
+              for(let ei = room.activeCardEffects.length - 1; ei >= 0; ei--){
+                const ev = room.activeCardEffects[ei];
+                if(!ev) continue;
+                if(ev.type === 'invisible' && (ev.pieceId === capturedPiece.id || ev.pieceSquare === capturedPiece.square)){
+                  try{ room.activeCardEffects.splice(ei,1); }catch(_){ }
+                  try{ io.to(room.id).emit('card:effect:removed', { roomId: room.id, effectId: ev.id, type: ev.type, playerId: ev.playerId }); }catch(_){ }
+                }
+              }
+            }catch(_){ }
+            // consume the sniper effect (one-time)
+            try{
+              const removedEffect = room.activeCardEffects.splice(sniperIdx, 1)[0];
+              try{ io.to(room.id).emit('card:effect:removed', { roomId: room.id, effectId: removedEffect && removedEffect.id, type: 'sniper', playerId: removedEffect && removedEffect.playerId }); }catch(_){ }
+            }catch(_){ }
+            sniperTriggered = true;
+          } else {
+            // no sniper: normal capture
+            const capturedPiece = pieces.splice(targetIndex, 1)[0];
+            try{
+              room.captured = room.captured || [];
+              const originalOwner = (room.players || []).find(p => (p.color && p.color[0]) === capturedPiece.color);
+              room.captured.push({ id: uuidv4().slice(0,8), piece: capturedPiece, originalOwnerId: (originalOwner && originalOwner.id) || null, capturedBy: senderId, ts: Date.now() });
+              try{ if(capturedPiece && capturedPiece.invisible) delete capturedPiece.invisible; }catch(_){ }
+            }catch(_){ /* ignore bookkeeping errors */ }
+            // If there were any 'invisible' effects targeting the captured piece or its square,
+            // remove them so the square does not remain hidden for non-owners when another piece arrives.
+            try{
+              for(let ei = room.activeCardEffects.length - 1; ei >= 0; ei--){
+                const ev = room.activeCardEffects[ei];
+                if(!ev) continue;
+                if(ev.type === 'invisible' && (ev.pieceId === capturedPiece.id || ev.pieceSquare === capturedPiece.square)){
+                  try{ room.activeCardEffects.splice(ei,1); }catch(_){ }
+                  try{ io.to(room.id).emit('card:effect:removed', { roomId: room.id, effectId: ev.id, type: ev.type, playerId: ev.playerId }); }catch(_){ }
+                }
+              }
+            }catch(_){ }
           }
-        }catch(_){ }
+        }catch(_){
+          // fallback: perform normal capture
+          const capturedPiece = pieces.splice(targetIndex, 1)[0];
+          try{ room.captured = room.captured || []; const originalOwner = (room.players || []).find(p => (p.color && p.color[0]) === capturedPiece.color); room.captured.push({ id: uuidv4().slice(0,8), piece: capturedPiece, originalOwnerId: (originalOwner && originalOwner.id) || null, capturedBy: senderId, ts: Date.now() }); }catch(_){ }
+        }
       }
-      // move the piece
-      moving.square = to;
+      // move the piece only if sniper didn't trigger
+      if(!sniperTriggered){ moving.square = to; }
 
       // consume any active card effects bound to this piece (rebondir is one-time and should be removed)
       // also update any persistent effects (like adoubement) to track the piece's new square so they remain active
@@ -1487,6 +1522,37 @@ io.on('connection', (socket) => {
               try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect: { id: played.id, type: 'parrure', pieceId: targetPiece.id, pieceSquare: targetPiece.square, playerId: senderId } }); }catch(_){ }
             }catch(e){ console.error('parrure apply error', e); }
           }catch(e){ console.error('parrure effect error', e); }
+        }
+        // sniper: bind a one-time sniper effect to one of your pieces.
+        // After playing this card the owner selects one of their pieces; the effect is recorded and
+        // when that piece later makes a capturing move, the capture is performed without moving the capturer.
+        else if((typeof cardId === 'string' && cardId.indexOf('sniper') !== -1) || cardId === 'sniper'){
+          try{
+            const board = room.boardState;
+            // client may send selected piece in payload.targetSquare (legacy owned selection) or payload.sourceSquare
+            let source = (payload && payload.sourceSquare) || (payload && payload.targetSquare) || null;
+            if(!source){ try{ source = socket.data && socket.data.lastSelectedSquare; }catch(e){ source = null; } }
+            const roomPlayer = room.players.find(p => p.id === senderId);
+            const playerColorShort = (roomPlayer && roomPlayer.color && roomPlayer.color[0]) || null;
+            const srcPiece = (board && board.pieces || []).find(p => p.square === source);
+            if(!board || !source || !srcPiece || srcPiece.color !== playerColorShort){
+              // invalid target: restore card to hand and abort
+              try{
+                room.hands = room.hands || {};
+                room.hands[senderId] = room.hands[senderId] || [];
+                if(removed) room.hands[senderId].push(removed);
+                room.discard = room.discard || [];
+                for(let i = room.discard.length - 1; i >= 0; i--){ if(room.discard[i] && room.discard[i].id === (removed && removed.id)){ room.discard.splice(i,1); break; } }
+              }catch(_){ }
+              return cb && cb({ error: 'no valid source selected' });
+            }
+            // bind sniper effect to the piece id (one-time use)
+            room.activeCardEffects = room.activeCardEffects || [];
+            const effect = { id: played.id, type: 'sniper', playerId: senderId, pieceId: srcPiece.id, pieceSquare: srcPiece.square, remainingUses: 1, imposedBy: senderId, ts: Date.now() };
+            room.activeCardEffects.push(effect);
+            played.payload = Object.assign({}, payload, { applied: 'sniper_bound', appliedTo: source });
+            try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect }); }catch(_){ }
+          }catch(e){ console.error('sniper binding error', e); }
         }
         // tout ou rien: choose a piece; that piece may only move if it captures (one owner turn)
         else if((typeof cardId === 'string' && cardId.indexOf('tout') !== -1 && cardId.indexOf('rien') !== -1) || cardId === 'tout_ou_rien'){

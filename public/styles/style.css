@@ -3,16 +3,17 @@
 html,body{height:100%}
 body{
   font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-  margin:0;padding:24px;background: linear-gradient(180deg,#f7fafc 0%, #eef2f7 60%);color:#0b1220;
+  margin:0;padding:28px;background: linear-gradient(180deg,#fff7f0 0%, #f3f6f9 60%);color:#0b1220;
+  -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
 }
 
 .page{max-width:1100px;margin:0 auto}
 
 header h2{margin:0 0 12px 0;color:#0b1220}
 
-.card{background: linear-gradient(180deg, #ffffff, #fbfdff);border:1px solid rgba(11,18,32,0.06);padding:16px;border-radius:10px;box-shadow:0 6px 18px rgba(11,18,32,0.06);} 
+.card{background: linear-gradient(180deg,#fffaf6,#ffffff);border:1px solid rgba(11,18,32,0.06);padding:18px;border-radius:14px;box-shadow:0 10px 30px rgba(11,18,32,0.06);} 
 
-button{background:#2563eb;color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600}
+button{background:linear-gradient(90deg,#ff7a59,#ffb199);color:#1b1b1f;border:none;padding:10px 14px;border-radius:12px;cursor:pointer;font-weight:700;box-shadow:0 8px 20px rgba(255,122,89,0.12);transition:transform 160ms ease, box-shadow 160ms ease}
 button[disabled]{opacity:0.6;cursor:not-allowed}
 input[type="text"], input[type="search"]{padding:8px;border-radius:8px;border:1px solid rgba(11,18,32,0.06);background:transparent;color:inherit}
 
@@ -41,9 +42,7 @@ a:hover{text-decoration:underline}
 /* layout helpers used from game.html */
 .layout-row{display:flex;gap:20px;align-items:flex-start}
 
-/* turn banner */
-/* turn banner - light theme */
-#turnBanner{color:#07203a;background:#c7f9d9;padding:8px 12px;border-radius:8px;font-weight:700;display:none}
+#turnBanner{color:#5a2b12;background:linear-gradient(90deg,#fff1e6,#ffe6da);padding:10px 14px;border-radius:12px;font-weight:800;display:none;border:1px solid rgba(90,43,18,0.06);box-shadow:0 6px 18px rgba(90,43,18,0.04)}
 #turnBanner.show{display:inline-block}
 
 /* board tweaks */
@@ -70,8 +69,8 @@ a:hover{text-decoration:underline}
   position: absolute;
   left: 50%; top: 50%; transform: translate(-50%, -50%);
   width: 36%; height: 36%; border-radius: 50%;
-  border: 2px solid rgba(234,88,12,0.95);
-  box-shadow: 0 2px 6px rgba(234,88,12,0.12) inset;
+  border: 2px solid rgba(255,121,63,0.98);
+  box-shadow: 0 6px 18px rgba(255,121,63,0.10) inset;
   pointer-events: none; z-index: 3;
 }
 
@@ -80,8 +79,8 @@ a:hover{text-decoration:underline}
   position:absolute;
   left:50%; top:50%; transform:translate(-50%,-50%);
   width:36%; height:36%; border-radius:50%;
-  background: radial-gradient(circle at 30% 30%, #ffdfe0 0%, #ff6b6b 30%, #b91c1c 100%);
-  box-shadow: inset 0 2px 6px rgba(255,255,255,0.25), 0 2px 6px rgba(0,0,0,0.25);
+  background: radial-gradient(circle at 30% 30%, #fff2ea 0%, #ff9a76 30%, #c94b2b 100%);
+  box-shadow: inset 0 2px 8px rgba(255,255,255,0.28), 0 4px 12px rgba(0,0,0,0.20);
   pointer-events:none; z-index:2;
 }
 
@@ -118,9 +117,9 @@ a:hover{text-decoration:underline}
 .square.selected-remote .piece{transform: scale(1.02); transition: transform 140ms ease}
 
 /* basic checkerboard coloring */
-.square.light{background: linear-gradient(180deg, #f8fafc, #f1f5f9);}
-.quare.dark{background: linear-gradient(180deg, #e6eef8, #dbe9f5);} 
-.square.dark{background: linear-gradient(180deg, #e6eef8, #dbe9f5);} 
+.square.light{background: linear-gradient(180deg,#fff8f4,#fff1ec);} 
+.quare.dark{background: linear-gradient(180deg,#fdeee2,#f6d9c5);} 
+.square.dark{background: linear-gradient(180deg,#fdeee2,#f6d9c5);} 
 .square{border:1px solid rgba(0,0,0,0.06)}
 
 /* flipped board for black perspective */
@@ -144,9 +143,9 @@ a:hover{text-decoration:underline}
 
 /* draw button: compact rectangular CTA used in the cards area */
 .btn-draw{
-  background:linear-gradient(90deg,#10b981,#059669); /* green gradient */
-  color:white;padding:10px 14px;border-radius:8px;border:none;cursor:pointer;font-weight:800;font-size:14px;
-  min-width:140px;height:44px;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 8px 18px rgba(6,95,70,0.12);
+  background:linear-gradient(90deg,#ff7a59,#ffb199); /* warm gradient */
+  color:#1b1b1f;padding:10px 14px;border-radius:12px;border:none;cursor:pointer;font-weight:900;font-size:14px;
+  min-width:140px;height:46px;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 10px 22px rgba(255,122,89,0.12);
 }
 .btn-draw[disabled]{opacity:0.6;cursor:not-allowed}
 

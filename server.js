@@ -312,6 +312,25 @@ function computeLegalMoves(room, square){
       });
     }
   }catch(_){ }
+  // detect teleport effect: allow this piece to move to any empty square (one-turn temporary effect)
+  try{
+    const hasTeleport = (room.activeCardEffects || []).some(e => e && e.type === 'teleport' && ((e.pieceId && e.pieceId === piece.id) || e.pieceSquare === square));
+    if(hasTeleport){
+      // iterate all board squares and add empty ones as legal non-capturing moves
+      for(let tx = 0; tx < width; tx++){
+        for(let ty = 0; ty < height; ty++){
+          const tsq = coordToSquare(tx, ty);
+          if(!tsq) continue;
+          // avoid adding the current square
+          if(tsq === square) continue;
+          const occ = getPieceAt(tsq);
+          if(!occ && !moves.some(m => m.to === tsq)){
+            moves.push({ from: square, to: tsq });
+          }
+        }
+      }
+    }
+  }catch(_){ }
   // detect if this specific piece has a permanent adoubement effect (grants knight moves)
   // effects may be bound either to the piece's current square or to the piece id (preferred)
   const hasAdoubement = (room.activeCardEffects || []).some(e => e.type === 'adoubement' && ((e.pieceId && e.pieceId === piece.id) || e.pieceSquare === square));
@@ -1212,6 +1231,35 @@ io.on('connection', (socket) => {
           room.activeCardEffects.push({ id: played.id, type: 'fortification', pieceId: targetPiece.id, pieceSquare: target, playerId: senderId });
           played.payload = Object.assign({}, payload, { applied: 'fortification', appliedTo: target });
         }catch(e){ console.error('fortification effect error', e); }
+      }
+      // teleportation: allow the selected piece to move to any empty square for one turn
+      else if((typeof cardId === 'string' && (cardId.indexOf('teleport') !== -1 || cardId.indexOf('t_l_portation') !== -1 || cardId.indexOf('t_lportation') !== -1)) || cardId === 'teleport'){
+        try{
+          const board = room.boardState;
+          let target = payload && payload.targetSquare;
+          if(!target){ try{ target = socket.data && socket.data.lastSelectedSquare; }catch(e){ target = null; } }
+          // validate target exists and belongs to the player
+          const roomPlayer = room.players.find(p => p.id === senderId);
+          const playerColorShort = (roomPlayer && roomPlayer.color && roomPlayer.color[0]) || null;
+          const targetPiece = (board && board.pieces || []).find(p => p.square === target);
+          if(!board || !target || !targetPiece || targetPiece.color !== playerColorShort){
+            // restore removed card to hand and remove from discard if necessary
+            try{
+              room.hands = room.hands || {};
+              room.hands[senderId] = room.hands[senderId] || [];
+              if(removed) room.hands[senderId].push(removed);
+              room.discard = room.discard || [];
+              for(let i = room.discard.length - 1; i >= 0; i--){ if(room.discard[i] && room.discard[i].id === (removed && removed.id)){ room.discard.splice(i,1); break; } }
+            }catch(e){ console.error('restore removed card error', e); }
+            return cb && cb({ error: 'no valid target' });
+          }
+          // apply a temporary teleport effect bound to the piece id for one owner turn
+          room.activeCardEffects = room.activeCardEffects || [];
+          const effect = { id: played.id, type: 'teleport', pieceId: targetPiece.id, pieceSquare: target, playerId: senderId, remainingTurns: 1, decrementOn: 'owner' };
+          room.activeCardEffects.push(effect);
+          played.payload = Object.assign({}, payload, { applied: 'teleport', appliedTo: target });
+          try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect }); }catch(_){ }
+        }catch(e){ console.error('teleport effect error', e); }
         }
         // promotion: promote one of your pawns to a queen
         else if(cardId === 'promotion' || cardId === 'promote' || (typeof cardId === 'string' && (cardId.indexOf('promotion') !== -1 || cardId.indexOf('promot') !== -1 || cardId.indexOf('promouvoir') !== -1))){

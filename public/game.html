@@ -485,8 +485,13 @@
             if(!occ || occ.color === myShort){ log('select an enemy piece'); return; }
             socket.emit('card:play', { roomId, playerId: myPlayerId, cardId: pendingCard.cardId, payload: { targetSquare: square } }, (resp)=>{
               if(resp && resp.error){ log('card:play error', resp); alert(resp.error); }
-              else { log('card played with target', resp); }
+              else { log('card played with target', resp);
+                // after server applied the card effect, request legal moves for the selected piece so the client
+                // will receive the updated legal moves (including teleport to empty squares)
+                try{ setSelection(square); }catch(_){ }
+              }
             });
+            // keep pendingCard until server response processed (client will call setSelection on success)
             pendingCard = null; clearTargetHighlights(); return;
           }
         }

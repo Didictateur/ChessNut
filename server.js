@@ -136,6 +136,48 @@ function visibleSquaresForPlayer(room, playerId){
   return out;
 }
 
+// Helper to end a player's turn after playing a card: flip turn, decrement per-turn effects and trigger next player's draw
+function endTurnAfterCard(room, senderId){
+  try{
+    if(!room || !room.boardState) return;
+    const board = room.boardState;
+    // flip turn
+    if(board.turn) board.turn = (board.turn === 'w') ? 'b' : 'w';
+    // decrement remainingTurns for any time-limited effects that belong to the player who just finished their turn
+    try{
+      room.activeCardEffects = room.activeCardEffects || [];
+      for(let i = room.activeCardEffects.length - 1; i >= 0; i--){
+        const e = room.activeCardEffects[i];
+        if(typeof e.remainingTurns === 'number'){
+          let shouldDecrement = false;
+          if(e.decrementOn === 'opponent'){
+            shouldDecrement = (e.playerId !== senderId);
+          } else if(e.decrementOn === 'owner'){
+            shouldDecrement = (e.playerId === senderId);
+          } else {
+            shouldDecrement = (e.playerId === senderId);
+          }
+          if(shouldDecrement){
+            e.remainingTurns = e.remainingTurns - 1;
+            try{ io.to(room.id).emit('card:effect:updated', { roomId: room.id, effect: e }); }catch(_){ }
+            if(e.remainingTurns <= 0){ room.activeCardEffects.splice(i,1); try{ io.to(room.id).emit('card:effect:removed', { roomId: room.id, effectId: e.id, type: e.type, playerId: e.playerId }); }catch(_){ } }
+          }
+        }
+      }
+    }catch(e){ console.error('updating temporary effects error', e); }
+
+    // reset per-turn card-play flags
+    try{ room._cardPlayedThisTurn = {}; }catch(_){ }
+
+    // perform next player's draw (if autoDraw) or at least send room update
+    try{ 
+      const nextColor = board.turn;
+      const nextPlayer = room.players.find(p => (p.color && p.color[0]) === nextColor);
+      if(nextPlayer){ maybeDrawAtTurnStart(room, nextPlayer.id); } else { sendRoomUpdate(room); }
+    }catch(_){ sendRoomUpdate(room); }
+  }catch(e){ console.error('endTurnAfterCard error', e); }
+}
+
 // Build a default deck from README list. Each card has a unique id, cardId (slug), title and description.
 function buildDefaultDeck(){
   const cards = [
@@ -174,7 +216,7 @@ function buildDefaultDeck(){
     ["toucher c'est jouer","Toucher une pièce adverse qu'il sera obligé de jouer"],
     // ['marécage','Pendant X tours, toutes les pièces ne peuvent se déplacer que comme un roi'],
     // ['sniper','Capturer une pièce sans avoir à bouger la pièce capturante'],
-    // ['inversion','Échange la position d une pièce avec une pièce adverse'],
+    ['inversion','Échange la position d une pièce avec une pièce adverse'],
     // ['jeu des 7 différences','Déplace une pièce du plateau pendant que le joueur adverse à les yeux fermés. S il la retrouve, elle est capturée, laissée sinon'],
     // ['punching ball','Replace le roi dans sa position initiale, et place un nouveau pion à l ancienne position du roi'],
     // ['reversi','Si deux pions encadrent parfaitement une pièce adverse, cette dernière change de camp'],
@@ -1412,6 +1454,50 @@ io.on('connection', (socket) => {
               try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect: { id: played.id, type: 'parrure', pieceId: targetPiece.id, pieceSquare: targetPiece.square, playerId: senderId } }); }catch(_){ }
             }catch(e){ console.error('parrure apply error', e); }
           }catch(e){ console.error('parrure effect error', e); }
+        }
+        // inversion: pick one of your pieces, then pick an enemy piece — swap their squares
+        else if((typeof cardId === 'string' && cardId.indexOf('inversion') !== -1) || cardId === 'inversion'){
+          try{
+            const board = room.boardState;
+            const payloadSrc = payload && payload.sourceSquare;
+            const payloadTgt = payload && payload.targetSquare;
+            // fallback to lastSelectedSquare for source if client didn't provide both
+            let source = payloadSrc || null;
+            let target = payloadTgt || null;
+            if(!source){ try{ source = socket.data && socket.data.lastSelectedSquare; }catch(_){ source = null; } }
+            if(!target){ /* nothing */ }
+            const roomPlayer = room.players.find(p => p.id === senderId);
+            const playerColorShort = (roomPlayer && roomPlayer.color && roomPlayer.color[0]) || null;
+            const srcPiece = (board && board.pieces || []).find(p => p.square === source);
+            const tgtPiece = (board && board.pieces || []).find(p => p.square === target);
+            // validate both pieces exist and belong respectively to player and opponent
+            if(!board || !source || !target || !srcPiece || !tgtPiece || srcPiece.color !== playerColorShort || tgtPiece.color === playerColorShort){
+              // invalid target(s): restore removed card to hand and abort
+              try{ room.hands = room.hands || {}; room.hands[senderId] = room.hands[senderId] || []; if(removed) room.hands[senderId].push(removed); room.discard = room.discard || []; for(let i = room.discard.length - 1; i >= 0; i--){ if(room.discard[i] && room.discard[i].id === (removed && removed.id)){ room.discard.splice(i,1); break; } } }catch(e){ console.error('restore removed card error', e); }
+              return cb && cb({ error: 'no valid targets' });
+            }
+            // swap their squares
+            try{
+              const sSquare = srcPiece.square;
+              const tSquare = tgtPiece.square;
+              srcPiece.square = tSquare;
+              tgtPiece.square = sSquare;
+              // update any activeCardEffects that reference squares
+              try{
+                room.activeCardEffects = room.activeCardEffects || [];
+                room.activeCardEffects.forEach(e => {
+                  try{
+                    if(e && e.pieceSquare && e.pieceSquare === sSquare) e.pieceSquare = tSquare;
+                    else if(e && e.pieceSquare && e.pieceSquare === tSquare) e.pieceSquare = sSquare;
+                  }catch(_){ }
+                });
+              }catch(_){ }
+              // bump board version
+              try{ board.version = (board.version || 0) + 1; }catch(_){ }
+              played.payload = Object.assign({}, payload, { applied: 'inversion', from: source, to: target });
+              try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect: { id: played.id, type: 'inversion', swapped: [srcPiece.id, tgtPiece.id], playerId: senderId } }); }catch(_){ }
+            }catch(e){ console.error('inversion apply error', e); }
+          }catch(e){ console.error('inversion effect error', e); }
       }
       // teleportation: allow the selected piece to move to any empty square for one turn
       else if((typeof cardId === 'string' && (cardId.indexOf('teleport') !== -1 || cardId.indexOf('t_l_portation') !== -1 || cardId.indexOf('t_lportation') !== -1)) || cardId === 'teleport'){
@@ -2029,8 +2115,8 @@ io.on('connection', (socket) => {
   }catch(e){ console.error('mark card played error', e); }
   // emit card played to entire room (informational)
   io.to(roomId).emit('card:played', played);
-  // send personalized room updates (will include updated hands and discardCount)
-  sendRoomUpdate(room);
+  // After playing a card, the player's turn is consumed: perform end-of-turn bookkeeping then send updates
+  try{ endTurnAfterCard(room, played.playerId); }catch(_){ /* fallback to simple update */ sendRoomUpdate(room); }
 
     cb && cb({ ok: true, played });
   });

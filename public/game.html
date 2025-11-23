@@ -115,6 +115,8 @@
     if(id.indexOf('coin') !== -1 || id === 'coin_coin') return 'owned';
     // teleportation: require selecting one of your pieces first (like promotion)
     if(id.indexOf('teleport') !== -1 || id.indexOf('tele') !== -1 || id.indexOf('t_l_portation') !== -1) return 'owned';
+    // inversion: first choose one of your pieces, then choose an enemy piece to swap places
+    if(id.indexOf('inversion') !== -1) return 'own_then_enemy';
       return null;
     }
 
@@ -483,8 +485,35 @@
 
         // If we're in a pending card-targeting mode, handle target selection and do NOT attempt moves
         if(pendingCard){
-          const req = pendingCard.requireType; // 'empty' | 'owned' | 'owned_pawn' | 'enemy'
+          const req = pendingCard.requireType; // 'empty' | 'owned' | 'owned_pawn' | 'enemy' | 'own_then_enemy' | 'enemy_queen'
           const myShort = (myColor && myColor[0]) || '';
+          // handle two-step selection for cards like 'inversion'
+          if(req === 'own_then_enemy'){
+            // first select one of your own pieces
+            if(!pendingCard.firstTarget){
+              const piece = currentBoardState && Array.isArray(currentBoardState.pieces) && currentBoardState.pieces.find(p => p.square === square);
+              if(!piece || piece.color !== myShort){ log('select one of your pieces (first)'); return; }
+              if(piece.type && piece.type.toLowerCase() === 'k'){ log('cannot select king'); return; }
+              // store first selection and highlight enemy pieces
+              pendingCard.firstTarget = square;
+              highlightTargets('enemy');
+              // mark visually the chosen source (temporary)
+              try{ const el = boardEl.querySelector(`.square[data-square="${square}"]`); if(el) el.classList.add('target-chosen'); }catch(_){ }
+              log('First piece selected for inversion:', square);
+              return;
+            }
+            // second selection: enemy piece to swap with
+            const occ = currentBoardState && Array.isArray(currentBoardState.pieces) && currentBoardState.pieces.find(p => p.square === square);
+            if(!occ || occ.color === myShort){ log('select an enemy piece (second)'); return; }
+            // emit swap payload: sourceSquare + targetSquare
+            socket.emit('card:play', { roomId, playerId: myPlayerId, cardId: pendingCard.cardId, payload: { sourceSquare: pendingCard.firstTarget, targetSquare: square } }, (resp)=>{
+              if(resp && resp.error){ log('card:play error', resp); alert(resp.error); }
+              else { log('inversion played', resp); }
+            });
+            // cleanup visuals
+            try{ const el = boardEl.querySelector(`.square[data-square="${pendingCard.firstTarget}"]`); if(el) el.classList.remove('target-chosen'); }catch(_){ }
+            pendingCard = null; clearTargetHighlights(); return;
+          }
           if(req === 'empty'){
             const occupied = currentBoardState && Array.isArray(currentBoardState.pieces) && currentBoardState.pieces.find(p => p.square === square);
             if(occupied){ log('square not empty for mine placement'); return; }
@@ -497,6 +526,7 @@
           } else if(req === 'owned'){
             const piece = currentBoardState && Array.isArray(currentBoardState.pieces) && currentBoardState.pieces.find(p => p.square === square);
             if(!piece || piece.color !== myShort){ log('select one of your pieces'); return; }
+            if(piece.type && piece.type.toLowerCase() === 'k'){ log('cannot select king'); return; }
             socket.emit('card:play', { roomId, playerId: myPlayerId, cardId: pendingCard.cardId, payload: { targetSquare: square } }, (resp)=>{
               if(resp && resp.error){ log('card:play error', resp); alert(resp.error); }
               else { log('card played with target', resp); }
@@ -524,6 +554,7 @@
           } else if(req === 'enemy'){
             const occ = currentBoardState && Array.isArray(currentBoardState.pieces) && currentBoardState.pieces.find(p => p.square === square);
             if(!occ || occ.color === myShort){ log('select an enemy piece'); return; }
+            if(occ.type && occ.type.toLowerCase() === 'k'){ log('cannot select king'); return; }
             socket.emit('card:play', { roomId, playerId: myPlayerId, cardId: pendingCard.cardId, payload: { targetSquare: square } }, (resp)=>{
               if(resp && resp.error){ log('card:play error', resp); alert(resp.error); }
               else { log('card played with target', resp);
@@ -724,16 +755,20 @@
           if(!occ) sqEl.classList.add('targetable');
         } else if(type === 'owned'){
           const occ = (currentBoardState.pieces||[]).find(p=>p.square===sq);
-          if(occ && occ.color === myShort) sqEl.classList.add('targetable');
+          if(occ && occ.color === myShort && occ.type && occ.type.toLowerCase() !== 'k') sqEl.classList.add('targetable');
         } else if(type === 'owned_pawn'){
           const occ = (currentBoardState.pieces||[]).find(p=>p.square===sq);
           if(occ && occ.color === myShort && occ.type && occ.type.toLowerCase() === 'p') sqEl.classList.add('targetable');
+        } else if(type === 'own_then_enemy'){
+          // initial phase: highlight only own pieces (client will switch to enemy after first selection)
+          const occ = (currentBoardState.pieces||[]).find(p=>p.square===sq);
+          if(occ && occ.color === myShort && occ.type && occ.type.toLowerCase() !== 'k') sqEl.classList.add('targetable');
         } else if(type === 'enemy_queen'){
           const occ = (currentBoardState.pieces||[]).find(p=>p.square===sq);
           if(occ && occ.color && occ.color !== myShort && occ.type && occ.type.toLowerCase() === 'q') sqEl.classList.add('targetable');
         } else if(type === 'enemy'){
           const occ = (currentBoardState.pieces||[]).find(p=>p.square===sq);
-          if(occ && occ.color && occ.color !== myShort) sqEl.classList.add('targetable');
+          if(occ && occ.color && occ.color !== myShort && occ.type && occ.type.toLowerCase() !== 'k') sqEl.classList.add('targetable');
         }
       });
       // add a small note near hands

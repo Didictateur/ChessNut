@@ -182,7 +182,7 @@ function buildDefaultDeck(){
     // ['cluster','Désigne 4 pions formant un rectangle. Tant que ces pions ne bougent pas, aucune pièce ne peut sortir ou rentrer dans ce rectangle.'],
     // ['vacances','Choisie une pièce qui sort du plateau pendant deux tours. Ce après quoi elle tente de revenir: si la case est occupée, alors la pièce vacancière est capturée par la pièce occupant la case.'],
     ['mélange','La position de toutes les pièces sont échangées aléatoirement.'],
-    // ['la parrure','Une reine est dégradée en pion'],
+    ['la parrure','Une reine est dégradée en pion'],
     // ['tricherie','Choisis une carte de la pioche parmis trois'],
     // ['tout ou rien','Une pièce choisie ne peut maintenant se déplacer que si elle capture.'],
     // ['tous les mêmes','Au yeux de l ennemie, toutes les pièces se ressemblent pendant 2 tours.'],
@@ -1387,6 +1387,31 @@ io.on('connection', (socket) => {
           played.payload = Object.assign({}, payload, { applied: 'toucher', appliedTo: target });
           try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect }); }catch(_){ }
         }catch(e){ console.error('toucher effect error', e); }
+        }
+        // la parrure: downgrade an enemy queen to a pawn (selected target must be an enemy queen)
+        else if((typeof cardId === 'string' && cardId.indexOf('parrure') !== -1) || cardId === 'la_parrure'){
+          try{
+            const board = room.boardState;
+            let target = payload && payload.targetSquare;
+            if(!target){ try{ target = socket.data && socket.data.lastSelectedSquare; }catch(e){ target = null; } }
+            const roomPlayer = room.players.find(p => p.id === senderId);
+            const playerColorShort = (roomPlayer && roomPlayer.color && roomPlayer.color[0]) || null;
+            const targetPiece = (board && board.pieces || []).find(p => p.square === target);
+            // validate target exists and belongs to the opponent and is a queen
+            if(!board || !target || !targetPiece || targetPiece.color === playerColorShort || !targetPiece.type || targetPiece.type.toLowerCase() !== 'q'){
+              // invalid target: do NOT restore the removed card (card is consumed). Return error but card remains in discard.
+              return cb && cb({ error: 'no valid target' });
+            }
+            // perform downgrade: change piece type to pawn
+            try{
+              targetPiece.type = 'p';
+              if(targetPiece.promoted) delete targetPiece.promoted;
+              // bump board version so clients react to the board mutation
+              try{ board.version = (board.version || 0) + 1; }catch(_){ }
+              played.payload = Object.assign({}, payload, { applied: 'parrure', appliedTo: target });
+              try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect: { id: played.id, type: 'parrure', pieceId: targetPiece.id, pieceSquare: targetPiece.square, playerId: senderId } }); }catch(_){ }
+            }catch(e){ console.error('parrure apply error', e); }
+          }catch(e){ console.error('parrure effect error', e); }
       }
       // teleportation: allow the selected piece to move to any empty square for one turn
       else if((typeof cardId === 'string' && (cardId.indexOf('teleport') !== -1 || cardId.indexOf('t_l_portation') !== -1 || cardId.indexOf('t_lportation') !== -1)) || cardId === 'teleport'){

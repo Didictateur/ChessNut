@@ -228,7 +228,7 @@ function buildDefaultDeck(){
     ['tout ou rien','Une pièce choisie ne peut maintenant se déplacer que si elle capture.'],
     // ['tous les mêmes','Au yeux de l ennemie, toutes les pièces se ressemblent pendant 2 tours.'],
     // ['petit pion','Le joueur choisit un pion. À partir du prochain tour, il est promu en reine dès qu il capture un pièce non pion.'],
-    // ['révolution','Tous les pions sont aléatoirement changés en Cavalier, Fou ou Tour et les Cavaliers, Fous et Tours sont changés en pions.'],
+    ['révolution','Tous les pions sont aléatoirement changés en Cavalier, Fou ou Tour et les Cavaliers, Fous et Tours sont changés en pions.'],
     // ['doppelganger','Choisis une pièce. À partir de maintenant, devient chacune des pièces qu elle capture.'],
     // ['kurby','Choisis une pièce. À sa prochaine capture, récupère les mouvements de la pièce capturée.']
   ];
@@ -1818,7 +1818,7 @@ io.on('connection', (socket) => {
                 if(removed) room.hands[senderId].push(removed);
                 room.discard = room.discard || [];
                 for(let i = room.discard.length - 1; i >= 0; i--){ if(room.discard[i] && room.discard[i].id === (removed && removed.id)){ room.discard.splice(i,1); break; } }
-              }catch(e){}
+              }catch(_){ }
               return cb && cb({ error: 'no pieces to shuffle' });
             }
             // gather pieces and compute a random set of distinct destination squares across the whole board
@@ -1853,28 +1853,55 @@ io.on('connection', (socket) => {
                 });
               }catch(_){ }
               played.payload = Object.assign({}, payload, { applied: 'melange', count: pieces.length });
-            }
-            // update any active effects that are bound to pieces (by pieceId) so their pieceSquare follows
-            try{
+              // bump board version and notify clients
+              board.version = (board.version || 0) + 1;
+              const effect = { id: played.id, type: 'melange', playerId: senderId, ts: Date.now(), note: 'pieces shuffled' };
               room.activeCardEffects = room.activeCardEffects || [];
-              room.activeCardEffects.forEach(e => {
-                if(!e) return;
-                try{
-                  if(e.pieceId && newSquareByPieceId[e.pieceId]){
-                    e.pieceSquare = newSquareByPieceId[e.pieceId];
-                  }
-                }catch(_){ }
-              });
-            }catch(_){ }
-            // bump board version
-            board.version = (board.version || 0) + 1;
-            // notify clients with an effect so they can show animation
-            const effect = { id: played.id, type: 'melange', playerId: senderId, ts: Date.now(), note: 'pieces shuffled' };
-            room.activeCardEffects = room.activeCardEffects || [];
-            room.activeCardEffects.push(effect);
-            try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect }); }catch(_){ }
-            played.payload = Object.assign({}, payload, { applied: 'melange', count: pieces.length });
+              room.activeCardEffects.push(effect);
+              try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect }); }catch(_){ }
+            }
           }catch(e){ console.error('melange error', e); }
+        }
+        // révolution: transform pawns into (knight|bishop|rook) randomly, and knights/bishops/rooks into pawns
+        else if((typeof cardId === 'string' && (cardId.indexOf('revol') !== -1 || cardId.indexOf('r\u00E9vol') !== -1)) || cardId === 'revolution' || cardId === 'r\u00E9volution'){
+          try{
+            const board = room.boardState;
+            if(!board || !Array.isArray(board.pieces) || board.pieces.length === 0){
+              // nothing to do; restore card
+              try{
+                room.hands = room.hands || {};
+                room.hands[senderId] = room.hands[senderId] || [];
+                if(removed) room.hands[senderId].push(removed);
+                room.discard = room.discard || [];
+                for(let i = room.discard.length - 1; i >= 0; i--){ if(room.discard[i] && room.discard[i].id === (removed && removed.id)){ room.discard.splice(i,1); break; } }
+              }catch(_){ }
+              return cb && cb({ error: 'no pieces to transform' });
+            }
+            const pieces = board.pieces;
+            const transformChoices = ['N','B','R'];
+            const mapping = [];
+            for(let i = 0; i < pieces.length; i++){
+              const p = pieces[i];
+              if(!p || !p.type) continue;
+              const t = ('' + p.type).toUpperCase();
+              if(t === 'P'){
+                // pawn -> random among N,B,R
+                const choice = transformChoices[Math.floor(Math.random() * transformChoices.length)];
+                p.type = choice;
+                if(p.promoted) try{ delete p.promoted; }catch(_){ }
+                mapping.push({ id: p.id, from: 'P', to: choice });
+              } else if(t === 'N' || t === 'B' || t === 'R'){
+                // knight/bishop/rook -> pawn
+                p.type = 'P';
+                if(p.promoted) try{ delete p.promoted; }catch(_){ }
+                mapping.push({ id: p.id, from: t, to: 'P' });
+              }
+            }
+            // bump version so clients refresh legal moves when they request them
+            board.version = (board.version || 0) + 1;
+            try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect: { id: played.id, type: 'revolution', mapping } }); }catch(_){ }
+            played.payload = Object.assign({}, payload, { applied: 'revolution', mapping });
+          }catch(e){ console.error('revolution effect error', e); }
         }
         // invisible: make one of your pieces invisible to the opponent for a number of turns
         else if(cardId === 'invisible' || (typeof cardId === 'string' && cardId.indexOf('invis') !== -1)){

@@ -94,6 +94,8 @@
         id = id.replace(/[^\x00-\x7F]/g, '');
       }
     if(id.indexOf('mine') !== -1) return 'empty';
+    // revolution is a global immediate effect: it should NOT require any piece selection
+    if(id.indexOf('revol') !== -1) return null;
     // 'toucher c'est jouer' : require selecting an enemy piece as the card target
   if(id.indexOf('toucher') !== -1) return 'enemy';
   // la parrure: select an enemy queen to downgrade to a pawn

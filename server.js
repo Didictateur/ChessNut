@@ -171,7 +171,7 @@ function buildDefaultDeck(){
     ['changement de camp','On retourne le plateau'],
     // ['ça tangue','Toutes les pièces se décale du même côté'],
     // ['réinitialisation','Toutes les pièces reviennent à leur position initiale. S il y a des pièces supplémenaires, se rangent devant les pions'],
-    // ['toucher c est jouer','Toucher une pièce adverse qu il sera obligé de jouer'],
+    ["toucher c'est jouer","Toucher une pièce adverse qu'il sera obligé de jouer"],
     // ['marécage','Pendant X tours, toutes les pièces ne peuvent se déplacer que comme un roi'],
     // ['sniper','Capturer une pièce sans avoir à bouger la pièce capturante'],
     // ['inversion','Échange la position d une pièce avec une pièce adverse'],
@@ -748,6 +748,16 @@ io.on('connection', (socket) => {
       if(!moving) return cb && cb({ error: 'no piece at source' });
       if(moving.color !== playerColorShort) return cb && cb({ error: 'not your piece' });
 
+      // Enforce 'toucher' restriction: if there is an active 'toucher' effect targeting this player,
+      // they may ONLY move the specified piece(s).
+      try{
+        const effects = room.activeCardEffects || [];
+        const toucher = effects.find(e => e && e.type === 'toucher' && e.playerId === senderId);
+        if(toucher && toucher.pieceId && moving.id !== toucher.pieceId){
+          return cb && cb({ error: 'must_move_restricted_piece' });
+        }
+      }catch(_){ }
+
       // validate that 'to' is among legal moves
       const legal = computeLegalMoves(room, from) || [];
       const ok = legal.some(m => m.to === to);
@@ -1040,6 +1050,19 @@ io.on('connection', (socket) => {
       console.error('computeLegalMoves error', e);
       moves = [];
     }
+    // Enforce 'toucher' restriction: if the selecting player is affected by a 'toucher' effect,
+    // they may only move the targeted piece. If they select another piece, show no moves.
+    try{
+      const effects = room.activeCardEffects || [];
+      const toucherEffects = effects.filter(e => e && e.type === 'toucher' && e.playerId === playerId);
+      if(toucherEffects && toucherEffects.length > 0){
+        const selectedPiece = (room.boardState && room.boardState.pieces || []).find(p => p.square === square);
+        const allowedPieceIds = toucherEffects.map(e => e.pieceId).filter(Boolean);
+        if(!selectedPiece || allowedPieceIds.indexOf(selectedPiece.id) === -1){
+          moves = [];
+        }
+      }
+    }catch(_){ /* ignore enforcement errors */ }
     // send selection to the selecting client WITH moves, but broadcast selection WITHOUT moves to other clients
     try{
       // send to selecting socket (include moves)
@@ -1333,6 +1356,37 @@ io.on('connection', (socket) => {
           room.activeCardEffects.push({ id: played.id, type: 'fortification', pieceId: targetPiece.id, pieceSquare: target, playerId: senderId });
           played.payload = Object.assign({}, payload, { applied: 'fortification', appliedTo: target });
         }catch(e){ console.error('fortification effect error', e); }
+      }
+      // toucher c'est jouer: force the targeted player to move only the chosen piece on their next turn
+      else if((typeof cardId === 'string' && cardId.indexOf('toucher') !== -1) || cardId === 'toucher_cest_jouer'){
+        try{
+          const board = room.boardState;
+          let target = payload && payload.targetSquare;
+          if(!target){ try{ target = socket.data && socket.data.lastSelectedSquare; }catch(e){ target = null; } }
+          const roomPlayer = room.players.find(p => p.id === senderId);
+          const playerColorShort = (roomPlayer && roomPlayer.color && roomPlayer.color[0]) || null;
+          const targetPiece = (board && board.pieces || []).find(p => p.square === target);
+          // validate target exists and belongs to the opponent
+          if(!board || !target || !targetPiece || targetPiece.color === playerColorShort){
+            // invalid target: restore removed card to hand and abort
+            try{
+              room.hands = room.hands || {};
+              room.hands[senderId] = room.hands[senderId] || [];
+              if(removed) room.hands[senderId].push(removed);
+              room.discard = room.discard || [];
+              for(let i = room.discard.length - 1; i >= 0; i--){ if(room.discard[i] && room.discard[i].id === (removed && removed.id)){ room.discard.splice(i,1); break; } }
+            }catch(e){ console.error('restore removed card error', e); }
+            return cb && cb({ error: 'no valid target' });
+          }
+          // find the owner (player) of the targeted piece
+          const targetOwner = (room.players || []).find(p => (p.color && p.color[0]) === targetPiece.color) || null;
+          // create a one-turn effect that forces the targetOwner to move only this piece on their next turn
+          room.activeCardEffects = room.activeCardEffects || [];
+          const effect = { id: played.id, type: 'toucher', playerId: (targetOwner && targetOwner.id) || null, pieceId: targetPiece.id, pieceSquare: targetPiece.square, remainingTurns: 1, decrementOn: 'owner', imposedBy: senderId, ts: Date.now() };
+          room.activeCardEffects.push(effect);
+          played.payload = Object.assign({}, payload, { applied: 'toucher', appliedTo: target });
+          try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect }); }catch(_){ }
+        }catch(e){ console.error('toucher effect error', e); }
       }
       // teleportation: allow the selected piece to move to any empty square for one turn
       else if((typeof cardId === 'string' && (cardId.indexOf('teleport') !== -1 || cardId.indexOf('t_l_portation') !== -1 || cardId.indexOf('t_lportation') !== -1)) || cardId === 'teleport'){

@@ -98,6 +98,8 @@
   if(id.indexOf('toucher') !== -1) return 'enemy';
   // la parrure: select an enemy queen to downgrade to a pawn
   if(id.indexOf('parrure') !== -1) return 'enemy_queen';
+  // tout ou rien: select a piece (any, except kings) to force it to only move when capturing
+  if(id.indexOf('tout') !== -1 && id.indexOf('rien') !== -1) return 'piece';
     // kamikaz targets one of your pieces (play card, then choose a piece)
     if(id.indexOf('kamikaz') !== -1) return 'owned';
     if(id.indexOf('invis') !== -1 || id.indexOf('invisible') !== -1) return 'owned';
@@ -577,6 +579,16 @@
             });
             pendingCard = null; clearTargetHighlights(); return;
           }
+          else if(req === 'piece'){
+            const occ = currentBoardState && Array.isArray(currentBoardState.pieces) && currentBoardState.pieces.find(p => p.square === square);
+            if(!occ){ log('select a piece'); return; }
+            if(occ.type && occ.type.toLowerCase() === 'k'){ log('cannot select king'); return; }
+            socket.emit('card:play', { roomId, playerId: myPlayerId, cardId: pendingCard.cardId, payload: { targetSquare: square } }, (resp)=>{
+              if(resp && resp.error){ log('card:play error', resp); alert(resp.error); }
+              else { log('card played with target', resp); }
+            });
+            pendingCard = null; clearTargetHighlights(); return;
+          }
         }
 
         // If this square contains a move-marker (either clicked marker or square area), attempt the move.
@@ -763,6 +775,9 @@
           // initial phase: highlight only own pieces (client will switch to enemy after first selection)
           const occ = (currentBoardState.pieces||[]).find(p=>p.square===sq);
           if(occ && occ.color === myShort && occ.type && occ.type.toLowerCase() !== 'k') sqEl.classList.add('targetable');
+        } else if(type === 'piece'){
+          const occ = (currentBoardState.pieces||[]).find(p=>p.square===sq);
+          if(occ && occ.type && occ.type.toLowerCase() !== 'k') sqEl.classList.add('targetable');
         } else if(type === 'enemy_queen'){
           const occ = (currentBoardState.pieces||[]).find(p=>p.square===sq);
           if(occ && occ.color && occ.color !== myShort && occ.type && occ.type.toLowerCase() === 'q') sqEl.classList.add('targetable');

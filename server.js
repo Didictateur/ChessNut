@@ -225,7 +225,7 @@ function buildDefaultDeck(){
     ['mélange','La position de toutes les pièces sont échangées aléatoirement'],
     ['la parrure','Une reine est dégradée en pion'],
     // ['tricherie','Choisis une carte de la pioche parmis trois'],
-    // ['tout ou rien','Une pièce choisie ne peut maintenant se déplacer que si elle capture.'],
+    ['tout ou rien','Une pièce choisie ne peut maintenant se déplacer que si elle capture.'],
     // ['tous les mêmes','Au yeux de l ennemie, toutes les pièces se ressemblent pendant 2 tours.'],
     // ['petit pion','Le joueur choisit un pion. À partir du prochain tour, il est promu en reine dès qu il capture un pièce non pion.'],
     // ['révolution','Tous les pions sont aléatoirement changés en Cavalier, Fou ou Tour et les Cavaliers, Fous et Tours sont changés en pions.'],
@@ -799,6 +799,19 @@ io.on('connection', (socket) => {
         }
       }catch(_){ }
 
+      // Enforce 'tout ou rien' restriction: if the moving piece is under 'tout_ou_rien', it may only move if the move captures
+      try{
+        const effects2 = room.activeCardEffects || [];
+        const tout = effects2.find(e => e && e.type === 'tout_ou_rien' && e.pieceId === moving.id);
+        if(tout){
+          // only allow moves that capture an occupied square
+          const targetIndexCheck = pieces.findIndex(p => p.square === to);
+          if(targetIndexCheck === -1){
+            return cb && cb({ error: 'must_capture_to_move' });
+          }
+        }
+      }catch(_){ }
+
       // validate that 'to' is among legal moves
       const legal = computeLegalMoves(room, from) || [];
       const ok = legal.some(m => m.to === to);
@@ -896,10 +909,22 @@ io.on('connection', (socket) => {
       // advance board version
       board.version = (board.version || 0) + 1;
 
+      // If the player was granted a free move by playing a card just now (room._freeMoveFor), consume it
+      // and treat it like a consumed 'double_move' (i.e. do NOT flip the turn). This allows the player to
+      // perform a single free piece move after playing a card without consuming their main turn.
+      let consumedDoubleMove = false;
+      try{
+        if(room && room._freeMoveFor && room._freeMoveFor === senderId){
+          // consume the free-move token
+          consumedDoubleMove = true;
+          try{ delete room._freeMoveFor; }catch(_){ room._freeMoveFor = null; }
+          try{ io.to(room.id).emit('card:free_move_consumed', { roomId: room.id, playerId: senderId }); }catch(_){ }
+        }
+      }catch(e){ /* ignore */ }
+
       // Attempt to consume a double-move effect for the moving player. If present, this allows the player
       // to make an additional move without flipping the turn. We represent that effect as:
       // { type: 'double_move', playerId, remainingMoves }
-      let consumedDoubleMove = false;
       try{
         room.activeCardEffects = room.activeCardEffects || [];
         for(let i = room.activeCardEffects.length - 1; i >= 0; i--){
@@ -1453,6 +1478,32 @@ io.on('connection', (socket) => {
               try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect: { id: played.id, type: 'parrure', pieceId: targetPiece.id, pieceSquare: targetPiece.square, playerId: senderId } }); }catch(_){ }
             }catch(e){ console.error('parrure apply error', e); }
           }catch(e){ console.error('parrure effect error', e); }
+        }
+        // tout ou rien: choose a piece; that piece may only move if it captures (one owner turn)
+        else if((typeof cardId === 'string' && cardId.indexOf('tout') !== -1 && cardId.indexOf('rien') !== -1) || cardId === 'tout_ou_rien'){
+          try{
+            const board = room.boardState;
+            let target = payload && payload.targetSquare;
+            if(!target){ try{ target = socket.data && socket.data.lastSelectedSquare; }catch(e){ target = null; } }
+            const targetPiece = (board && board.pieces || []).find(p => p.square === target);
+            if(!board || !target || !targetPiece){
+              // invalid target: do not restore card (consume) and return error
+              return cb && cb({ error: 'no valid target' });
+            }
+            // do not allow kings to be affected
+            if(targetPiece.type && targetPiece.type.toLowerCase() === 'k'){
+              // consume card but report invalid
+              return cb && cb({ error: 'cannot_target_king' });
+            }
+            // find owner of the targeted piece
+            const targetOwner = (room.players || []).find(p => (p.color && p.color[0]) === targetPiece.color) || null;
+            room.activeCardEffects = room.activeCardEffects || [];
+            // Make 'tout_ou_rien' permanent until explicitly removed by another effect
+            const effect = { id: played.id, type: 'tout_ou_rien', playerId: (targetOwner && targetOwner.id) || null, pieceId: targetPiece.id, pieceSquare: targetPiece.square, imposedBy: senderId, ts: Date.now() };
+            room.activeCardEffects.push(effect);
+            played.payload = Object.assign({}, payload, { applied: 'tout_ou_rien', appliedTo: target });
+            try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect }); }catch(_){ }
+          }catch(e){ console.error('tout_ou_rien effect error', e); }
         }
         // inversion: pick one of your pieces, then pick an enemy piece — swap their squares
         else if((typeof cardId === 'string' && cardId.indexOf('inversion') !== -1) || cardId === 'inversion'){
@@ -2114,8 +2165,13 @@ io.on('connection', (socket) => {
   }catch(e){ console.error('mark card played error', e); }
   // emit card played to entire room (informational)
   io.to(roomId).emit('card:played', played);
-  // After playing a card, the player's turn is consumed: perform end-of-turn bookkeeping then send updates
-  try{ endTurnAfterCard(room, played.playerId); }catch(_){ /* fallback to simple update */ sendRoomUpdate(room); }
+  // After playing a card, allow the player one free piece move that does NOT consume their turn.
+  try{
+    room._freeMoveFor = played.playerId; // client may use this flag to enable a free move UI
+    // broadcast updated room state so clients can reflect the free-move opportunity
+    sendRoomUpdate(room);
+    try{ io.to(room.id).emit('card:free_move_allowed', { roomId: room.id, playerId: played.playerId }); }catch(_){ }
+  }catch(e){ /* fallback */ sendRoomUpdate(room); }
 
     cb && cb({ ok: true, played });
   });

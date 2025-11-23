@@ -27,6 +27,7 @@ function sendRoomUpdate(room){
     hostId: room.hostId,
     size: (room.boardState && room.boardState.width) || room.size,
     cards: Object.keys(room.cards || {}),
+    autoDraw: !!room.autoDraw,
     deckCount: (room.deck && room.deck.length) || 0,
     discardCount: (room.discard && room.discard.length) || 0
   };
@@ -624,7 +625,7 @@ app.post('/rooms', (req, res) => {
   // hostId will be set when the first player joins
   // initialize a deck for this room
   const deck = buildDefaultDeck();
-  rooms.set(id, { id, boardState, players: [], status: 'waiting', hostId: null, size, cards: {}, playedCards: [], removalTimers: new Map(), deck, hands: {} });
+  rooms.set(id, { id, boardState, players: [], status: 'waiting', hostId: null, size, cards: {}, playedCards: [], removalTimers: new Map(), deck, hands: {}, autoDraw: false });
   res.json({ roomId: id, size });
 });
 
@@ -633,7 +634,7 @@ app.get('/rooms/:id', (req, res) => {
   if (!room) return res.status(404).json({ error: 'room not found' });
     const boardState = room.boardState || null;
     const size = (room.boardState && room.boardState.width) || room.size;
-  res.json({ id: room.id, boardState, size: size, players: room.players.map(p => ({ id: p.id, color: p.color })), status: room.status, hostId: room.hostId, cards: Object.keys(room.cards || {}) });
+  res.json({ id: room.id, boardState, size: size, players: room.players.map(p => ({ id: p.id, color: p.color })), status: room.status, hostId: room.hostId, cards: Object.keys(room.cards || {}), autoDraw: !!room.autoDraw });
 });
 
 io.on('connection', (socket) => {
@@ -690,6 +691,20 @@ io.on('connection', (socket) => {
       }
     }catch(e){ console.error('post-join draw error', e); }
     cb && cb({ ok: true, color, roomId, playerId: assignedId, hostId: room.hostId });
+  });
+
+  // Host can toggle automatic drawing in the waiting room. Only the host may change this setting.
+  socket.on('room:auto_draw:set', ({ roomId, enabled }, cb) => {
+    const room = rooms.get(roomId);
+    if(!room) return cb && cb({ error: 'room not found' });
+    const sender = socket.data.playerId;
+    if(!sender) return cb && cb({ error: 'not joined' });
+    if(room.hostId !== sender) return cb && cb({ error: 'only the host can change auto-draw' });
+    room.autoDraw = !!enabled;
+    // Broadcast updated room state to all participants
+    try{ sendRoomUpdate(room); }catch(_){ }
+    try{ io.to(room.id).emit('room:auto_draw:changed', { roomId: room.id, enabled: room.autoDraw }); }catch(_){ }
+    return cb && cb({ ok: true, autoDraw: room.autoDraw });
   });
 
   socket.on('game:move', ({ roomId, from, to, promotion }, cb) => {

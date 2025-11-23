@@ -19,7 +19,14 @@
       <div>Room: <strong id="roomId">-</strong></div>
       <div>Status: <strong id="status">-</strong></div>
       <div>Joueurs: <strong id="playerCount">0/2</strong></div>
-      <div><span id="youAreHost" style="display:none;font-weight:bold">Vous êtes l'hôte</span></div>
+      <div id="youAreHost" style="display:none;color:green;font-weight:bold;">(Vous êtes l'hôte)</div>
+
+      <div style="margin-top:8px">
+        <label id="autoDrawLabel" style="display:none;align-items:center;gap:8px;">
+          <input type="checkbox" id="autoDrawToggle" />
+          Pioche automatique
+        </label>
+      </div>
 
       <div style="margin-top:8px">
         <button id="startBtn" style="display:none" class="btn-cta">Commencer la partie</button>
@@ -45,6 +52,8 @@
   let roomHostId = null;
   const hostLabelEl = document.getElementById('hostLabel');
   const youAreHostEl = document.getElementById('youAreHost');
+  const autoDrawLabelEl = document.getElementById('autoDrawLabel');
+  const autoDrawToggleEl = document.getElementById('autoDrawToggle');
 
     function log(...args){ console.log(...args); }
 
@@ -91,6 +100,20 @@
             startBtn.style.display = 'none';
           }
         }
+        // update auto-draw UI if server provides it
+        try{
+          if(typeof data.autoDraw !== 'undefined' && autoDrawLabelEl && autoDrawToggleEl){
+            // show the control only to the host
+            if(myPlayerId && roomHostId && myPlayerId === roomHostId){
+              autoDrawLabelEl.style.display = 'inline-flex';
+              autoDrawToggleEl.checked = !!data.autoDraw;
+              autoDrawToggleEl.disabled = false;
+            } else {
+              // hide control for non-hosts
+              autoDrawLabelEl.style.display = 'none';
+            }
+          }
+        }catch(_){ }
       });
 
       // register game started handler early so we don't miss the broadcast
@@ -129,6 +152,17 @@
         }
         // after join, fetch room state to avoid missing a recent 'playing' state
         fetch(`/rooms/${encodeURIComponent(roomId)}`).then(r => r.json()).then(roomInfo => {
+          try{
+            if(roomInfo && typeof roomInfo.autoDraw !== 'undefined'){
+              if(myPlayerId && roomHostId && myPlayerId === roomHostId){
+                // host: show control and set state
+                if(autoDrawLabelEl && autoDrawToggleEl){ autoDrawLabelEl.style.display = 'inline-flex'; autoDrawToggleEl.checked = !!roomInfo.autoDraw; autoDrawToggleEl.disabled = false; }
+              } else {
+                // non-host: hide control
+                if(autoDrawLabelEl) autoDrawLabelEl.style.display = 'none';
+              }
+            }
+          }catch(_){ }
           if(roomInfo && roomInfo.status === 'playing'){
             // server already marked room as playing; redirect immediately
             if(myPlayerId){
@@ -151,6 +185,18 @@
         log('game:start acknowledged');
       });
     });
+
+    // Auto-draw toggle (host only)
+    if(autoDrawToggleEl){
+      autoDrawToggleEl.addEventListener('change', (ev)=>{
+        if(!socket) return;
+        const enabled = !!autoDrawToggleEl.checked;
+        socket.emit('room:auto_draw:set', { roomId, enabled }, (resp)=>{
+          if(resp && resp.error){ log('auto-draw error', resp); alert(resp.error); return; }
+          log('auto-draw updated', resp);
+        });
+      });
+    }
 
     // Copy invite link (hidden link, no display)
     document.getElementById('copyInviteBtn').addEventListener('click', async ()=>{

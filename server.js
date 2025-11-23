@@ -152,10 +152,10 @@ function buildDefaultDeck(){
     // ['glue','Toutes les pièces autour de la pièce désignée ne peuvent pas bouger tant que cette dernière ne bouge pas'],
     ["coin coin","Possibilité de se téléporter depuis un coin vers n'importe quel autre coin"],
     ['téléportation','Téléporte n importe quelle pièce de son camp sur une case vide'],
-    // ['changement de camp','On retourne le plateau'],
+    ['changement de camp','On retourne le plateau'],
     // ['ça tangue','Toutes les pièces se décale du même côté'],
     // ['réinitialisation','Toutes les pièces reviennent à leur position initiale. S il y a des pièces supplémenaires, se rangent devant les pions'],
-    // ['toucher c est jouer','Toucher une pièce adverse qu il sera obligé de jouer si elle existe encore lors de son tour'],
+    // ['toucher c est jouer','Toucher une pièce adverse qu il sera obligé de jouer'],
     // ['marécage','Pendant X tours, toutes les pièces ne peuvent se déplacer que comme un roi'],
     // ['sniper','Capturer une pièce sans avoir à bouger la pièce capturante'],
     // ['inversion','Échange la position d une pièce avec une pièce adverse'],
@@ -1261,6 +1261,64 @@ io.on('connection', (socket) => {
           try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect }); }catch(_){ }
         }catch(e){ console.error('teleport effect error', e); }
         }
+      // changement de camp / flip sides: swap the camps so each player controls the other's pieces
+      else if((typeof cardId === 'string' && (cardId.indexOf('changement') !== -1 || cardId.indexOf('changer') !== -1 || cardId.indexOf('change') !== -1 || cardId.indexOf('camp') !== -1)) || cardId === 'changement_de_camp'){
+        try{
+          const board = room.boardState;
+          if(!board || !Array.isArray(board.pieces)){
+            // nothing to do; restore card
+            try{
+              room.hands = room.hands || {};
+              room.hands[senderId] = room.hands[senderId] || [];
+              if(removed) room.hands[senderId].push(removed);
+              room.discard = room.discard || [];
+              for(let i = room.discard.length - 1; i >= 0; i--){ if(room.discard[i] && room.discard[i].id === (removed && removed.id)){ room.discard.splice(i,1); break; } }
+            }catch(e){ }
+            return cb && cb({ error: 'no board to flip' });
+          }
+          // swap piece colors
+          // helper: square <-> coords
+          function squareToCoord(sq){ if(!sq) return null; const s = String(sq).trim().toLowerCase(); if(!/^[a-z][1-9][0-9]*$/.test(s)) return null; const file = s.charCodeAt(0) - 'a'.charCodeAt(0); const rank = parseInt(s.slice(1),10) - 1; return { x: file, y: rank }; }
+          function coordToSquare(x,y){ if(x<0||y<0||!board.width||!board.height) return null; if(x<0||y<0||x>=board.width||y>=board.height) return null; return String.fromCharCode('a'.charCodeAt(0) + x) + (y+1); }
+          // perform 180° rotation and swap piece colors
+          const w = board.width || 8; const h = board.height || 8;
+          (board.pieces || []).forEach(p => {
+            try{
+              // rotate square
+              const c = squareToCoord(p.square);
+              if(c){ const nx = (w - 1) - c.x; const ny = (h - 1) - c.y; const ns = coordToSquare(nx, ny); if(ns) p.square = ns; }
+              // swap colour
+              p.color = (p.color === 'w' ? 'b' : (p.color === 'b' ? 'w' : p.color));
+            }catch(_){ }
+          });
+          // also rotate/adjust any active effect squares (pieceSquare, square, allowedSquares)
+          try{
+            room.activeCardEffects = room.activeCardEffects || [];
+            room.activeCardEffects.forEach(e => {
+              if(!e) return;
+              try{
+                if(e.pieceSquare){ const c = squareToCoord(e.pieceSquare); if(c){ const nx = (w-1)-c.x; const ny = (h-1)-c.y; const ns = coordToSquare(nx,ny); if(ns) e.pieceSquare = ns; } }
+                if(e.square){ const c2 = squareToCoord(e.square); if(c2){ const nx = (w-1)-c2.x; const ny = (h-1)-c2.y; const ns2 = coordToSquare(nx,ny); if(ns2) e.square = ns2; } }
+                if(Array.isArray(e.allowedSquares)){
+                  e.allowedSquares = e.allowedSquares.map(sq => { const cc = squareToCoord(sq); if(!cc) return sq; const nx = (w-1)-cc.x; const ny = (h-1)-cc.y; return coordToSquare(nx,ny) || sq; });
+                }
+              }catch(_){ }
+            });
+          }catch(_){ }
+          // swap players' assigned colors (so UIs re-orient)
+          (room.players || []).forEach(pl => { try{ pl.color = (pl.color === 'white' ? 'black' : (pl.color === 'black' ? 'white' : pl.color)); }catch(_){ } });
+          // flip whose turn it is (since colors swapped)
+          if(board.turn) board.turn = (board.turn === 'w' ? 'b' : (board.turn === 'b' ? 'w' : board.turn));
+          // bump board version
+          board.version = (board.version || 0) + 1;
+          // emit an effect to notify clients
+          const effect = { id: played.id, type: 'changement_de_camp', playerId: senderId, ts: Date.now() };
+          room.activeCardEffects = room.activeCardEffects || [];
+          room.activeCardEffects.push(effect);
+          played.payload = Object.assign({}, payload, { applied: 'changement_de_camp' });
+          try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect }); }catch(_){ }
+        }catch(e){ console.error('changement de camp error', e); }
+      }
         // promotion: promote one of your pawns to a queen
         else if(cardId === 'promotion' || cardId === 'promote' || (typeof cardId === 'string' && (cardId.indexOf('promotion') !== -1 || cardId.indexOf('promot') !== -1 || cardId.indexOf('promouvoir') !== -1))){
           try{

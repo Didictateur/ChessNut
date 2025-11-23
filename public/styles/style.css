@@ -142,6 +142,14 @@ a:hover{text-decoration:underline}
 .btn-ghost{background:transparent;border:1px solid rgba(11,18,32,0.06);padding:8px 10px;border-radius:8px;color:inherit}
 .btn-cta{background:linear-gradient(90deg,#3b82f6,#60a5fa);box-shadow:0 8px 20px rgba(59,130,246,0.18)}
 
+/* draw button: compact rectangular CTA used in the cards area */
+.btn-draw{
+  background:linear-gradient(90deg,#10b981,#059669); /* green gradient */
+  color:white;padding:10px 14px;border-radius:8px;border:none;cursor:pointer;font-weight:800;font-size:14px;
+  min-width:140px;height:44px;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 8px 18px rgba(6,95,70,0.12);
+}
+.btn-draw[disabled]{opacity:0.6;cursor:not-allowed}
+
 /* cancel button shown during pending card selection: white background, red text for clear contrast */
 .btn-cancel{
   background: #ffffff;

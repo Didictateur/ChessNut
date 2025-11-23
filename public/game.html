@@ -20,9 +20,13 @@
         <div style="margin-top:8px">
           <!-- movement controls removed as requested -->
         </div>
-        <pre id="log" style="margin-top:8px;height:160px;overflow:auto">logs...</pre>
+        <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+          <pre id="log" style="margin-top:0px;height:140px;overflow:auto;flex:1">logs...</pre>
+        </div>
       </section>
-      <div id="hands" style="margin-top:8px;display:flex;flex-direction:column;gap:8px"></div>
+      <div style="margin-top:10px;display:flex;align-items:center;gap:12px">
+        <div id="hands" style="display:flex;flex-direction:column;gap:8px;flex:1;margin-left:6px"></div>
+      </div>
     </aside>
   </div>
 
@@ -154,6 +158,23 @@
     } else if(data.handsOwn || data.handCounts){
       renderHands(data.handsOwn || [], data.handCounts || {});
     }
+    // show/hide draw button: only when autoDraw is OFF and it's this player's turn
+    try{
+      const drawBtn = document.getElementById('drawBtn');
+      if(drawBtn){
+        const auto = !!data.autoDraw;
+        const board = data.boardState || null;
+        const myShort = myColor && myColor[0];
+        if(!auto && board && myShort && board.turn === myShort){
+          // enable draw if hand not full
+          const myHandLen = (data.handsOwn && data.handsOwn.length) || 0;
+          drawBtn.style.display = 'inline-block';
+          drawBtn.disabled = myHandLen >= 5;
+        } else {
+          drawBtn.style.display = 'none';
+        }
+      }
+    }catch(_){ }
       });
   socket.on('game:over', (data)=>{ log('game:over', data); if(data.boardState){ renderBoardFromState(data.boardState); updateTurnBanner(data.boardState); } });
   socket.on('game:started', (data)=>{ log('game:started', data); if(data.boardState){ renderBoardFromState(data.boardState); updateTurnBanner(data.boardState); } });
@@ -165,6 +186,8 @@
           showCardDrawnNotification(data);
         }catch(e){ console.warn('card:drawn handler error', e); }
       });
+  // when server broadcasts generic room updates, it includes autoDraw flag
+  // ensure draw button visibility is updated inside the room:update handler below
       // when a card is played by any player, ensure the UI removes it from the owner's hand
       socket.on('card:played', (data) => {
         try{
@@ -847,6 +870,28 @@
 
         row.appendChild(cardEl);
       });
+
+      // draw button inside the 'Vos cartes' header (visible only when autoDraw is off and it's your turn)
+      try{
+        const drawBtn = document.createElement('button');
+        drawBtn.id = 'drawBtn';
+        drawBtn.type = 'button';
+        drawBtn.className = 'btn-draw';
+        drawBtn.style.display = 'none';
+        drawBtn.textContent = 'Piocher';
+        // attach handler that emits player:draw and temporarily disables the button
+        drawBtn.addEventListener('click', (ev)=>{
+          ev.stopPropagation();
+          if(!socket) return;
+          drawBtn.disabled = true;
+          socket.emit('player:draw', { roomId }, (resp)=>{
+            if(resp && resp.error){ log('player:draw error', resp); alert(resp.error); drawBtn.disabled = false; return; }
+            log('player:draw ok', resp);
+            // server will send room:update which will hide/disable the button as needed
+          });
+        });
+        header.appendChild(drawBtn);
+      }catch(_){ }
 
       wrap.appendChild(row);
       handsEl.appendChild(wrap);

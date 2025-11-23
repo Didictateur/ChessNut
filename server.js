@@ -86,6 +86,21 @@ function sendRoomUpdate(room){
   });
 }
 
+// Helper: at the start of a player's turn, either perform an automatic draw
+// if room.autoDraw is enabled, or simply broadcast the room state so clients
+// can update UI. This centralizes the auto-draw toggle behavior.
+function maybeDrawAtTurnStart(room, playerId){
+  try{
+    if(!room) return;
+    if(room.autoDraw){
+      drawCardForPlayer(room, playerId);
+    } else {
+      // ensure clients get the updated room state even if no draw happens
+      sendRoomUpdate(room);
+    }
+  }catch(e){ console.error('maybeDrawAtTurnStart error', e); sendRoomUpdate(room); }
+}
+
 // Compute the set of squares visible to a given player (adjacent to any of their pieces).
 // Returns a Set of square strings (e.g., 'e4').
 function visibleSquaresForPlayer(room, playerId){
@@ -681,12 +696,12 @@ io.on('connection', (socket) => {
     // If the game is already playing and it's this player's turn, attempt to draw (useful on reconnect)
     // Only draw if the player's hand is currently empty to avoid double-drawing (e.g. initial granted cards)
     try{
-      if(room.status === 'playing' && room.boardState && room.boardState.turn){
+        if(room.status === 'playing' && room.boardState && room.boardState.turn){
         const myPlayer = room.players.find(p => p.id === assignedId);
         const myShort = (myPlayer && myPlayer.color || '')[0];
         if(myShort === room.boardState.turn){
           const hasHand = room.hands && room.hands[assignedId] && room.hands[assignedId].length > 0;
-          if(!hasHand) drawCardForPlayer(room, assignedId);
+          if(!hasHand) maybeDrawAtTurnStart(room, assignedId);
         }
       }
     }catch(e){ console.error('post-join draw error', e); }
@@ -902,12 +917,12 @@ io.on('connection', (socket) => {
       // determine next player and perform their draw BEFORE broadcasting the move, so the draw happens at the start of their turn
   const moved = { playerId: senderId, from, to };
       try{
-        if(!consumedDoubleMove){
+          if(!consumedDoubleMove){
           const nextColor = board.turn; // 'w' or 'b'
           const nextPlayer = room.players.find(p => (p.color && p.color[0]) === nextColor);
           if(nextPlayer){
-            // draw for next player (this will emit card:drawn privately and send personalized room:update)
-            drawCardForPlayer(room, nextPlayer.id);
+            // draw for next player (respect room.autoDraw)
+            maybeDrawAtTurnStart(room, nextPlayer.id);
           } else {
             // ensure room state is broadcast
             sendRoomUpdate(room);
@@ -955,7 +970,7 @@ io.on('connection', (socket) => {
         const firstPlayer = room.players.find(p => (p.color && p.color[0]) === firstColor);
         if(firstPlayer){
           const hasHand = room.hands && room.hands[firstPlayer.id] && room.hands[firstPlayer.id].length > 0;
-          if(!hasHand) drawCardForPlayer(room, firstPlayer.id);
+          if(!hasHand) maybeDrawAtTurnStart(room, firstPlayer.id);
         }
       }
     }catch(e){
@@ -1037,6 +1052,75 @@ io.on('connection', (socket) => {
       io.to(roomId).emit('game:select', { playerId, square, moves: [] });
     }
     cb && cb({ ok: true });
+  });
+
+  // Manual draw by player (consumes the player's turn). Only valid when autoDraw is disabled.
+  socket.on('player:draw', ({ roomId }, cb) => {
+    const room = rooms.get(roomId);
+    if(!room) return cb && cb({ error: 'room not found' });
+    const senderId = socket.data.playerId;
+    if(!senderId) return cb && cb({ error: 'not joined' });
+    const board = room.boardState;
+    if(!board) return cb && cb({ error: 'no board state' });
+    const roomPlayer = room.players.find(p => p.id === senderId);
+    if(!roomPlayer) return cb && cb({ error: 'player not in room' });
+    const playerColorShort = (roomPlayer.color && roomPlayer.color[0]) || null;
+    // must be player's turn
+    if(board.turn !== playerColorShort) return cb && cb({ error: 'not your turn' });
+    // manual draw only allowed when autoDraw is disabled
+    if(room.autoDraw) return cb && cb({ error: 'auto_draw_enabled' });
+    // do not allow drawing if player already played a card this turn
+    room._cardPlayedThisTurn = room._cardPlayedThisTurn || {};
+    if(room._cardPlayedThisTurn[senderId]) return cb && cb({ error: 'card_already_played_this_turn' });
+
+    try{
+      // perform the draw (this will emit card:drawn privately and send personalized room:update)
+      const drawn = drawCardForPlayer(room, senderId);
+      if(!drawn){
+        // nothing drawn (hand full or deck empty)
+        return cb && cb({ error: 'no_card_drawn' });
+      }
+      // drawing consumes the player's turn: flip turn and decrement per-turn effects
+      // advance board version
+      board.version = (board.version || 0) + 1;
+      // flip turn
+      board.turn = (board.turn === 'w') ? 'b' : 'w';
+      // decrement remainingTurns for time-limited effects that belong to the player who just finished their turn
+      try{
+        room.activeCardEffects = room.activeCardEffects || [];
+        for(let i = room.activeCardEffects.length - 1; i >= 0; i--){
+          const e = room.activeCardEffects[i];
+          if(typeof e.remainingTurns === 'number'){
+            let shouldDecrement = false;
+            if(e.decrementOn === 'opponent'){
+              shouldDecrement = (e.playerId !== senderId);
+            } else if(e.decrementOn === 'owner'){
+              shouldDecrement = (e.playerId === senderId);
+            } else {
+              shouldDecrement = (e.playerId === senderId);
+            }
+            if(shouldDecrement){
+              e.remainingTurns = e.remainingTurns - 1;
+              try{ io.to(room.id).emit('card:effect:updated', { roomId: room.id, effect: e }); }catch(_){ }
+              if(e.remainingTurns <= 0){ room.activeCardEffects.splice(i,1); try{ io.to(room.id).emit('card:effect:removed', { roomId: room.id, effectId: e.id, type: e.type, playerId: e.playerId }); }catch(_){ } }
+            }
+          }
+        }
+      }catch(e){ console.error('decrement-after-draw error', e); }
+
+      // reset per-turn card-play flags
+      try{ room._cardPlayedThisTurn = {}; }catch(_){ }
+
+      // at this point it's the next player's turn; perform start-of-turn draw if autoDraw enabled
+      const nextColor = board.turn;
+      const nextPlayer = (room.players || []).find(p => (p.color && p.color[0]) === nextColor);
+      if(nextPlayer){ try{ maybeDrawAtTurnStart(room, nextPlayer.id); }catch(_){ sendRoomUpdate(room); } }
+      else { sendRoomUpdate(room); }
+
+      // notify room that the player drew and ended their turn
+      try{ io.to(room.id).emit('player:drew', { roomId: room.id, playerId: senderId, card: drawn }); }catch(_){ }
+      return cb && cb({ ok: true, card: drawn });
+    }catch(err){ console.error('player:draw error', err); return cb && cb({ error: 'server_error' }); }
   });
 
   // Simple cards API via sockets: list/play
@@ -1440,7 +1524,7 @@ io.on('connection', (socket) => {
                 // draw for the next player at the start of their turn
                 const nextColor = board.turn;
                 const nextPlayer = (room.players || []).find(p => (p.color && p.color[0]) === nextColor);
-                if(nextPlayer){ try{ drawCardForPlayer(room, nextPlayer.id); }catch(_){ } }
+                if(nextPlayer){ try{ maybeDrawAtTurnStart(room, nextPlayer.id); }catch(_){ } }
               }
             }catch(_){ }
           }catch(e){ console.error('kamikaz effect error', e); }
@@ -1713,7 +1797,7 @@ io.on('connection', (socket) => {
                 // draw for the next player at the start of their turn
                 const nextColor = board.turn;
                 const nextPlayer = (room.players || []).find(p => (p.color && p.color[0]) === nextColor);
-                if(nextPlayer){ try{ drawCardForPlayer(room, nextPlayer.id); }catch(_){ } }
+                if(nextPlayer){ try{ maybeDrawAtTurnStart(room, nextPlayer.id); }catch(_){ } }
               }
             }catch(_){ }
             }

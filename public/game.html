@@ -862,6 +862,21 @@
         const top = document.createElement('div'); top.className = 'pokemon-card-top';
         const art = document.createElement('div'); art.className = 'pokemon-card-art';
         art.textContent = '';
+        // show card artwork if available in assets/img/cards matching the cardId or title
+        try{
+          const cid = (c.cardId || c.id || '').toString().toLowerCase();
+          const title = (c.title || '').toString().toLowerCase();
+          let imgSrc = null;
+          if(cid === 'adoubement' || title.indexOf('adoub') !== -1) imgSrc = '/assets/img/cards/adoubement.png';
+          if(imgSrc){
+            const img = document.createElement('img');
+            img.src = imgSrc;
+            img.alt = c.title || cid || 'card';
+            img.className = 'card-art-img';
+            img.style.width = '100%'; img.style.height = '100%'; img.style.objectFit = 'cover';
+            art.appendChild(img);
+          }
+        }catch(e){ /* ignore artwork errors */ }
         top.appendChild(art);
 
         const mid = document.createElement('div'); mid.className = 'pokemon-card-mid';

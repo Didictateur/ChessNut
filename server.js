@@ -910,13 +910,14 @@ io.on('connection', (socket) => {
       board.version = (board.version || 0) + 1;
 
       // If the player was granted a free move by playing a card just now (room._freeMoveFor), consume it
-      // and treat it like a consumed 'double_move' (i.e. do NOT flip the turn). This allows the player to
-      // perform a single free piece move after playing a card without consuming their main turn.
+      // and mark that we should end the turn after this move. We DO NOT treat it like a 'double_move' —
+      // instead it is the player's one move for the turn and should cause normal end-of-turn bookkeeping.
       let consumedDoubleMove = false;
+      let freeMoveConsumed = false;
       try{
         if(room && room._freeMoveFor && room._freeMoveFor === senderId){
-          // consume the free-move token
-          consumedDoubleMove = true;
+          // consume the free-move token and remember to end the turn after this move
+          freeMoveConsumed = true;
           try{ delete room._freeMoveFor; }catch(_){ room._freeMoveFor = null; }
           try{ io.to(room.id).emit('card:free_move_consumed', { roomId: room.id, playerId: senderId }); }catch(_){ }
         }
@@ -1172,6 +1173,14 @@ io.on('connection', (socket) => {
       // drawing consumes the player's turn: flip turn and decrement per-turn effects
       // advance board version
       board.version = (board.version || 0) + 1;
+
+      // If the move consumed a free-move granted by a card, perform end-of-turn bookkeeping now
+      if(freeMoveConsumed){
+        const moved = { playerId: senderId, from, to };
+        try{ io.to(roomId).emit('move:moved', moved); }catch(_){ }
+        try{ endTurnAfterCard(room, senderId); }catch(e){ try{ sendRoomUpdate(room); }catch(_){ } }
+        return cb && cb({ ok: true, moved });
+      }
       // flip turn
       board.turn = (board.turn === 'w') ? 'b' : 'w';
       // decrement remainingTurns for time-limited effects that belong to the player who just finished their turn

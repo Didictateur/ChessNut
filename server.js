@@ -266,7 +266,7 @@ function buildDefaultDeck(){
     // ['tous les mêmes','Au yeux de l ennemie, toutes les pièces se ressemblent pendant 2 tours.'],
     // ['petit pion','Le joueur choisit un pion. À partir du prochain tour, il est promu en reine dès qu il capture un pièce non pion.'],
     ['révolution','Tous les pions sont aléatoirement changés en Cavalier, Fou ou Tour et les Cavaliers, Fous et Tours sont changés en pions.'],
-    // ['doppelganger','Choisis une pièce. À partir de maintenant, devient chacune des pièces qu elle capture.'],
+    ["doppelganger","Choisis une pièce. À partir de maintenant, devient chacune des pièces qu'elle capture."],
     // ['kurby','Choisis une pièce. À sa prochaine capture, récupère les mouvements de la pièce capturée.']
   ];
   function cap(s){ if(!s) return s; s = String(s).trim(); return s.charAt(0).toUpperCase() + s.slice(1); }
@@ -905,8 +905,10 @@ io.on('connection', (socket) => {
 
       // apply move: remove any piece on target (capture)
       const targetIndex = pieces.findIndex(p => p.square === to);
-      // sniper: special-case capture without moving when an active sniper effect is bound to the moving piece
-      let sniperTriggered = false;
+  // sniper: special-case capture without moving when an active sniper effect is bound to the moving piece
+  let sniperTriggered = false;
+  // remember captured piece for post-capture reactions (like doppelganger)
+  let capturedPieceForReactions = null;
       if(targetIndex >= 0){
         // check for sniper effect bound to the moving piece for this player
         try{
@@ -915,6 +917,7 @@ io.on('connection', (socket) => {
           if(sniperIdx !== -1){
             // perform sniper capture: remove target piece and record it for potential resurrection
             const capturedPiece = pieces.splice(targetIndex, 1)[0];
+              capturedPieceForReactions = capturedPiece;
             try{
               room.captured = room.captured || [];
               const originalOwner = (room.players || []).find(p => (p.color && p.color[0]) === capturedPiece.color);
@@ -938,9 +941,10 @@ io.on('connection', (socket) => {
               try{ io.to(room.id).emit('card:effect:removed', { roomId: room.id, effectId: removedEffect && removedEffect.id, type: 'sniper', playerId: removedEffect && removedEffect.playerId }); }catch(_){ }
             }catch(_){ }
             sniperTriggered = true;
-          } else {
+            } else {
             // no sniper: normal capture
             const capturedPiece = pieces.splice(targetIndex, 1)[0];
+              capturedPieceForReactions = capturedPiece;
             try{
               room.captured = room.captured || [];
               const originalOwner = (room.players || []).find(p => (p.color && p.color[0]) === capturedPiece.color);
@@ -963,11 +967,32 @@ io.on('connection', (socket) => {
         }catch(_){
           // fallback: perform normal capture
           const capturedPiece = pieces.splice(targetIndex, 1)[0];
+            capturedPieceForReactions = capturedPiece;
           try{ room.captured = room.captured || []; const originalOwner = (room.players || []).find(p => (p.color && p.color[0]) === capturedPiece.color); room.captured.push({ id: uuidv4().slice(0,8), piece: capturedPiece, originalOwnerId: (originalOwner && originalOwner.id) || null, capturedBy: senderId, ts: Date.now() }); }catch(_){ }
         }
+  }
+  // If a capture happened, and the moving piece has a doppelganger effect bound, adopt captured type
+  if(capturedPieceForReactions){
+    try{
+      room.activeCardEffects = room.activeCardEffects || [];
+      const doppel = room.activeCardEffects.find(e => e && e.type === 'doppelganger' && e.pieceId === moving.id);
+      if(doppel && capturedPieceForReactions && typeof capturedPieceForReactions.type !== 'undefined'){
+        // change the moving piece's type to the captured piece's type (preserve color)
+        moving.type = capturedPieceForReactions.type;
+        if(capturedPieceForReactions.promoted) {
+          moving.promoted = true;
+        } else if(moving.promoted){
+          try{ delete moving.promoted; }catch(_){ }
+        }
+        // update recorded square for the effect so it follows the piece
+        doppel.pieceSquare = to;
+        try{ io.to(room.id).emit('card:effect:updated', { roomId: room.id, effect: doppel }); }catch(_){ }
+        try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect: Object.assign({}, doppel, { appliedType: capturedPieceForReactions.type }) }); }catch(_){ }
       }
-      // move the piece only if sniper didn't trigger
-      if(!sniperTriggered){ moving.square = to; }
+    }catch(_){ }
+  }
+  // move the piece only if sniper didn't trigger
+  if(!sniperTriggered){ moving.square = to; }
 
       // consume any active card effects bound to this piece (rebondir is one-time and should be removed)
       // also update any persistent effects (like adoubement) to track the piece's new square so they remain active
@@ -1378,6 +1403,7 @@ io.on('connection', (socket) => {
         room._cardPlayedThisTurn = room._cardPlayedThisTurn || {};
         if(room._cardPlayedThisTurn[senderId]) return cb && cb({ error: 'card_already_played_this_turn' });
       }
+      
     }catch(e){ console.error('card play pre-check error', e); }
     // store played card and apply card effects when applicable
     const played = { id: uuidv4().slice(0,8), playerId: senderId, cardId, payload, ts: Date.now() };
@@ -1513,6 +1539,38 @@ io.on('connection', (socket) => {
           played.payload = Object.assign({}, payload, { applied: 'adoubement', appliedTo: target });
         }catch(e){ console.error('adoubement effect error', e); }
           }
+      // doppelganger (minimal): require selecting one of your pieces when playing the card; record target but do not apply any effect
+      else if((typeof cardId === 'string' && cardId.indexOf('doppelganger') !== -1) || cardId === 'doppelganger'){
+        try{
+          const board = room.boardState;
+          let target = payload && payload.targetSquare;
+          if(!target){ try{ target = socket.data && socket.data.lastSelectedSquare; }catch(e){ target = null; } }
+          const roomPlayer = room.players.find(p => p.id === senderId);
+          const playerColorShort = (roomPlayer && roomPlayer.color && roomPlayer.color[0]) || null;
+          const targetPiece = (board && board.pieces || []).find(p => p.square === target);
+          // validate target exists and belongs to the player
+          if(!board || !target || !targetPiece || targetPiece.color !== playerColorShort){
+            // restore removed card to hand and abort
+            try{
+              room.hands = room.hands || {};
+              room.hands[senderId] = room.hands[senderId] || [];
+              if(removed) room.hands[senderId].push(removed);
+              room.discard = room.discard || [];
+              for(let i = room.discard.length - 1; i >= 0; i--){ if(room.discard[i] && room.discard[i].id === (removed && removed.id)){ room.discard.splice(i,1); break; } }
+            }catch(e){ console.error('restore removed card error', e); }
+            return cb && cb({ error: 'no valid target' });
+          }
+          // create a persistent doppelganger effect bound to the selected piece
+          try{
+            room.activeCardEffects = room.activeCardEffects || [];
+            const effect = { id: played.id, type: 'doppelganger', pieceId: targetPiece.id, pieceSquare: target, playerId: senderId };
+            room.activeCardEffects.push(effect);
+            // inform clients that the effect was applied so they can show badges/UI
+            try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect }); }catch(_){ }
+            played.payload = Object.assign({}, payload, { applied: 'doppelganger', appliedTo: target });
+          }catch(e){ console.error('apply persistent doppelganger error', e); played.payload = Object.assign({}, payload, { applied: 'doppelganger', appliedTo: target }); }
+        }catch(e){ console.error('doppelganger minimal apply error', e); }
+      }
           // folie: grant permanent bishop-move ability to the targeted piece
           else if(cardId === 'folie' || (typeof cardId === 'string' && cardId.indexOf('folie') !== -1)){
             try{

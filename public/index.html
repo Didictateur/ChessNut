@@ -40,6 +40,13 @@
       </ul>
       <p style="margin-top:8px;font-size:0.95em;color:#444">Remarque : ces règles couvrent uniquement les mécaniques des cartes — pour le jeu d'échecs standard, les mouvements habituels s'appliquent (pions, tours, cavaliers, fous, dames, rois).</p>
     </section>
+
+    <section class="card" id="availableCards" style="margin-top:16px">
+      <h3>Cartes disponibles</h3>
+      <div id="cardsGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:12px">
+        <!-- cards will be injected here -->
+      </div>
+    </section>
   </div>
 
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
@@ -77,6 +84,59 @@
       const qs = `?roomId=${encodeURIComponent(roomId)}${playerId?`&playerId=${encodeURIComponent(playerId)}`:''}`;
       window.location.href = '/waiting.html' + qs;
     });
+
+    // Fetch available cards from server and render as a grid using the same card UI as in-game
+    async function loadCardsGrid(){
+      try{
+        const resp = await fetch('/cards');
+        if(!resp.ok) return;
+        const j = await resp.json();
+        if(!j || !Array.isArray(j.cards)) return;
+        const grid = document.getElementById('cardsGrid');
+        if(!grid) return;
+        grid.innerHTML = '';
+        j.cards.forEach(c => {
+          try{
+            const cardEl = document.createElement('div');
+            cardEl.className = 'pokemon-card';
+            cardEl.dataset.cardId = c.cardId || c.id || '';
+            cardEl.dataset.cardUuid = c.id || '';
+
+            const top = document.createElement('div'); top.className = 'pokemon-card-top';
+            const art = document.createElement('div'); art.className = 'pokemon-card-art';
+            art.textContent = '';
+            // artwork mapping (reuse same simple heuristics as in game view)
+            try{
+              const cid = (c.cardId || c.id || '').toString().toLowerCase();
+              const title = (c.title || '').toString().toLowerCase();
+              let imgSrc = null;
+              if(cid === 'adoubement' || title.indexOf('adoub') !== -1) imgSrc = '/assets/img/cards/adoubement.png';
+              if(imgSrc){ const img = document.createElement('img'); img.src = imgSrc; img.alt = c.title || cid || 'card'; img.className = 'card-art-img'; img.style.width = '100%'; img.style.height = '100%'; img.style.objectFit = 'cover'; art.appendChild(img); }
+            }catch(_){ }
+            top.appendChild(art);
+
+            const mid = document.createElement('div'); mid.className = 'pokemon-card-mid';
+            const h = document.createElement('div'); h.className = 'pokemon-card-title'; h.textContent = c.title || c.cardId || 'Carte';
+            const p = document.createElement('div'); p.className = 'pokemon-card-desc'; p.textContent = c.description || '';
+            mid.appendChild(h); mid.appendChild(p);
+
+            const footer = document.createElement('div'); footer.className = 'pokemon-card-footer';
+            const playBtn = document.createElement('button'); playBtn.className = 'card-play-btn'; playBtn.textContent = 'Voir'; playBtn.disabled = true; // homepage view: disabled
+            footer.appendChild(playBtn);
+
+            cardEl.appendChild(top);
+            cardEl.appendChild(mid);
+            cardEl.appendChild(footer);
+
+            grid.appendChild(cardEl);
+          }catch(e){ console.warn('render card error', e); }
+        });
+      }catch(e){ console.warn('loadCardsGrid error', e); }
+    }
+
+    function escapeHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+    // populate on load
+    try{ loadCardsGrid(); }catch(_){ }
   </script>
 </body>
 </html>

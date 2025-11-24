@@ -13,6 +13,16 @@ app.use(express.static('public'));
 // Serve provided assets (piece sets, boards, etc.) under /assets
 app.use('/assets', express.static(path.join(__dirname, 'assets')));
 
+// Public API: list available cards (uses the same deck builder as the server)
+app.get('/cards', (req, res) => {
+  try{
+    const deck = buildDefaultDeck() || [];
+    // Return a lightweight view (id, cardId, title, description)
+    const out = deck.map(c => ({ id: c.id, cardId: c.cardId, title: c.title, description: c.description }));
+    res.json({ ok: true, cards: out });
+  }catch(e){ console.error('GET /cards error', e); res.status(500).json({ error: 'server_error' }); }
+});
+
 // In-memory rooms store. For production replace with persistent store.
 // room = { id, boardState: object|null, players: [{id, socketId, color}], status, size }
 const rooms = new Map();

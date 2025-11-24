@@ -6,6 +6,17 @@
   <link rel="stylesheet" href="/styles/style.css">
 </head>
 <body>
+  <!-- Game over modal (hidden by default). Shown when server emits game:over -->
+  <div id="gameOverModal" style="position:fixed;left:0;top:0;right:0;bottom:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);z-index:9999">
+    <div style="background:#fff;padding:24px;border-radius:10px;min-width:260px;max-width:90%;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,0.25)">
+      <h2 id="gameOverTitle" style="margin-top:0;margin-bottom:8px">Partie terminée</h2>
+      <div id="gameOverMessage" style="margin-bottom:12px">Chargement...</div>
+      <div style="display:flex;gap:8px;justify-content:center">
+        <button id="gameOverClose" style="background:#efefef;border:0;padding:8px 12px;border-radius:6px;cursor:pointer">Rester</button>
+        <button id="gameOverReload" style="background:linear-gradient(90deg,#ff7a59,#ffb199);border:0;color:#fff;padding:8px 12px;border-radius:6px;cursor:pointer">Quitter</button>
+      </div>
+    </div>
+  </div>
   <h2>ChessNut — Partie</h2>
   <div id="turnBanner" style="margin-bottom:8px"></div>
   <div>Room: <strong id="roomId">-</strong> &nbsp;•&nbsp; Vous jouez: <strong id="myColor">-</strong>
@@ -53,6 +64,8 @@
   let myPlayerId = playerId || null;
   // track remote selections: { playerId: square }
   const remoteSelections = {};
+  // whether this client stayed to spectate after game over
+  let isSpectating = false;
   // track remote moves: { playerId: [moves] }
   const remoteMoves = {};
   // current boardState cached locally
@@ -133,7 +146,7 @@
       socket.on('connect', ()=>{ log('socket connecté', socket.id); });
 
       socket.on('room:update', (data)=>{
-        log('room:update', data);
+      log('room:update', data);
   // server now sends `boardState` (JSON). renderBoardFromState will handle it.
         if(playersEl){
           playersEl.innerHTML = '';
@@ -155,6 +168,8 @@
       renderBoardFromState(data.boardState);
       updateTurnBanner(data.boardState);
     }
+    // if the room is no longer finished, remove spectator quit button
+    try{ if(data && data.status && data.status !== 'finished'){ removeSpectatorQuitButton(); } }catch(_){ }
     // store mines owned by this client (private)
     try{ myMines = data.minesOwn || []; }catch(e){ myMines = []; }
     // after rendering the board, render mines for owner
@@ -188,7 +203,14 @@
       }
     }catch(_){ }
       });
-  socket.on('game:over', (data)=>{ log('game:over', data); if(data.boardState){ renderBoardFromState(data.boardState); updateTurnBanner(data.boardState); } });
+  socket.on('game:over', (data)=>{
+    try{
+      log('game:over', data);
+      if(data.boardState){ renderBoardFromState(data.boardState); updateTurnBanner(data.boardState); }
+      // show modal with friendly message
+      try{ showGameOver(data); }catch(_){ }
+    }catch(e){ console.warn('game:over handler error', e); }
+  });
   socket.on('game:started', (data)=>{ log('game:started', data); if(data.boardState){ renderBoardFromState(data.boardState); updateTurnBanner(data.boardState); } });
       // card drawn notification from server
       socket.on('card:drawn', (data) => {
@@ -366,6 +388,89 @@
           banner.classList.add('show');
         }
       }
+
+        // Show the end-of-game modal with a helpful message and actions
+        function showGameOver(data){
+          try{
+            const modal = document.getElementById('gameOverModal');
+            const title = document.getElementById('gameOverTitle');
+            const msg = document.getElementById('gameOverMessage');
+            const close = document.getElementById('gameOverClose');
+            const reload = document.getElementById('gameOverReload');
+            if(!modal || !title || !msg) return;
+            // determine outcome
+            if(data && data.draw){
+              title.textContent = 'Égalité';
+              msg.textContent = 'La partie est terminée: aucun roi n\'est en jeu.';
+            } else if(data && data.winnerId){
+              const youAreWinner = (myPlayerId && data.winnerId && myPlayerId === data.winnerId);
+              if(youAreWinner){ title.textContent = 'Victoire 🎉'; msg.textContent = 'Félicitations — vous avez gagné !'; }
+              else { title.textContent = 'Défaite'; msg.textContent = 'Vous avez perdu — l\'adversaire a conservé son roi.'; }
+            } else if(data && data.winnerColor){
+              // fallback: present color-based message
+              const youWin = myColor && myColor[0] === data.winnerColor;
+              if(youWin){ title.textContent = 'Victoire 🎉'; msg.textContent = 'Félicitations — vous avez gagné !'; }
+              else { title.textContent = 'Défaite'; msg.textContent = 'Vous avez perdu — l\'adversaire a gagné.'; }
+            } else {
+              title.textContent = 'Partie terminée';
+              msg.textContent = 'La partie est terminée.';
+            }
+            modal.style.display = 'flex';
+            // disable interactions with board by adding an overlay class (optionally style via CSS)
+            if(boardEl) boardEl.classList.add('disabled-during-gameover');
+            // wire actions: stay (close modal) or quit (leave room and go back to index)
+            close.onclick = ()=>{ 
+              modal.style.display = 'none'; 
+              try{ if(boardEl) boardEl.classList.remove('disabled-during-gameover'); }catch(_){ }
+              // mark that this user stayed to spectate and show a persistent Quit button
+              try{ isSpectating = true; createSpectatorQuitButton(); }catch(_){ }
+            };
+            reload.onclick = ()=>{
+              try{
+                // try to inform server that we voluntarily leave the room, then navigate away
+                if(socket && socket.connected){
+                  socket.emit('room:leave', { roomId }, (resp)=>{
+                    try{ window.location.href = '/'; }catch(_){ window.location.reload(); }
+                  });
+                } else {
+                  window.location.href = '/';
+                }
+              }catch(e){ try{ window.location.href = '/'; }catch(_){ window.location.reload(); } }
+            };
+          }catch(e){ console.warn('showGameOver error', e); }
+        }
+
+        // create a persistent 'Quitter' button for spectators (appears when user chose to stay)
+        function createSpectatorQuitButton(){
+          try{
+            removeSpectatorQuitButton(); // ensure only one
+            const btn = document.createElement('button');
+            btn.id = 'spectatorQuitBtn';
+            btn.textContent = 'Quitter la partie';
+            btn.style.position = 'fixed';
+            btn.style.right = '18px';
+            btn.style.bottom = '18px';
+            btn.style.zIndex = 9999;
+            btn.style.padding = '10px 12px';
+            btn.style.borderRadius = '8px';
+            btn.style.border = '0';
+            btn.style.background = 'linear-gradient(90deg,#ff7a59,#ffb199)';
+            btn.style.color = '#fff';
+            btn.style.cursor = 'pointer';
+            btn.onclick = ()=>{
+              try{
+                if(socket && socket.connected){
+                  socket.emit('room:leave', { roomId }, (resp)=>{ try{ window.location.href = '/'; }catch(_){ window.location.reload(); } });
+                } else { window.location.href = '/'; }
+              }catch(e){ try{ window.location.href = '/'; }catch(_){ window.location.reload(); } }
+            };
+            document.body.appendChild(btn);
+          }catch(e){ console.warn('createSpectatorQuitButton error', e); }
+        }
+
+        function removeSpectatorQuitButton(){
+          try{ const existing = document.getElementById('spectatorQuitBtn'); if(existing) existing.remove(); isSpectating = false; }catch(_){ }
+        }
 
     // movement UI removed: legalMoves and move markers are disabled
 

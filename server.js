@@ -178,6 +178,32 @@ function endTurnAfterCard(room, senderId){
   }catch(e){ console.error('endTurnAfterCard error', e); }
 }
 
+// Check if a king is missing and end the game. Returns an object describing the outcome or null if game continues.
+function checkAndHandleVictory(room){
+  try{
+    if(!room || !room.boardState) return null;
+    // if the room is already finished, don't re-emit or change state
+    if(room.status === 'finished') return null;
+    const pieces = room.boardState.pieces || [];
+    const hasWhiteKing = pieces.some(p => p && p.type && String(p.type).toUpperCase() === 'K' && p.color === 'w');
+    const hasBlackKing = pieces.some(p => p && p.type && String(p.type).toUpperCase() === 'K' && p.color === 'b');
+    if(hasWhiteKing && hasBlackKing) return null;
+    // both missing -> draw
+    if(!hasWhiteKing && !hasBlackKing){
+      room.status = 'finished';
+      try{ io.to(room.id).emit('game:over', { roomId: room.id, draw: true, boardState: room.boardState }); }catch(_){ }
+      return { over: true, draw: true };
+    }
+    const winnerColor = hasWhiteKing ? 'w' : 'b';
+    const loserColor = hasWhiteKing ? 'b' : 'w';
+    const winner = (room.players || []).find(p => (p.color && p.color[0]) === winnerColor) || null;
+    const loser = (room.players || []).find(p => (p.color && p.color[0]) === loserColor) || null;
+    room.status = 'finished';
+    try{ io.to(room.id).emit('game:over', { roomId: room.id, winnerId: winner && winner.id, loserId: loser && loser.id, winnerColor, boardState: room.boardState }); }catch(_){ }
+    return { over: true, winnerId: winner && winner.id, loserId: loser && loser.id, winnerColor };
+  }catch(e){ console.error('checkAndHandleVictory error', e); return null; }
+}
+
 // Build a default deck from README list. Each card has a unique id, cardId (slug), title and description.
 function buildDefaultDeck(){
   const cards = [
@@ -749,6 +775,31 @@ io.on('connection', (socket) => {
     cb && cb({ ok: true, color, roomId, playerId: assignedId, hostId: room.hostId });
   });
 
+  // Allow a client to voluntarily leave a room (immediate removal). This differs from
+  // disconnect which waits briefly to allow quick reconnects.
+  socket.on('room:leave', ({ roomId }, cb) => {
+    try{
+      const room = rooms.get(roomId || socket.data.roomId);
+      const playerId = socket.data.playerId;
+      if(!room) return cb && cb({ error: 'room not found' });
+      if(!playerId) return cb && cb({ error: 'not joined' });
+      // remove player immediately
+      room.players = (room.players || []).filter(p => p.id !== playerId);
+      // if the host left, promote the next player
+      if(room.hostId && !room.players.find(p => p.id === room.hostId)){
+        room.hostId = room.players[0] ? room.players[0].id : null;
+      }
+      // if fewer than 2 players remain, mark the room waiting
+      if((room.players || []).length < 2 && room.status === 'playing') room.status = 'waiting';
+      // leave socket.io room and clear socket data
+      try{ socket.leave(room.id); }catch(_){ }
+      try{ socket.data.roomId = null; }catch(_){ }
+      // notify remaining players
+      try{ sendRoomUpdate(room); }catch(_){ }
+      return cb && cb({ ok: true });
+    }catch(e){ console.error('room:leave error', e); return cb && cb({ error: 'server_error' }); }
+  });
+
   // Host can toggle automatic drawing in the waiting room. Only the host may change this setting.
   socket.on('room:auto_draw:set', ({ roomId, enabled }, cb) => {
     const room = rooms.get(roomId);
@@ -766,6 +817,8 @@ io.on('connection', (socket) => {
   socket.on('game:move', ({ roomId, from, to, promotion }, cb) => {
     const room = rooms.get(roomId);
     if (!room) return cb && cb({ error: 'room not found' });
+    // don't allow moves in finished games
+    if(room.status === 'finished') return cb && cb({ error: 'game_over' });
     // Basic move handling: validate turn, validate piece ownership, validate target is one of computeLegalMoves,
     // apply the move to room.boardState, handle captures, flip turn and broadcast the updated board.
     try{
@@ -943,6 +996,18 @@ io.on('connection', (socket) => {
 
       // advance board version
       board.version = (board.version || 0) + 1;
+
+      // Check victory (king capture) before further turn bookkeeping. If game ended, broadcast move and game:over and return.
+      try{
+        const end = checkAndHandleVictory(room);
+        if(end && end.over){
+          const moved = { playerId: senderId, from, to };
+          try{ io.to(roomId).emit('move:moved', moved); }catch(_){ }
+          // send personalized updates (room:update) so clients can refresh final board
+          try{ sendRoomUpdate(room); }catch(_){ }
+          return cb && cb({ ok: true, moved, gameOver: end });
+        }
+      }catch(_){ }
 
       // If the player was granted a free move by playing a card just now (room._freeMoveFor), consume it
       // and mark that we should end the turn after this move. We DO NOT treat it like a 'double_move' —
@@ -1183,6 +1248,7 @@ io.on('connection', (socket) => {
   socket.on('player:draw', ({ roomId }, cb) => {
     const room = rooms.get(roomId);
     if(!room) return cb && cb({ error: 'room not found' });
+    if(room.status === 'finished') return cb && cb({ error: 'game_over' });
     const senderId = socket.data.playerId;
     if(!senderId) return cb && cb({ error: 'not joined' });
     const board = room.boardState;
@@ -1271,6 +1337,7 @@ io.on('connection', (socket) => {
   socket.on('card:play', ({ roomId, playerId, cardId, payload }, cb) => {
     const room = rooms.get(roomId);
     if(!room) return cb && cb({ error: 'room not found' });
+    if(room.status === 'finished') return cb && cb({ error: 'game_over' });
     // enforce sender identity from socket (don't trust client-supplied playerId)
     const senderId = socket.data.playerId;
     if(!senderId) return cb && cb({ error: 'not joined' });
@@ -1807,14 +1874,21 @@ io.on('connection', (socket) => {
             // reuse the mine detonation animation on clients for kamikaz: show the same explosion visual
             try{ io.to(room.id).emit('mine:detonated', { roomId: room.id, square: target }); }catch(_){ }
             played.payload = Object.assign({}, payload, { applied: 'kamikaz', appliedTo: target, affected: affected, removedCount: removedPieces.length });
-            // After playing kamikaz the player immediately loses their turn (same behavior as steal-piece)
+            // After applying kamikaz, check for victory (kings may have been removed).
             try{
-              if(board){
-                board.turn = (board.turn === 'w') ? 'b' : 'w';
-                // draw for the next player at the start of their turn
-                const nextColor = board.turn;
-                const nextPlayer = (room.players || []).find(p => (p.color && p.color[0]) === nextColor);
-                if(nextPlayer){ try{ maybeDrawAtTurnStart(room, nextPlayer.id); }catch(_){ } }
+              const end = checkAndHandleVictory(room);
+              if(end && end.over){
+                // if game over, broadcast final state and stop further turn changes
+                try{ sendRoomUpdate(room); }catch(_){ }
+              } else {
+                // normal behavior: the player immediately loses their turn
+                if(board){
+                  board.turn = (board.turn === 'w') ? 'b' : 'w';
+                  // draw for the next player at the start of their turn
+                  const nextColor = board.turn;
+                  const nextPlayer = (room.players || []).find(p => (p.color && p.color[0]) === nextColor);
+                  if(nextPlayer){ try{ maybeDrawAtTurnStart(room, nextPlayer.id); }catch(_){ } }
+                }
               }
             }catch(_){ }
           }catch(e){ console.error('kamikaz effect error', e); }
@@ -2283,3 +2357,23 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`ChessNut server listening on port ${PORT}`);
 });
+
+// Periodic sweep to ensure victory conditions are detected even if some code path
+// didn't call checkAndHandleVictory after mutating the board. This protects against
+// missed edge-cases (cards, effects or unexpected flows) by validating rooms once
+// per second and emitting `game:over` when appropriate.
+setInterval(() => {
+  try{
+    for(const [id, room] of rooms.entries()){
+      try{
+        if(!room) continue;
+        if(room.status === 'finished') continue;
+        // run the victory check (it will emit game:over and set room.status when needed)
+        const res = checkAndHandleVictory(room);
+        if(res && res.over){
+          try{ sendRoomUpdate(room); }catch(_){ }
+        }
+      }catch(e){ console.error('periodic room check error for', id, e); }
+    }
+  }catch(e){ console.error('periodic victory sweep error', e); }
+}, 1000);

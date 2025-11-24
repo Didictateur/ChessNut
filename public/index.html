@@ -112,6 +112,7 @@
               let imgSrc = null;
               if(cid === 'adoubement' || title.indexOf('adoub') !== -1) imgSrc = '/assets/img/cards/adoubement.png';
               if(cid === 'folie' || title.indexOf('folie') !== -1 || title.indexOf('fou') !== -1) imgSrc = '/assets/img/cards/folie.png';
+              if(cid === 'fortification' || title.indexOf('fortification') !== -1 || title.indexOf('fortif') !== -1) imgSrc = '/assets/img/cards/fortification.png';
               if(imgSrc){ const img = document.createElement('img'); img.src = imgSrc; img.alt = c.title || cid || 'card'; img.className = 'card-art-img'; img.style.width = '100%'; img.style.height = '100%'; img.style.objectFit = 'cover'; art.appendChild(img); }
             }catch(_){ }
             top.appendChild(art);
@@ -122,8 +123,6 @@
             mid.appendChild(h); mid.appendChild(p);
 
             const footer = document.createElement('div'); footer.className = 'pokemon-card-footer';
-            const playBtn = document.createElement('button'); playBtn.className = 'card-play-btn'; playBtn.textContent = 'Voir'; playBtn.disabled = true; // homepage view: disabled
-            footer.appendChild(playBtn);
 
             cardEl.appendChild(top);
             cardEl.appendChild(mid);

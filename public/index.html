@@ -111,6 +111,7 @@
               const title = (c.title || '').toString().toLowerCase();
               let imgSrc = null;
               if(cid === 'adoubement' || title.indexOf('adoub') !== -1) imgSrc = '/assets/img/cards/adoubement.png';
+              if(cid === 'folie' || title.indexOf('folie') !== -1 || title.indexOf('fou') !== -1) imgSrc = '/assets/img/cards/folie.png';
               if(imgSrc){ const img = document.createElement('img'); img.src = imgSrc; img.alt = c.title || cid || 'card'; img.className = 'card-art-img'; img.style.width = '100%'; img.style.height = '100%'; img.style.objectFit = 'cover'; art.appendChild(img); }
             }catch(_){ }
             top.appendChild(art);

@@ -992,6 +992,7 @@
           const title = (c.title || '').toString().toLowerCase();
           let imgSrc = null;
           if(cid === 'adoubement' || title.indexOf('adoub') !== -1) imgSrc = '/assets/img/cards/adoubement.png';
+          if(cid === 'folie' || title.indexOf('folie') !== -1 || title.indexOf('fou') !== -1) imgSrc = '/assets/img/cards/folie.png';
           if(imgSrc){
             const img = document.createElement('img');
             img.src = imgSrc;

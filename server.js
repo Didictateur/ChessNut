@@ -1420,9 +1420,17 @@ io.on('connection', (socket) => {
       const removed = hand.splice(idx,1)[0];
       room.hands[senderId] = hand;
       room.discard = room.discard || [];
-      room.discard.push(removed);
-      // attach the removed card object to the played record for informational broadcast
-      played.card = removed;
+      // Respect the room.noRemise flag: when true, do NOT move the played card into the discard pile.
+      if(!room.noRemise){
+        room.discard.push(removed);
+        // attach the removed card object to the played record for informational broadcast
+        played.card = removed;
+        played._discarded = true;
+      } else {
+        // still attach the card instance for informational purposes but note it wasn't discarded
+        played.card = removed;
+        played._discarded = false;
+      }
   // normalize cardId to the card's slug when the client passed an instance id
   cardId = (removed && removed.cardId) || cardId;
     }catch(e){

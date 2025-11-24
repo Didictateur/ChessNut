@@ -231,6 +231,18 @@
       });
     }
 
+    // No-remise toggle (host only) - independent from auto-draw
+    if(noRemiseToggleEl){
+      noRemiseToggleEl.addEventListener('change', (ev)=>{
+        if(!socket) return;
+        const enabled = !!noRemiseToggleEl.checked;
+        socket.emit('room:no_remise:set', { roomId, enabled }, (resp)=>{
+          if(resp && resp.error){ log('no-remise error', resp); alert(resp.error); return; }
+          log('no-remise updated', resp);
+        });
+      });
+    }
+
     // Copy invite link (hidden link, no display)
     document.getElementById('copyInviteBtn').addEventListener('click', async ()=>{
       const link = `${window.location.origin}/waiting.html?roomId=${encodeURIComponent(roomId)}`;

@@ -2432,12 +2432,67 @@ io.on('connection', (socket) => {
   }catch(e){ console.error('mark card played error', e); }
   // emit card played to entire room (informational)
   io.to(roomId).emit('card:played', played);
-  // After playing a card, allow the player one free piece move that does NOT consume their turn.
+  // After playing a card, either grant a free move OR, for cards that "count as a move" (like inversion),
+  // consume the player's turn immediately (flip turn, decrement per-turn effects, draw for next player).
   try{
-    room._freeMoveFor = played.playerId; // client may use this flag to enable a free move UI
-    // broadcast updated room state so clients can reflect the free-move opportunity
-    sendRoomUpdate(room);
-    try{ io.to(room.id).emit('card:free_move_allowed', { roomId: room.id, playerId: played.playerId }); }catch(_){ }
+    const countsAsMove = ((typeof cardId === 'string' && cardId.indexOf('inversion') !== -1) || cardId === 'inversion' || (played.payload && played.payload.applied === 'inversion'));
+    if(countsAsMove){
+      // treat this card play as if the player made their move: flip the turn and run per-turn bookkeeping
+      try{
+        const board = room.boardState;
+        if(board){
+          board.turn = (board.turn === 'w') ? 'b' : 'w';
+
+          // decrement remainingTurns for any time-limited effects as the finished-turn player is `senderId`
+          try{
+            room.activeCardEffects = room.activeCardEffects || [];
+            for(let i = room.activeCardEffects.length - 1; i >= 0; i--){
+              const e = room.activeCardEffects[i];
+              if(typeof e.remainingTurns === 'number'){
+                let shouldDecrement = false;
+                if(e.decrementOn === 'opponent'){
+                  shouldDecrement = (e.playerId !== senderId);
+                } else if(e.decrementOn === 'owner'){
+                  shouldDecrement = (e.playerId === senderId);
+                } else {
+                  shouldDecrement = (e.playerId === senderId);
+                }
+                if(shouldDecrement){
+                  e.remainingTurns = e.remainingTurns - 1;
+                  try{ io.to(room.id).emit('card:effect:updated', { roomId: room.id, effect: e }); }catch(_){ }
+                  if(e.remainingTurns <= 0){
+                    room.activeCardEffects.splice(i,1);
+                    try{ io.to(room.id).emit('card:effect:removed', { roomId: room.id, effectId: e.id, type: e.type, playerId: e.playerId }); }catch(_){ }
+                  }
+                }
+              }
+            }
+          }catch(err){ console.error('updating temporary effects error (inversion)', err); }
+
+          // reset per-turn card-play flags because turn changed
+          try{ room._cardPlayedThisTurn = {}; }catch(_){ }
+
+          // draw for next player (respect room.autoDraw)
+          try{
+            const nextColor = board.turn;
+            const nextPlayer = room.players.find(p => (p.color && p.color[0]) === nextColor);
+            if(nextPlayer){
+              maybeDrawAtTurnStart(room, nextPlayer.id);
+            } else {
+              sendRoomUpdate(room);
+            }
+          }catch(e){ sendRoomUpdate(room); }
+        } else {
+          sendRoomUpdate(room);
+        }
+      }catch(err){ console.error('inversion end-of-turn handling error', err); sendRoomUpdate(room); }
+    } else {
+      // default: grant a free move that does NOT consume the player's turn
+      room._freeMoveFor = played.playerId; // client may use this flag to enable a free move UI
+      // broadcast updated room state so clients can reflect the free-move opportunity
+      sendRoomUpdate(room);
+      try{ io.to(room.id).emit('card:free_move_allowed', { roomId: room.id, playerId: played.playerId }); }catch(_){ }
+    }
   }catch(e){ /* fallback */ sendRoomUpdate(room); }
 
     cb && cb({ ok: true, played });

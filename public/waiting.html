@@ -4,6 +4,12 @@
   <meta charset="utf-8" />
   <title>ChessNut - Salle d'attente</title>
   <link rel="stylesheet" href="/styles/style.css">
+  <style>
+    /* small waiting-room styles for selectable cards */
+    .pokemon-card { position: relative; cursor: pointer; transition: transform .08s ease, box-shadow .08s ease; }
+    .pokemon-card.selected { border-color: #28a745; box-shadow: 0 6px 14px rgba(40,167,69,0.08); transform: translateY(-3px); }
+    .pokemon-card .select-mark { position: absolute; right:8px; top:8px; background:#28a745; color:#fff; border-radius:50%; width:20px;height:20px; display:flex;align-items:center;justify-content:center;font-size:12px; }
+  </style>
 </head>
 <body>
   <div class="page">
@@ -36,6 +42,25 @@
       </div>
 
       <div style="margin-top:8px">
+        <label id="customDrawLabel" style="display:none;align-items:center;gap:8px;">
+          <input type="checkbox" id="customDrawToggle" />
+          Pioche personnalisée
+        </label>
+      </div>
+
+      <!-- Minimal card list: shown only if Pioche personnalisée is checked -->
+      <div id="customCardsSection" style="display:none;margin-top:8px;border:1px solid #eee;padding:8px;border-radius:6px;background:#fff;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <div style="font-weight:600">Cartes disponibles</div>
+          <div style="display:flex;gap:8px">
+            <button id="customSelectAll" class="btn-ghost">Tout sélectionner</button>
+            <button id="customDeselectAll" class="btn-ghost">Tout déselectionner</button>
+          </div>
+        </div>
+        <div id="customCardsContainer" style="color:#333;padding-right:6px">(Cochez "Pioche personnalisée" pour charger la liste)</div>
+      </div>
+
+      <div style="margin-top:8px">
         <button id="startBtn" style="display:none" class="btn-cta">Commencer la partie</button>
         <button id="copyInviteBtn" style="margin-left:8px" class="btn-ghost">Copier le lien d'invitation</button>
       </div>
@@ -63,6 +88,14 @@
   const autoDrawToggleEl = document.getElementById('autoDrawToggle');
   const noRemiseLabelEl = document.getElementById('no-remise');
   const noRemiseToggleEl = document.getElementById('no-remiseToggle');
+  const customDrawLabelEl = document.getElementById('customDrawLabel');
+  const customDrawToggleEl = document.getElementById('customDrawToggle');
+
+  // Selection state for custom draw (persisted per room)
+  let selectedCards = new Set();
+  function storageKey(){ return `customDrawSelection:${roomId}`; }
+  function saveSelection(){ try{ localStorage.setItem(storageKey(), JSON.stringify(Array.from(selectedCards))); }catch(_){} }
+  function loadSelection(){ try{ const v = localStorage.getItem(storageKey()); if(v){ const arr = JSON.parse(v); selectedCards = new Set(arr || []); } }catch(_){} }
 
     function log(...args){ console.log(...args); }
 
@@ -137,6 +170,18 @@
             }
           }
         }catch(_){ }
+        // show custom draw checkbox to host (UI-only for now)
+        try{
+          if(customDrawLabelEl && customDrawToggleEl){
+            if(myPlayerId && roomHostId && myPlayerId === roomHostId){
+              customDrawLabelEl.style.display = 'inline-flex';
+              // do not override the user's local choice; leave checked as-is
+              customDrawToggleEl.disabled = false;
+            } else {
+              customDrawLabelEl.style.display = 'none';
+            }
+          }
+        }catch(_){ }
       });
 
       // register game started handler early so we don't miss the broadcast
@@ -195,6 +240,18 @@
                 }
               }
             }catch(_){ }
+            // show custom draw checkbox to host on initial fetch as well
+            try{
+              if(customDrawLabelEl && customDrawToggleEl){
+                if(myPlayerId && roomHostId && myPlayerId === roomHostId){
+                  customDrawLabelEl.style.display = 'inline-flex';
+                  // preserve local UI state for this control; do not force-assign checked
+                  customDrawToggleEl.disabled = false;
+                } else {
+                  customDrawLabelEl.style.display = 'none';
+                }
+              }
+            }catch(_){ }
           }catch(_){ }
           if(roomInfo && roomInfo.status === 'playing'){
             // server already marked room as playing; redirect immediately
@@ -241,6 +298,113 @@
           log('no-remise updated', resp);
         });
       });
+    }
+
+    // Custom draw toggle (minimal behavior)
+    // When checked, show a new section and fetch /cards to display a simple list.
+    if(customDrawToggleEl){
+      const customCardsSection = document.getElementById('customCardsSection');
+      const customCardsContainer = document.getElementById('customCardsContainer');
+      const customSelectAllBtn = document.getElementById('customSelectAll');
+      const customDeselectAllBtn = document.getElementById('customDeselectAll');
+      customDrawToggleEl.addEventListener('change', async (ev)=>{
+        const checked = !!customDrawToggleEl.checked;
+        log('custom-draw toggled (minimal)', { checked });
+        if(customCardsSection) customCardsSection.style.display = checked ? 'block' : 'none';
+        if(checked){
+          // fetch card list and render simple names
+          if(customCardsContainer){
+            customCardsContainer.textContent = 'Chargement...';
+            try{
+              const r = await fetch('/cards');
+              const data = await r.json();
+              const cards = Array.isArray(data) ? data : (data && Array.isArray(data.cards) ? data.cards : []);
+              if(cards.length === 0){ customCardsContainer.textContent = 'Aucune carte trouvée.'; return; }
+              // restore previous selection for this room
+              try{ loadSelection(); }catch(_){}
+              const grid = document.createElement('div');
+              grid.style.display = 'grid';
+              grid.style.gridTemplateColumns = 'repeat(auto-fill,minmax(220px,1fr))';
+              grid.style.gap = '10px';
+
+              cards.forEach(c => {
+                // create the same visual structure as in game.renderHands -> .pokemon-card
+                const cardEl = document.createElement('div');
+                cardEl.className = 'pokemon-card';
+                const cardId = (c.id || c.cardId || c.name || c.title || JSON.stringify(c)).toString();
+                cardEl.dataset.cardId = cardId;
+
+                const top = document.createElement('div'); top.className = 'pokemon-card-top';
+                const art = document.createElement('div'); art.className = 'pokemon-card-art'; art.textContent = '';
+                try{
+                  const cid = (c.cardId || c.id || '').toString().toLowerCase();
+                  const titleRaw = (c.title || '').toString().toLowerCase();
+                  let imgSrc = null;
+                  if(cid === 'adoubement' || titleRaw.indexOf('adoub') !== -1) imgSrc = '/assets/img/cards/adoubement.png';
+                  if(cid === 'folie' || titleRaw.indexOf('folie') !== -1 || titleRaw.indexOf('fou') !== -1) imgSrc = '/assets/img/cards/folie.png';
+                  if(cid === 'fortification' || titleRaw.indexOf('fortification') !== -1 || titleRaw.indexOf('fortif') !== -1) imgSrc = '/assets/img/cards/fortification.png';
+                  if(imgSrc){ const img = document.createElement('img'); img.src = imgSrc; img.alt = c.title || cid || 'card'; img.className = 'card-art-img'; img.style.width='100%'; img.style.height='100%'; img.style.objectFit='cover'; art.appendChild(img); }
+                }catch(e){}
+                top.appendChild(art);
+
+                const mid = document.createElement('div'); mid.className = 'pokemon-card-mid';
+                const h = document.createElement('div'); h.className = 'pokemon-card-title'; h.textContent = c.name || c.title || c.cardId || c.id || 'Carte';
+                const p = document.createElement('div'); p.className = 'pokemon-card-desc'; p.textContent = c.short || c.description || '';
+                mid.appendChild(h); mid.appendChild(p);
+
+                const footer = document.createElement('div'); footer.className = 'pokemon-card-footer';
+
+                // add a small select mark (hidden unless selected)
+                const selectMark = document.createElement('div'); selectMark.className = 'select-mark'; selectMark.textContent = '✓'; selectMark.style.display = 'none';
+                cardEl.appendChild(selectMark);
+
+                cardEl.appendChild(top); cardEl.appendChild(mid); cardEl.appendChild(footer);
+
+                // apply selection state if previously selected
+                if(selectedCards.has(cardId)){
+                  cardEl.classList.add('selected');
+                  selectMark.style.display = 'flex';
+                }
+
+                // click toggles selection (no other action in waiting room)
+                cardEl.addEventListener('click', (ev)=>{
+                  ev.stopPropagation();
+                  if(selectedCards.has(cardId)){
+                    selectedCards.delete(cardId);
+                    cardEl.classList.remove('selected');
+                    selectMark.style.display = 'none';
+                  } else {
+                    selectedCards.add(cardId);
+                    cardEl.classList.add('selected');
+                    selectMark.style.display = 'flex';
+                  }
+                  saveSelection();
+                });
+
+                grid.appendChild(cardEl);
+              });
+              customCardsContainer.innerHTML = '';
+              customCardsContainer.appendChild(grid);
+            }catch(e){ customCardsContainer.textContent = 'Erreur lors du chargement des cartes.'; }
+          }
+        }
+      });
+      // wire up select all / deselect all
+      function setAllVisible(yes){
+        // find card elements in the container grid
+        const els = customCardsContainer ? customCardsContainer.querySelectorAll('.pokemon-card') : [];
+        els.forEach(el => {
+          const id = el.dataset.cardId;
+          const mark = el.querySelector('.select-mark');
+          if(yes){ selectedCards.add(id); el.classList.add('selected'); if(mark) mark.style.display = 'flex'; }
+          else { selectedCards.delete(id); el.classList.remove('selected'); if(mark) mark.style.display = 'none'; }
+        });
+        saveSelection();
+      }
+      if(customSelectAllBtn) customSelectAllBtn.addEventListener('click', (e)=>{ e.preventDefault(); setAllVisible(true); });
+      if(customDeselectAllBtn) customDeselectAllBtn.addEventListener('click', (e)=>{ e.preventDefault(); setAllVisible(false); });
+      // ensure initial state: hide unless checkbox is already checked
+      if(customDrawToggleEl.checked && customCardsSection){ customCardsSection.style.display = 'block'; customDrawToggleEl.dispatchEvent(new Event('change')); }
     }
 
     // Copy invite link (hidden link, no display)

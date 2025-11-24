@@ -92,6 +92,11 @@ a:hover{text-decoration:underline}
   pointer-events:none; z-index:2; image-rendering: -webkit-optimize-contrast;
 }
 
+/* When a square is veiled by brouillard, hide its piece images to ensure full concealment
+   This is a robust fallback in case stacking context / transform interactions make an overlay
+   not fully cover the image. Hiding the image guarantees the piece is not visible. */
+.square.veiled img, .square.veiled .piece{ visibility: hidden !important; opacity: 0 !important; }
+
 /* highlighted/selected square when a player selects a piece */
 .square.selected{
   outline: 3px solid rgba(245,158,11,0.95); /* amber */

@@ -4,6 +4,18 @@
   <meta charset="utf-8" />
   <title>ChessNut - Partie</title>
   <link rel="stylesheet" href="/styles/style.css">
+  <style>
+    /* veil overlay for brouillard effect */
+    .square { position: relative; }
+    .square .veil {
+      position: absolute;
+      left: 0; top: 0; right: 0; bottom: 0;
+      background: rgba(255,255,255,0.95);
+      pointer-events: auto; /* block interactions so veiled squares are not clickable */
+      z-index: 50;
+      cursor: default;
+    }
+  </style>
 </head>
 <body>
   <!-- Game over modal (hidden by default). Shown when server emits game:over -->
@@ -71,6 +83,7 @@
   // current boardState cached locally
   let currentBoardState = null;
   let myMines = [];
+  let currentVeiledSquares = [];
   let pendingCard = null; // when set, next square click is used as card target
 
     // safe logger: prefer on-page log if present, otherwise console
@@ -166,6 +179,8 @@
             boardEl.style.width = side + 'px';
             boardEl.style.height = side + 'px';
         }
+    // store veiled squares list for brouillard effect (if provided by server)
+    try{ currentVeiledSquares = Array.isArray(data.veiledSquares) ? data.veiledSquares : (data.boardState && data.boardState.veiledSquares) || []; }catch(_){ currentVeiledSquares = []; }
     if(data.boardState) {
       renderBoardFromState(data.boardState);
       updateTurnBanner(data.boardState);
@@ -529,6 +544,11 @@
         if(!to) return;
         const target = boardEl.querySelector(`.square[data-square="${to}"]`);
         if(!target) return;
+        // do not show legal-move markers on squares that are veiled/hidden
+        try{
+          if(Array.isArray(currentVeiledSquares) && currentVeiledSquares.indexOf(to) !== -1) return;
+          if(target.classList && target.classList.contains('veiled')) return;
+        }catch(_){ }
         const marker = document.createElement('div');
         marker.className = 'move-marker';
         // store metadata if needed later
@@ -546,6 +566,11 @@
         if(!to) return;
         const target = boardEl.querySelector(`.square[data-square="${to}"]`);
         if(!target) return;
+        // do not show remote move markers on veiled/hidden squares
+        try{
+          if(Array.isArray(currentVeiledSquares) && currentVeiledSquares.indexOf(to) !== -1) return;
+          if(target.classList && target.classList.contains('veiled')) return;
+        }catch(_){ }
         const marker = document.createElement('div');
         marker.className = 'move-marker';
         marker.dataset.from = m.from || '';
@@ -591,10 +616,21 @@
 
     if(boardEl){
       boardEl.addEventListener('click', (ev)=>{
-        const sqEl = ev.target.closest && ev.target.closest('.square');
-        if(!sqEl) return;
-        const square = sqEl.getAttribute('data-square');
-        if(!square) return;
+          const sqEl = ev.target.closest && ev.target.closest('.square');
+          if(!sqEl) return;
+          const square = sqEl.getAttribute('data-square');
+          if(!square) return;
+
+          // Do not allow interacting with veiled/hidden squares.
+          // `currentVeiledSquares` is populated from server `room:update` and
+          // we also add a `.veiled` class during rendering as a fallback.
+          try{
+            if(Array.isArray(currentVeiledSquares) && currentVeiledSquares.indexOf(square) !== -1){
+              log('clicked veiled square, ignoring');
+              return;
+            }
+            if(sqEl.classList && sqEl.classList.contains('veiled')){ log('clicked veiled square (DOM class), ignoring'); return; }
+          }catch(_){ }
 
         // If we're in a pending card-targeting mode, handle target selection and do NOT attempt moves
         if(pendingCard){
@@ -783,6 +819,31 @@
       });
       // render any mines owned by this player
       try{ renderMines(); }catch(e){ }
+      // render veils for brouillard effect (if any)
+      try{
+        // remove existing veils
+        const allSq = boardEl.querySelectorAll('.square');
+        allSq.forEach(sqEl => {
+          const v = sqEl.querySelector('.veil'); if(v) v.remove();
+          // also remove prior veiled marker class
+          try{ sqEl.classList.remove('veiled'); }catch(_){ }
+        });
+        if(Array.isArray(currentVeiledSquares) && currentVeiledSquares.length){
+          currentVeiledSquares.forEach(sq => {
+            const el = boardEl.querySelector(`.square[data-square="${sq}"]`);
+            if(!el) return;
+            const veil = document.createElement('div'); veil.className = 'veil';
+            el.appendChild(veil);
+            // add a class to hide piece images as a fallback in case z-index/stacking causes overlay issues
+            try{ 
+              el.classList.add('veiled'); 
+              // remove any move markers that may have been added previously on this square
+              const prevMarkers = el.querySelectorAll('.move-marker');
+              prevMarkers.forEach(m => m.remove());
+            }catch(_){ }
+          });
+        }
+      }catch(_){ }
     }
 
     // draw mine icons on squares for mines owned by this client

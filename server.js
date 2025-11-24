@@ -77,9 +77,36 @@ function sendRoomUpdate(room){
         payload.boardState = base.boardState || null;
       }
     }catch(_){ payload.boardState = base.boardState || null; }
-    // attach visible squares for this recipient (fog of war)
+        // attach visible squares for this recipient (fog of war)
     try{
-      payload.visibleSquares = Array.from(visibleSquaresForPlayer(room, p.id) || []);
+        payload.visibleSquares = Array.from(visibleSquaresForPlayer(room, p.id) || []);
+        // attach veiled squares if a brouillard effect targets this recipient
+        try{
+          const brouillards = (room.activeCardEffects || []).filter(e => e && e.type === 'brouillard');
+          if(brouillards && brouillards.length){
+            // If any brouillard is active in the room, veil the board for ALL players,
+            // but exclude the recipient's visible squares (their pieces + adjacent squares).
+            const state = room.boardState || {};
+            const width = state.width || 8;
+            const height = state.height || 8;
+            const all = [];
+            for(let yy = 0; yy < height; yy++){
+              for(let xx = 0; xx < width; xx++){
+                all.push(String.fromCharCode('a'.charCodeAt(0) + xx) + (yy+1));
+              }
+            }
+            // compute the set of squares that the recipient can see (their pieces + adjacent squares)
+            let visibleSet = new Set();
+            try{
+              const vs = visibleSquaresForPlayer(room, p.id) || new Set();
+              visibleSet = new Set(Array.from(vs));
+            }catch(_){ visibleSet = new Set(); }
+            // veiled squares are all minus visibleSet (so own pieces and their neighbors remain visible)
+            payload.veiledSquares = all.filter(sq => !visibleSet.has(sq));
+          } else {
+            payload.veiledSquares = [];
+          }
+        }catch(_){ payload.veiledSquares = []; }
       // attach any mines owned by this recipient (mines are hidden from other players)
       try{
         const mines = (room.activeCardEffects || []).filter(e => e.type === 'mine' && e.playerId === p.id).map(e => e.square);
@@ -225,7 +252,7 @@ function buildDefaultDeck(){
     ['folie','La pièce sélectionnée peut maintenant faire les déplacements du fou en plus'],
     ['fortification','La pièce sélectionnée peut maintenant faire les déplacements de la tour en plus'],
     ["l'anneau","Le plateau devient un anneau pendant un tour"],
-    // ['brouillard de guerre','Les joueur ne peuvent voir que au alentour de leurs pièces pendant 4 tours'],
+    ['brouillard de guerre','Les joueur ne peuvent voir que au alentour de leurs pièces pendant 4 tours'],
     // ['changer la pièce à capturer','Le joueur choisie la nouvelle pièce jouant le rôle de roi sans la révéler'],
     // ['trou de ver','Deux cases du plateau deviennent maintenant la même'],
     ['jouer deux fois','Le joueur peut déplacer deux pièces'],
@@ -471,17 +498,7 @@ function computeLegalMoves(room, square){
     return null;
   }
 
-  // filter moves according to brouillard (fog of war) if it is active for the owner of this piece
-  function filterMovesByFog(moves){
-    try{
-      const owner = ownerPlayer;
-      if(!owner) return moves;
-      const hasBrouillard = (room.activeCardEffects || []).some(e => e.type === 'brouillard' && e.playerId === owner.id);
-      if(!hasBrouillard) return moves;
-      const vis = visibleSquaresForPlayer(room, owner.id);
-      return (moves || []).filter(m => vis.has(m.to));
-    }catch(e){ return moves; }
-  }
+  // brouillard (fog of war) removed — moves are not filtered by fog
 
   // helper to add diagonal sliding moves when a piece has been "folié"
   function addFolieMoves(){
@@ -571,7 +588,7 @@ function computeLegalMoves(room, square){
       if(occ && occ.color !== color) moves.push({ from: square, to: tsq });
     });
     addAdoubementMoves(); addFolieMoves(); addFortificationMoves();
-    return filterMovesByFog(moves);
+    return moves;
   }
 
   if(type === 'N'){
@@ -584,7 +601,7 @@ function computeLegalMoves(room, square){
       if(!occ || occ.color !== color) moves.push({ from: square, to: tsq });
     });
     addAdoubementMoves(); addFolieMoves(); addFortificationMoves();
-    return filterMovesByFog(moves);
+    return moves;
   }
 
   if(type === 'B' || type === 'Q' || type === 'R'){
@@ -658,7 +675,7 @@ function computeLegalMoves(room, square){
       }
     });
     addAdoubementMoves(); addFolieMoves(); addFortificationMoves();
-    return filterMovesByFog(moves);
+    return moves;
   }
 
   if(type === 'K'){
@@ -671,11 +688,11 @@ function computeLegalMoves(room, square){
       if(!occ || occ.color !== color) moves.push({ from: square, to: tsq });
     }
     addAdoubementMoves(); addFolieMoves();
-    return filterMovesByFog(moves);
+    return moves;
   }
 
   addAdoubementMoves(); addFolieMoves(); addFortificationMoves();
-  return filterMovesByFog(moves);
+  return moves;
 }
 
 function startingBoardState8(){
@@ -894,14 +911,16 @@ io.on('connection', (socket) => {
       const legal = computeLegalMoves(room, from) || [];
       const ok = legal.some(m => m.to === to);
       if(!ok) return cb && cb({ error: 'illegal move' });
-      // additionally, do not allow moving into a fogged square if brouillard is active for this player
+      // If any brouillard is active in the room, disallow moving onto squares that the player cannot see
       try{
-        const hasBrouillardForPlayer = (room.activeCardEffects || []).some(e => e.type === 'brouillard' && e.playerId === senderId);
-        if(hasBrouillardForPlayer){
-          const vis = visibleSquaresForPlayer(room, senderId);
-          if(!vis.has(to)) return cb && cb({ error: 'destination not visible (fog of war)' });
+        const hasBrouillard = (room.activeCardEffects || []).some(e => e && e.type === 'brouillard');
+        if(hasBrouillard){
+          const visible = visibleSquaresForPlayer(room, senderId) || new Set();
+          if(!visible.has(to)){
+            return cb && cb({ error: 'destination_not_visible' });
+          }
         }
-      }catch(e){ /* ignore */ }
+      }catch(_){ }
 
       // apply move: remove any piece on target (capture)
       const targetIndex = pieces.findIndex(p => p.square === to);
@@ -1046,6 +1065,31 @@ io.on('connection', (socket) => {
 
       // advance board version
       board.version = (board.version || 0) + 1;
+
+      // Update brouillard play counters: if any brouillard is active, increment the move count for the moving player.
+      try{
+        room.activeCardEffects = room.activeCardEffects || [];
+        for(let ei = room.activeCardEffects.length - 1; ei >= 0; ei--){
+          const ev = room.activeCardEffects[ei];
+          if(!ev || ev.type !== 'brouillard') continue;
+          try{
+            ev.playCounts = ev.playCounts || {};
+            ev.playCounts[senderId] = (ev.playCounts[senderId] || 0) + 1;
+            try{ io.to(room.id).emit('card:effect:updated', { roomId: room.id, effect: ev }); }catch(_){ }
+            // expire the brouillard when ALL players have reached the threshold of plays
+            const threshold = 2;
+            const players = room.players || [];
+            let allReached = true;
+            for(const pl of players){ if(!pl || !pl.id) continue; if((ev.playCounts[pl.id] || 0) < threshold){ allReached = false; break; } }
+            if(allReached){
+              try{ room.activeCardEffects.splice(ei,1); }catch(_){ }
+              try{ io.to(room.id).emit('card:effect:removed', { roomId: room.id, effectId: ev.id, type: ev.type, playerId: ev.playerId }); }catch(_){ }
+              // broadcast updated room state so clients remove veils
+              try{ sendRoomUpdate(room); }catch(_){ }
+            }
+          }catch(_){ }
+        }
+      }catch(e){ console.error('brouillard playcount update error', e); }
 
       // Check victory (king capture) before further turn bookkeeping. If game ended, broadcast move and game:over and return.
       try{
@@ -2166,29 +2210,40 @@ io.on('connection', (socket) => {
             played.payload = Object.assign({}, payload, { applied: 'invisible', appliedTo: target });
           }catch(e){ console.error('invisible effect error', e); }
         }
-        // brouillard de guerre: target a player so their board is fogged (they only see adjacent squares)
-        else if(cardId === 'brouillard_de_guerre' || (typeof cardId === 'string' && cardId.indexOf('brouillard') !== -1)){
-          try{
-            const board = room.boardState;
-            // determine target player id: payload.targetPlayerId or the opponent
-            let targetPlayerId = payload && payload.targetPlayerId;
-            if(!targetPlayerId){
-              const opp = (room.players || []).find(p => p.id !== senderId);
-              targetPlayerId = opp && opp.id;
-            }
-            const targetPlayer = (room.players || []).find(p => p.id === targetPlayerId);
-            if(!board || !targetPlayer || targetPlayer.id === senderId){
-              // restore removed card to hand and abort
-              try{ room.hands = room.hands || {}; room.hands[senderId] = room.hands[senderId] || []; if(removed) room.hands[senderId].push(removed); room.discard = room.discard || []; for(let i = room.discard.length-1;i>=0;i--){ if(room.discard[i] && room.discard[i].id === (removed && removed.id)){ room.discard.splice(i,1); break; } } }catch(e){}
-              return cb && cb({ error: 'no valid target player' });
-            }
-            // record brouillard effect for target player
-            room.activeCardEffects = room.activeCardEffects || [];
-            const effect = { id: played.id, type: 'brouillard', playerId: targetPlayer.id, ts: Date.now(), remainingTurns: (payload && payload.turns) || 4 };
-            room.activeCardEffects.push(effect);
-            try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect }); }catch(_){}
-            played.payload = Object.assign({}, payload, { applied: 'brouillard', appliedToPlayer: targetPlayer.id });
-          }catch(e){ console.error('brouillard effect error', e); }
+    else if(cardId === 'brouillard_de_guerre' || (typeof cardId === 'string' && cardId.indexOf('brouillard') !== -1)){
+      try{
+              const board = room.boardState;
+              // determine target player id: payload.targetPlayerId or the opponent
+              let targetPlayerId = payload && payload.targetPlayerId;
+              if(!targetPlayerId){
+                const opp = (room.players || []).find(p => p.id !== senderId);
+                targetPlayerId = opp && opp.id;
+              }
+              const targetPlayer = (room.players || []).find(p => p.id === targetPlayerId);
+              if(!board || !targetPlayer || targetPlayer.id === senderId){
+                // restore removed card to hand and abort
+                try{ room.hands = room.hands || {}; room.hands[senderId] = room.hands[senderId] || []; if(removed) room.hands[senderId].push(removed); room.discard = room.discard || []; for(let i = room.discard.length-1;i>=0;i--){ if(room.discard[i] && room.discard[i].id === (removed && removed.id)){ room.discard.splice(i,1); break; } } }catch(e){}
+                return cb && cb({ error: 'no valid target player' });
+              }
+              // compute list of all squares (each square veiled individually)
+              const width = board.width || 8;
+              const height = board.height || 8;
+              const all = [];
+              for(let yy = 0; yy < height; yy++){
+                for(let xx = 0; xx < width; xx++){
+                  all.push(String.fromCharCode('a'.charCodeAt(0) + xx) + (yy+1));
+                }
+              }
+              // record brouillard effect for target player with veiledSquares
+              room.activeCardEffects = room.activeCardEffects || [];
+              // initialize playCounts so we can expire brouillard after each player played N times
+              const playCounts = {};
+              try{ (room.players || []).forEach(pl => { if(pl && pl.id) playCounts[pl.id] = 0; }); }catch(_){ }
+              const effect = { id: played.id, type: 'brouillard', playerId: targetPlayer.id, ts: Date.now(), remainingTurns: (payload && payload.turns) || 4, veiledSquares: all, playCounts };
+              room.activeCardEffects.push(effect);
+              try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect }); }catch(_){ }
+              played.payload = Object.assign({}, payload, { applied: 'brouillard', appliedToPlayer: targetPlayer.id });
+            }catch(e){ console.error('brouillard effect error', e); }
         }
         // anneau: make the board horizontally wrap for the playing player's pieces for this turn
         else if(cardId === 'anneau' || (typeof cardId === 'string' && cardId.indexOf('anneau') !== -1)){

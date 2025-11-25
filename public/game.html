@@ -290,6 +290,16 @@
           showCardDrawnNotification(data);
         }catch(e){ console.warn('card:drawn handler error', e); }
       });
+          // public notice that a player drew a card when autoDraw is OFF (server emits this only in that case)
+          socket.on('player:drew', (data) => {
+            try{
+              const pid = data && data.playerId;
+              if(!pid) return;
+              const actor = (pid === myPlayerId) ? 'Vous' : (playerColors[pid] ? playerColors[pid] : 'Adversaire');
+              // show owner message as 'Vous : a pioché une carte' so the player sees the activity line too
+              appendActivity(`${actor} : a pioché une carte`);
+            }catch(_){ }
+          });
   // when server broadcasts generic room updates, it includes autoDraw flag
   // ensure draw button visibility is updated inside the room:update handler below
       // when a card is played by any player, ensure the UI removes it from the owner's hand

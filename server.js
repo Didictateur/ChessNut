@@ -294,7 +294,8 @@ function buildDefaultDeck(){
     // ['petit pion','Le joueur choisit un pion. À partir du prochain tour, il est promu en reine dès qu il capture un pièce non pion.'],
     ['révolution','Tous les pions sont aléatoirement changés en Cavalier, Fou ou Tour et les Cavaliers, Fous et Tours sont changés en pions.'],
     ["doppelganger","Choisis une pièce. À partir de maintenant, devient chacune des pièces qu'elle capture."],
-    // ['kurby','Choisis une pièce. À sa prochaine capture, récupère les mouvements de la pièce capturée.']
+    // ['kurby','Choisis une pièce. À sa prochaine capture, récupère les mouvements de la pièce capturée.'],
+    // ["cachotier", "La prochaine carte jouée ne sera pas révélée à l'adversaire."],
   ];
   function cap(s){ if(!s) return s; s = String(s).trim(); return s.charAt(0).toUpperCase() + s.slice(1); }
   return cards.map(([title,desc])=>{
@@ -1401,18 +1402,12 @@ io.on('connection', (socket) => {
         // nothing drawn (hand full or deck empty)
         return cb && cb({ error: 'no_card_drawn', message: "Aucune carte n'a été tirée." });
       }
-      // drawing consumes the player's turn: flip turn and decrement per-turn effects
-      // advance board version
+      // drawing consumes the player's turn: advance board version and mark that the player used their action
       board.version = (board.version || 0) + 1;
-
-      // If the move consumed a free-move granted by a card, perform end-of-turn bookkeeping now
-      if(freeMoveConsumed){
-        const moved = { playerId: senderId, from, to };
-        try{ io.to(roomId).emit('move:moved', moved); }catch(_){ }
-        try{ endTurnAfterCard(room, senderId); }catch(e){ try{ sendRoomUpdate(room); }catch(_){ } }
-        return cb && cb({ ok: true, moved });
-      }
-      // flip turn
+      room._cardPlayedThisTurn = room._cardPlayedThisTurn || {};
+      // mark that this player has used their card/draw action this turn (prevents playing a card after drawing)
+      room._cardPlayedThisTurn[senderId] = true;
+      // flip turn to the next player
       board.turn = (board.turn === 'w') ? 'b' : 'w';
       // decrement remainingTurns for time-limited effects that belong to the player who just finished their turn
       try{
@@ -1437,8 +1432,7 @@ io.on('connection', (socket) => {
         }
       }catch(e){ console.error('decrement-after-draw error', e); }
 
-      // reset per-turn card-play flags
-      try{ room._cardPlayedThisTurn = {}; }catch(_){ }
+  // note: do NOT clear room._cardPlayedThisTurn here; it should be reset at endTurnAfterCard
 
       // at this point it's the next player's turn; perform start-of-turn draw if autoDraw enabled
       const nextColor = board.turn;
@@ -1446,8 +1440,8 @@ io.on('connection', (socket) => {
       if(nextPlayer){ try{ maybeDrawAtTurnStart(room, nextPlayer.id); }catch(_){ sendRoomUpdate(room); } }
       else { sendRoomUpdate(room); }
 
-      // notify room that the player drew and ended their turn
-      try{ io.to(room.id).emit('player:drew', { roomId: room.id, playerId: senderId, card: drawn }); }catch(_){ }
+  // notify room that the player drew and ended their turn (do NOT reveal card contents)
+  try{ io.to(room.id).emit('player:drew', { roomId: room.id, playerId: senderId }); }catch(_){ }
       return cb && cb({ ok: true, card: drawn });
     }catch(err){ console.error('player:draw error', err); return cb && cb({ error: 'server_error' }); }
   });

@@ -256,7 +256,7 @@ function buildDefaultDeck(){
     // ['changer la pièce à capturer','Le joueur choisie la nouvelle pièce jouant le rôle de roi sans la révéler'],
     // ['trou de ver','Deux cases du plateau deviennent maintenant la même'],
     ['jouer deux fois','Le joueur peut déplacer deux pièces'],
-    // ['annulation d une carte','Annule l effet d une carte qui est jouée par l adversaire'],
+    ["totem d'immunité","Annule l'effet de la prochaine carte jouée par l'adversaire"],
     ['placement de mines','Le joueur place une mine sur une case vide sans la révéler au joueur adverse. Une pièce qui se pose dessus explose et est capturée par le joueur ayant placé la mine'],
     ['vole d une pièce','Désigne une pièce non roi qui change de camp.\n\nCompte comme un mouvement'],
     ['promotion','Un pion au choix est promu'],
@@ -1507,6 +1507,36 @@ io.on('connection', (socket) => {
       console.error('card removal error', e);
     }
 
+  // ===== Totem check: if any totem is active protecting a player other than the sender,
+  // the totem is consumed and this played card is canceled (no effect applied) =====
+  try{
+    const active = room.activeCardEffects || [];
+    const totems = active.filter(e => e && (e.type === 'totem' || e.type === 'totem_immunity'));
+    if(totems && totems.length){
+      // find a totem protecting someone other than the current sender
+      const blocking = totems.find(t => t && t.playerId && t.playerId !== senderId);
+      if(blocking){
+        try{
+          // remove the totem effect from room
+          room.activeCardEffects = (room.activeCardEffects || []).filter(e => !(e && e.id === blocking.id));
+        }catch(_){ }
+        try{ io.to(room.id).emit('card:effect:removed', { roomId: room.id, effectId: blocking.id, type: 'totem', playerId: blocking.playerId }); }catch(_){ }
+        try{ io.to(room.id).emit('card:play_blocked', { roomId: room.id, played, blockedBy: 'totem', protectedPlayerId: blocking.playerId }); }catch(_){ }
+        // private notification to the player who attempted the play
+        try{ socket.emit('card:play_blocked:private', { ok: true, blocked: true, reason: 'totem', protectedPlayerId: blocking.playerId, message: 'Votre carte a été annulée par un totem d\'immunité.' }); }catch(_){ }
+        // optional: notify the protected player that their totem was consumed
+        try{
+          const protectedPlayer = (room.players || []).find(p => p && p.id === blocking.playerId);
+          if(protectedPlayer && protectedPlayer.socketId){
+            io.to(protectedPlayer.socketId).emit('notification', { type: 'totem_consumed', roomId: room.id, message: 'Votre totem d\'immunité a annulé la dernière carte jouée par l\'adversaire.' });
+          }
+        }catch(_){ }
+        try{ sendRoomUpdate(room); }catch(_){ }
+        return cb && cb({ ok: true, blocked: true, reason: 'totem', protectedPlayerId: blocking.playerId });
+      }
+    }
+  }catch(e){ console.error('totem immunity check error', e); }
+
   // Implement specific card effects here
   // Convention: For cards that require a target, if the target is invalid the card is consumed by default
   // (player loses the card). If you want a different behavior for a specific card, explicitly restore
@@ -2255,6 +2285,17 @@ io.on('connection', (socket) => {
             try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect }); }catch(_){}
             played.payload = Object.assign({}, payload, { applied: 'anneau' });
           }catch(e){ console.error('anneau effect error', e); }
+        }
+        // totem d'immunité: protect the playing player so the next card played by an opponent is canceled
+        else if((typeof cardId === 'string' && (cardId.indexOf('totem') !== -1 || cardId.indexOf('immun') !== -1))){
+          try{
+            room.activeCardEffects = room.activeCardEffects || [];
+            // create a persistent totem effect bound to the player. It will be removed when it blocks the next opponent card.
+            const effect = { id: played.id, type: 'totem', playerId: senderId, ts: Date.now() };
+            room.activeCardEffects.push(effect);
+            try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect }); }catch(_){ }
+            played.payload = Object.assign({}, payload, { applied: 'totem', appliedToPlayer: senderId });
+          }catch(e){ console.error('totem effect error', e); }
         }
         // placement de mines: place a hidden mine on an empty square (hidden from other players)
         else if((typeof cardId === 'string' && cardId.indexOf('mine') !== -1)){

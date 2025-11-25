@@ -69,6 +69,7 @@
   </div>
 
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script src="/toast.js"></script>
   <script>
     function qs(name){ const url = new URL(window.location.href); return url.searchParams.get(name); }
     const roomId = qs('roomId');
@@ -98,7 +99,7 @@
 
     function log(...args){ console.log(...args); }
 
-    if(!roomId){ alert('roomId manquant dans l\'URL'); }
+  if(!roomId){ showToast('roomId manquant dans l\'URL', { background: 'rgba(200,60,60,0.95)' }); }
 
     function connectAndJoin(){
       socket = io();
@@ -270,7 +271,7 @@
     document.getElementById('startBtn').addEventListener('click', ()=>{
       if(!socket) return;
       socket.emit('game:start', { roomId }, (resp)=>{
-        if(resp && resp.error){ log('start error', resp); alert(resp.error); return; }
+  if(resp && resp.error){ log('start error', resp); showToast(resp.error || resp.message || 'Erreur', { background: 'rgba(200,60,60,0.95)' }); return; }
         log('game:start acknowledged');
       });
     });
@@ -281,7 +282,7 @@
         if(!socket) return;
         const enabled = !!autoDrawToggleEl.checked;
         socket.emit('room:auto_draw:set', { roomId, enabled }, (resp)=>{
-          if(resp && resp.error){ log('auto-draw error', resp); alert(resp.error); return; }
+          if(resp && resp.error){ log('auto-draw error', resp); showToast(resp.error || resp.message || 'Erreur', { background: 'rgba(200,60,60,0.95)' }); return; }
           log('auto-draw updated', resp);
         });
       });
@@ -293,7 +294,7 @@
         if(!socket) return;
         const enabled = !!noRemiseToggleEl.checked;
         socket.emit('room:no_remise:set', { roomId, enabled }, (resp)=>{
-          if(resp && resp.error){ log('no-remise error', resp); alert(resp.error); return; }
+          if(resp && resp.error){ log('no-remise error', resp); showToast(resp.error || resp.message || 'Erreur', { background: 'rgba(200,60,60,0.95)' }); return; }
           log('no-remise updated', resp);
         });
       });
@@ -411,7 +412,7 @@
       const link = `${window.location.origin}/waiting.html?roomId=${encodeURIComponent(roomId)}`;
       try{
         await navigator.clipboard.writeText(link);
-        alert('Lien d\'invitation copié dans le presse-papier');
+  showToast('Lien d\'invitation copié dans le presse-papier', { background: 'rgba(40,160,40,0.95)' });
       }catch(e){
         // fallback
         window.prompt('Copie le lien ci-dessous', link);

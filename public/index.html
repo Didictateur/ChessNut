@@ -49,6 +49,7 @@
   </div>
 
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script src="/toast.js"></script>
   <script>
     function log(...args){ console.log(...args); }
 
@@ -63,17 +64,17 @@
 
     document.getElementById('join').addEventListener('click', async ()=>{
       const roomId = document.getElementById('roomId').value.trim();
-      if(!roomId){ alert('Entrez roomId'); return; }
+  if(!roomId){ showToast('Entrez roomId', { background: 'rgba(200,60,60,0.95)' }); return; }
       // verify room exists before redirecting
       try{
         const resp = await fetch(`/rooms/${encodeURIComponent(roomId)}`);
         if(!resp.ok){
           const j = await resp.json().catch(()=>({ error: 'room not found' }));
-          alert(j.error || 'room not found');
+          showToast(j.error || 'room not found', { background: 'rgba(200,60,60,0.95)' });
           return;
         }
       }catch(e){
-        alert('Erreur de connexion au serveur');
+        showToast('Erreur de connexion au serveur', { background: 'rgba(200,60,60,0.95)' });
         return;
       }
 

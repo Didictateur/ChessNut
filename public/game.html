@@ -320,7 +320,13 @@
             const title = (cardObj && (cardObj.title || cardObj.cardId)) || (played && played.card && (played.card.title || played.card.cardId)) || 'Carte';
             // show player's color instead of their id; fallback to generic label
             const actor = (owner === myPlayerId) ? 'Vous' : (playerColors[owner] ? playerColors[owner] : 'Adversaire');
-            appendActivity(`${actor} : a joué la carte "${title}"`);
+              // If the played card is marked hidden, do not reveal the title to other players
+              const isHidden = (cardObj && cardObj.hidden) || (played && played.card && played.card.hidden);
+              if(isHidden && owner !== myPlayerId){
+                appendActivity(`${actor} : a joué une carte`);
+              } else {
+                appendActivity(`${actor} : a joué la carte "${title}"`);
+              }
           }catch(_){ }
         }catch(e){ console.warn('card:played handler error', e); }
       });

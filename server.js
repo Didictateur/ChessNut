@@ -305,7 +305,9 @@ function buildDefaultDeck(){
     const cardId = ascii.replace(/[^a-z0-9]+/gi,'_').toLowerCase();
     // Use deterministic id equal to the slug so clients and server agree on identifiers across requests
     const id = cardId;
-    return { id, cardId, title: cap(normalized), description: desc };
+    // mark some cards as hidden so their play isn't revealed publicly (mines, totems, immunities)
+    const hidden = /mine|totem|immun/i.test(cardId);
+    return { id, cardId, title: cap(normalized), description: desc, hidden: !!hidden };
   });
 }
 

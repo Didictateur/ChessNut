@@ -15,6 +15,9 @@
       z-index: 50;
       cursor: default;
     }
+    /* activity feed for user-facing logs (card plays) */
+    #activityFeed { max-height: 140px; overflow:auto; padding:8px; background:#fff; border:1px solid #eee; border-radius:6px; font-size:14px; color:#222 }
+    #log { display:none; }
   </style>
 </head>
 <body>
@@ -46,6 +49,10 @@
         <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
           <pre id="log" style="margin-top:0px;height:140px;overflow:auto;flex:1">logs...</pre>
         </div>
+        <div style="margin-top:8px">
+          <div><strong>Activité</strong></div>
+          <div id="activityFeed" style="margin-top:8px">Aucune activité pour l'instant.</div>
+        </div>
       </section>
       <div style="margin-top:10px;display:flex;align-items:center;gap:12px">
         <div id="hands" style="display:flex;flex-direction:column;gap:8px;flex:1;margin-left:6px"></div>
@@ -70,6 +77,8 @@
   const myColorEl = document.getElementById('myColor');
   let socket = null;
   let myColor = null;
+  // map playerId -> color (kept up-to-date from room:update)
+  let playerColors = {};
   // selection state for this client
   let selectedSquare = null; // algebraic name like 'e2'
   let selectedSquareEl = null;
@@ -96,6 +105,22 @@
       } else {
         console.log(...args);
       }
+    }
+
+    // append a user-facing activity message (visible to players). Keeps recent N entries.
+    function appendActivity(message){
+      try{
+        const feed = document.getElementById('activityFeed');
+        if(!feed) return;
+        const line = document.createElement('div');
+        // show only the message (no timestamp)
+        line.textContent = message;
+        // prepend newest at top
+        if(feed.textContent && feed.textContent.indexOf("Aucune activité") !== -1){ feed.textContent = ''; }
+        feed.insertBefore(line, feed.firstChild);
+        // limit to 30 entries
+        while(feed.children.length > 30) feed.removeChild(feed.lastChild);
+      }catch(_){ }
     }
 
     // small toast notification helper (non-blocking)
@@ -190,8 +215,12 @@
         if(playersEl){
           playersEl.innerHTML = '';
           (data.players||[]).forEach(p=>{
+            // keep a mapping from playerId -> color for activity feed formatting
+            try{ playerColors[p.id] = p.color; }catch(_){ }
+            // if this is our player, store the color locally and update UI
+            try{ if(p.id === myPlayerId){ myColor = p.color; if(myColorEl) myColorEl.textContent = myColor; } }catch(_){ }
             const li = document.createElement('li');
-            li.textContent = p.id + ' (' + p.color + ')';
+            li.textContent = (p.color || 'Joueur') + (p.id === myPlayerId ? ' (vous)' : '');
             playersEl.appendChild(li);
           });
         }
@@ -286,6 +315,13 @@
               });
             }
           }
+          // show friendly activity: who played which card (use title if available)
+          try{
+            const title = (cardObj && (cardObj.title || cardObj.cardId)) || (played && played.card && (played.card.title || played.card.cardId)) || 'Carte';
+            // show player's color instead of their id; fallback to generic label
+            const actor = (owner === myPlayerId) ? 'Vous' : (playerColors[owner] ? playerColors[owner] : 'Adversaire');
+            appendActivity(`${actor} : a joué la carte "${title}"`);
+          }catch(_){ }
         }catch(e){ console.warn('card:played handler error', e); }
       });
       // show card effect notifications (both public and private) so owners get feedback on failed placements/promotions

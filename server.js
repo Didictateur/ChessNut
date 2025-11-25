@@ -303,7 +303,9 @@ function buildDefaultDeck(){
     let ascii = normalized;
     try{ ascii = ascii.normalize('NFD').replace(/\p{Diacritic}/gu, ''); }catch(e){ /* ignore if normalize unsupported */ }
     const cardId = ascii.replace(/[^a-z0-9]+/gi,'_').toLowerCase();
-    return { id: uuidv4().slice(0,8), cardId, title: cap(normalized), description: desc };
+    // Use deterministic id equal to the slug so clients and server agree on identifiers across requests
+    const id = cardId;
+    return { id, cardId, title: cap(normalized), description: desc };
   });
 }
 
@@ -1249,6 +1251,38 @@ io.on('connection', (socket) => {
     }
 
     cb && cb({ ok: true });
+  });
+
+  // Host can set a custom deck for the room (selected list of card ids). Only host may change it.
+  socket.on('room:deck:set', ({ roomId, selected }, cb) => {
+    const room = rooms.get(roomId);
+    if(!room) return cb && cb({ error: 'room not found', message: "Aucune salle trouvée." });
+    const sender = socket.data.playerId;
+    if(!sender) return cb && cb({ error: 'not joined', message: "Vous n'avez pas rejoint la salle." });
+    if(room.hostId !== sender) return cb && cb({ error: 'only host can set deck', message: "Seul l'hôte peut définir la pioche." });
+    try{
+      // selected is expected to be an array of card identifiers (either id or cardId)
+      const sel = Array.isArray(selected) ? selected : [];
+      // Build a lookup from the canonical default deck and current room deck
+      const master = buildDefaultDeck();
+      const pool = (room.deck && Array.isArray(room.deck) && room.deck.length) ? room.deck.concat(master) : master;
+      const byId = {};
+      pool.forEach(c => { if(c && c.id) byId[c.id] = c; if(c && c.cardId) byId[c.cardId] = c; });
+      // Map selected ids to card objects, preserving order. If a selected id is unknown, ignore it.
+      const newDeck = [];
+      sel.forEach(sid => { const c = byId[sid]; if(c) newDeck.push(Object.assign({}, c)); });
+      if(newDeck.length === 0){
+        // empty selection -> revert to default deck
+        room.deck = buildDefaultDeck();
+      } else {
+        room.deck = newDeck;
+      }
+      // reset discard and hands so the new deck applies for the upcoming game
+      room.discard = room.discard || [];
+      // inform players
+      sendRoomUpdate(room);
+      return cb && cb({ ok: true, deckCount: room.deck.length });
+    }catch(err){ console.error('room:deck:set error', err); return cb && cb({ error: 'server_error' }); }
   });
 
   socket.on('disconnect', () => {

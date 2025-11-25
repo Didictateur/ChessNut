@@ -267,11 +267,26 @@
 
     connectAndJoin();
 
-    // Start button handler (host)
+    // Start button handler (host) — ensure custom deck is applied before starting
     document.getElementById('startBtn').addEventListener('click', ()=>{
       if(!socket) return;
+      // If custom draw is enabled and host selected cards, send the deck first
+      try{
+        if(customDrawToggleEl && customDrawToggleEl.checked && selectedCards.size && myPlayerId && roomHostId && myPlayerId === roomHostId){
+          socket.emit('room:deck:set', { roomId, selected: Array.from(selectedCards) }, (deckResp)=>{
+            if(deckResp && deckResp.error){ showToast(deckResp.message || deckResp.error, { background: 'rgba(200,60,60,0.95)' }); return; }
+            // now start the game
+            socket.emit('game:start', { roomId }, (resp)=>{
+              if(resp && resp.error){ log('start error', resp); showToast(resp.error || resp.message || 'Erreur', { background: 'rgba(200,60,60,0.95)' }); return; }
+              log('game:start acknowledged');
+            });
+          });
+          return;
+        }
+      }catch(_){ }
+      // fallback: start immediately
       socket.emit('game:start', { roomId }, (resp)=>{
-  if(resp && resp.error){ log('start error', resp); showToast(resp.error || resp.message || 'Erreur', { background: 'rgba(200,60,60,0.95)' }); return; }
+        if(resp && resp.error){ log('start error', resp); showToast(resp.error || resp.message || 'Erreur', { background: 'rgba(200,60,60,0.95)' }); return; }
         log('game:start acknowledged');
       });
     });
@@ -311,6 +326,26 @@
         const checked = !!customDrawToggleEl.checked;
         log('custom-draw toggled (minimal)', { checked });
         if(customCardsSection) customCardsSection.style.display = checked ? 'block' : 'none';
+        // When toggling the checkbox, inform server: if unchecked, clear custom deck on server so default deck is used.
+        try{
+          if(socket && socket.connected && myPlayerId && roomHostId && myPlayerId === roomHostId){
+            if(!checked){
+              // inform server to revert to default deck
+              socket.emit('room:deck:set', { roomId, selected: [] }, (resp)=>{
+                if(resp && resp.error) showToast(resp.message || resp.error, { background: 'rgba(200,60,60,0.95)' });
+                else showToast('Pioche personnalisée désactivée — pioche par défaut restaurée', { background: 'rgba(40,160,40,0.95)' });
+              });
+            } else {
+              // if checked and we already have a selection, push it to server
+              if(selectedCards.size){
+                socket.emit('room:deck:set', { roomId, selected: Array.from(selectedCards) }, (resp)=>{
+                  if(resp && resp.error) showToast(resp.message || resp.error, { background: 'rgba(200,60,60,0.95)' });
+                  else showToast('Pioche personnalisée activée', { background: 'rgba(40,160,40,0.95)' });
+                });
+              }
+            }
+          }
+        }catch(_){ }
         if(checked){
           // fetch card list and render simple names
           if(customCardsContainer){
@@ -379,6 +414,15 @@
                     selectMark.style.display = 'flex';
                   }
                   saveSelection();
+                  // if we're the host and connected AND custom-draw is enabled, update the server's custom deck selection
+                  try{
+                    if(socket && socket.connected && myPlayerId && roomHostId && myPlayerId === roomHostId && customDrawToggleEl && customDrawToggleEl.checked){
+                      socket.emit('room:deck:set', { roomId, selected: Array.from(selectedCards) }, (resp)=>{
+                        if(resp && resp.error){ showToast(resp.message || resp.error, { background: 'rgba(200,60,60,0.95)' }); }
+                        else { showToast('Pioche personnalisée mise à jour', { background: 'rgba(40,160,40,0.95)' }); }
+                      });
+                    }
+                  }catch(_){ }
                 });
 
                 grid.appendChild(cardEl);
@@ -400,6 +444,15 @@
           else { selectedCards.delete(id); el.classList.remove('selected'); if(mark) mark.style.display = 'none'; }
         });
         saveSelection();
+        // send selection to server if host AND custom-draw enabled
+        try{
+          if(socket && socket.connected && myPlayerId && roomHostId && myPlayerId === roomHostId && customDrawToggleEl && customDrawToggleEl.checked){
+            socket.emit('room:deck:set', { roomId, selected: Array.from(selectedCards) }, (resp)=>{
+              if(resp && resp.error) showToast(resp.message || resp.error, { background: 'rgba(200,60,60,0.95)' });
+              else showToast('Pioche personnalisée mise à jour', { background: 'rgba(40,160,40,0.95)' });
+            });
+          }
+        }catch(_){ }
       }
       if(customSelectAllBtn) customSelectAllBtn.addEventListener('click', (e)=>{ e.preventDefault(); setAllVisible(true); });
       if(customDeselectAllBtn) customDeselectAllBtn.addEventListener('click', (e)=>{ e.preventDefault(); setAllVisible(false); });

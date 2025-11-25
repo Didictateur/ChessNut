@@ -741,7 +741,7 @@ app.post('/rooms', (req, res) => {
 
 app.get('/rooms/:id', (req, res) => {
   const room = rooms.get(req.params.id);
-  if (!room) return res.status(404).json({ error: 'room not found' });
+  if (!room) return res.status(404).json({ error: 'room not found', message: "Aucune salle trouvée." });
     const boardState = room.boardState || null;
     const size = (room.boardState && room.boardState.width) || room.size;
   res.json({ id: room.id, boardState, size: size, players: room.players.map(p => ({ id: p.id, color: p.color })), status: room.status, hostId: room.hostId, cards: Object.keys(room.cards || {}), autoDraw: !!room.autoDraw, noRemise: !!room.noRemise });
@@ -752,7 +752,7 @@ io.on('connection', (socket) => {
 
   socket.on('room:join', ({ roomId, playerId }, cb) => {
     const room = rooms.get(roomId);
-    if (!room) return cb && cb({ error: 'room not found' });
+    if (!room) return cb && cb({ error: 'room not found', message: "Aucune salle trouvée." });
   const assignedId = playerId || uuidv4();
 
     // If this player was pending removal (disconnect during navigation), cancel removal
@@ -809,8 +809,8 @@ io.on('connection', (socket) => {
     try{
       const room = rooms.get(roomId || socket.data.roomId);
       const playerId = socket.data.playerId;
-      if(!room) return cb && cb({ error: 'room not found' });
-      if(!playerId) return cb && cb({ error: 'not joined' });
+      if(!room) return cb && cb({ error: 'room not found', message: "Aucune salle trouvée." });
+      if(!playerId) return cb && cb({ error: 'not joined', message: "Vous n'avez pas rejoint la salle." });
       // remove player immediately
       room.players = (room.players || []).filter(p => p.id !== playerId);
       // if the host left, promote the next player
@@ -831,10 +831,10 @@ io.on('connection', (socket) => {
   // Host can toggle automatic drawing in the waiting room. Only the host may change this setting.
   socket.on('room:auto_draw:set', ({ roomId, enabled }, cb) => {
     const room = rooms.get(roomId);
-    if(!room) return cb && cb({ error: 'room not found' });
+    if(!room) return cb && cb({ error: 'room not found', message: "Aucune salle trouvée." });
     const sender = socket.data.playerId;
-    if(!sender) return cb && cb({ error: 'not joined' });
-    if(room.hostId !== sender) return cb && cb({ error: 'only the host can change auto-draw' });
+    if(!sender) return cb && cb({ error: 'not joined', message: "Vous n'avez pas rejoint la salle." });
+    if(room.hostId !== sender) return cb && cb({ error: 'only the host can change auto-draw', message: "Seul l'hôte peut changer le dessin automatique." });
     room.autoDraw = !!enabled;
     // Broadcast updated room state to all participants
     try{ sendRoomUpdate(room); }catch(_){ }
@@ -845,10 +845,10 @@ io.on('connection', (socket) => {
   // Host can toggle the 'no remise' flag (prevent reshuffling discard into deck). Only the host may change this setting.
   socket.on('room:no_remise:set', ({ roomId, enabled }, cb) => {
     const room = rooms.get(roomId);
-    if(!room) return cb && cb({ error: 'room not found' });
+    if(!room) return cb && cb({ error: 'room not found', message: "Aucune salle trouvée." });
     const sender = socket.data.playerId;
-    if(!sender) return cb && cb({ error: 'not joined' });
-    if(room.hostId !== sender) return cb && cb({ error: 'only the host can change no-remise' });
+    if(!sender) return cb && cb({ error: 'not joined', message: "Vous n'avez pas rejoint la salle." });
+    if(room.hostId !== sender) return cb && cb({ error: 'only the host can change no-remise', message: "Seul l'hôte peut changer le no-remise." });
     room.noRemise = !!enabled;
     // Broadcast updated room state to all participants
     try{ sendRoomUpdate(room); }catch(_){ }
@@ -858,17 +858,17 @@ io.on('connection', (socket) => {
 
   socket.on('game:move', ({ roomId, from, to, promotion }, cb) => {
     const room = rooms.get(roomId);
-    if (!room) return cb && cb({ error: 'room not found' });
+    if (!room) return cb && cb({ error: 'room not found', message: "Aucune salle trouvée." });
     // don't allow moves in finished games
-    if(room.status === 'finished') return cb && cb({ error: 'game_over' });
+    if(room.status === 'finished') return cb && cb({ error: 'game_over', message: "La partie est terminée." });
     // Basic move handling: validate turn, validate piece ownership, validate target is one of computeLegalMoves,
     // apply the move to room.boardState, handle captures, flip turn and broadcast the updated board.
     try{
       const senderId = socket.data.playerId;
-      if(!senderId) return cb && cb({ error: 'not joined' });
+      if(!senderId) return cb && cb({ error: 'not joined', message: "Vous n'avez pas rejoint la salle." });
       const roomPlayer = room.players.find(p => p.id === senderId);
-      if(!roomPlayer) return cb && cb({ error: 'player not in room' });
-      if(!room.boardState) return cb && cb({ error: 'no board state' });
+      if(!roomPlayer) return cb && cb({ error: 'player not in room', message: "Vous n'êtes pas dans cette salle." });
+      if(!room.boardState) return cb && cb({ error: 'no board state', message: "Aucun état de plateau disponible." });
 
       const board = room.boardState;
       // determine player's color short form ('w'|'b')
@@ -876,13 +876,13 @@ io.on('connection', (socket) => {
       if(!playerColorShort) return cb && cb({ error: 'invalid player color' });
 
       // must be player's turn
-      if(board.turn !== playerColorShort) return cb && cb({ error: 'not your turn' });
+      if(board.turn !== playerColorShort) return cb && cb({ error: 'not your turn', message: "Ce n'est pas à votre tour de jouer." });
 
       // find piece at 'from'
       const pieces = board.pieces || [];
       const moving = pieces.find(p => p.square === from);
       if(!moving) return cb && cb({ error: 'no piece at source' });
-      if(moving.color !== playerColorShort) return cb && cb({ error: 'not your piece' });
+      if(moving.color !== playerColorShort) return cb && cb({ error: 'not your piece', message: "Vous ne pouvez pas déplacer une pièce adverse." });
 
       // Enforce 'toucher' restriction: if there is an active 'toucher' effect targeting this player,
       // they may ONLY move the specified piece(s).
@@ -890,7 +890,7 @@ io.on('connection', (socket) => {
         const effects = room.activeCardEffects || [];
         const toucher = effects.find(e => e && e.type === 'toucher' && e.playerId === senderId);
         if(toucher && toucher.pieceId && moving.id !== toucher.pieceId){
-          return cb && cb({ error: 'must_move_restricted_piece' });
+          return cb && cb({ error: 'must_move_restricted_piece', message: "Vous devez déplacer la pièce restreinte." });
         }
       }catch(_){ }
 
@@ -898,11 +898,11 @@ io.on('connection', (socket) => {
       try{
         const effects2 = room.activeCardEffects || [];
         const tout = effects2.find(e => e && e.type === 'tout_ou_rien' && e.pieceId === moving.id);
-        if(tout){
+            if(tout){
           // only allow moves that capture an occupied square
           const targetIndexCheck = pieces.findIndex(p => p.square === to);
           if(targetIndexCheck === -1){
-            return cb && cb({ error: 'must_capture_to_move' });
+            return cb && cb({ error: 'must_capture_to_move', message: "Mouvement impossible : cette pièce ne peut se déplacer que pour capturer une pièce adverse." });
           }
         }
       }catch(_){ }
@@ -910,14 +910,14 @@ io.on('connection', (socket) => {
       // validate that 'to' is among legal moves
       const legal = computeLegalMoves(room, from) || [];
       const ok = legal.some(m => m.to === to);
-      if(!ok) return cb && cb({ error: 'illegal move' });
+      if(!ok) return cb && cb({ error: 'illegal move', message: "Mouvement illégal." });
       // If any brouillard is active in the room, disallow moving onto squares that the player cannot see
       try{
         const hasBrouillard = (room.activeCardEffects || []).some(e => e && e.type === 'brouillard');
         if(hasBrouillard){
           const visible = visibleSquaresForPlayer(room, senderId) || new Set();
           if(!visible.has(to)){
-            return cb && cb({ error: 'destination_not_visible' });
+            return cb && cb({ error: 'destination_not_visible', message: "La destination n'est pas visible." });
           }
         }
       }catch(_){ }
@@ -1219,14 +1219,14 @@ io.on('connection', (socket) => {
   // Host can start the game explicitly
   socket.on('game:start', ({ roomId }, cb) => {
     const room = rooms.get(roomId);
-    if (!room) return cb && cb({ error: 'room not found' });
+    if (!room) return cb && cb({ error: 'room not found', message: "La partie n'a pas été trouvée." });
 
     // verify sender is the host (first player)
     const senderId = socket.data.playerId;
-    if (!senderId) return cb && cb({ error: 'not joined' });
-    if (room.players.length < 2) return cb && cb({ error: 'need 2 players to start' });
+    if (!senderId) return cb && cb({ error: 'not joined', message: "Vous n'avez pas rejoint la partie." });
+    if (room.players.length < 2) return cb && cb({ error: 'need 2 players to start', message: "Il faut 2 joueurs pour commencer." });
     // verify sender is the host (explicit hostId)
-    if (!room.hostId || room.hostId !== senderId) return cb && cb({ error: 'only host can start' });
+    if (!room.hostId || room.hostId !== senderId) return cb && cb({ error: 'only host can start', message: "Seul l'hôte peut commencer la partie." });
 
   room.status = 'playing';
   // Do not broadcast the raw boardState to all sockets (use per-recipient sendRoomUpdate to enforce invisibility)
@@ -1286,20 +1286,20 @@ io.on('connection', (socket) => {
   // Re-add legalMoves API to compute and return pseudo-legal moves for a square.
   socket.on('game:legalMoves', ({ roomId, square }, cb) => {
     const room = rooms.get(roomId);
-    if (!room) return cb && cb({ error: 'room not found' });
+    if (!room) return cb && cb({ error: 'room not found', message: "La partie n'a pas été trouvée." });
     try{
       const moves = computeLegalMoves(room, square) || [];
       return cb && cb({ ok: true, moves });
     }catch(e){
       console.error('game:legalMoves error', e);
-      return cb && cb({ error: 'invalid square', moves: [] });
+      return cb && cb({ error: 'invalid square', moves: [], message: "La case sélectionnée est invalide." });
     }
   });
 
   // propagate selection made by one client to the other clients in the same room
   socket.on('game:select', ({ roomId, square }, cb) => {
     const room = rooms.get(roomId);
-    if(!room) return cb && cb({ error: 'room not found' });
+    if(!room) return cb && cb({ error: 'room not found', message: "La partie n'a pas été trouvée." });
     const playerId = socket.data.playerId || null;
     // remember last selected square for this socket so cards that need a target can use it
     try{ socket.data.lastSelectedSquare = square || null; }catch(e){}
@@ -1341,29 +1341,29 @@ io.on('connection', (socket) => {
   // Manual draw by player (consumes the player's turn). Only valid when autoDraw is disabled.
   socket.on('player:draw', ({ roomId }, cb) => {
     const room = rooms.get(roomId);
-    if(!room) return cb && cb({ error: 'room not found' });
-    if(room.status === 'finished') return cb && cb({ error: 'game_over' });
+    if(!room) return cb && cb({ error: 'room not found', message: "La partie n'a pas été trouvée." });
+    if(room.status === 'finished') return cb && cb({ error: 'game_over', message: "La partie est terminée." });
     const senderId = socket.data.playerId;
-    if(!senderId) return cb && cb({ error: 'not joined' });
+    if(!senderId) return cb && cb({ error: 'not joined', message: "Vous n'avez pas rejoint la partie." });
     const board = room.boardState;
-    if(!board) return cb && cb({ error: 'no board state' });
+    if(!board) return cb && cb({ error: 'no board state', message: "L'état du plateau est introuvable." });
     const roomPlayer = room.players.find(p => p.id === senderId);
-    if(!roomPlayer) return cb && cb({ error: 'player not in room' });
+    if(!roomPlayer) return cb && cb({ error: 'player not in room', message: "Vous n'êtes pas dans cette partie." });
     const playerColorShort = (roomPlayer.color && roomPlayer.color[0]) || null;
     // must be player's turn
-    if(board.turn !== playerColorShort) return cb && cb({ error: 'not your turn' });
+    if(board.turn !== playerColorShort) return cb && cb({ error: 'not your turn', message: "Ce n'est pas à votre tour de jouer." });
     // manual draw only allowed when autoDraw is disabled
-    if(room.autoDraw) return cb && cb({ error: 'auto_draw_enabled' });
+    if(room.autoDraw) return cb && cb({ error: 'auto_draw_enabled', message: "Le tirage manuel n'est pas autorisé." });
     // do not allow drawing if player already played a card this turn
     room._cardPlayedThisTurn = room._cardPlayedThisTurn || {};
-    if(room._cardPlayedThisTurn[senderId]) return cb && cb({ error: 'card_already_played_this_turn' });
+    if(room._cardPlayedThisTurn[senderId]) return cb && cb({ error: 'card_already_played_this_turn', message: "Vous avez déjà joué une carte ce tour." });
 
     try{
       // perform the draw (this will emit card:drawn privately and send personalized room:update)
       const drawn = drawCardForPlayer(room, senderId);
       if(!drawn){
         // nothing drawn (hand full or deck empty)
-        return cb && cb({ error: 'no_card_drawn' });
+        return cb && cb({ error: 'no_card_drawn', message: "Aucune carte n'a été tirée." });
       }
       // drawing consumes the player's turn: flip turn and decrement per-turn effects
       // advance board version
@@ -1419,7 +1419,7 @@ io.on('connection', (socket) => {
   // Simple cards API via sockets: list/play
   socket.on('card:list', ({ roomId }, cb) => {
     const room = rooms.get(roomId);
-    if(!room) return cb && cb({ error: 'room not found' });
+    if(!room) return cb && cb({ error: 'room not found', message: "La partie n'a pas été trouvée." });
     // return available card types (placeholder)
     const available = [
       { id: 'invert', name: 'Invert Turn', description: 'Swap movement directions for one move' },
@@ -1430,11 +1430,11 @@ io.on('connection', (socket) => {
 
   socket.on('card:play', ({ roomId, playerId, cardId, payload }, cb) => {
     const room = rooms.get(roomId);
-    if(!room) return cb && cb({ error: 'room not found' });
-    if(room.status === 'finished') return cb && cb({ error: 'game_over' });
+    if(!room) return cb && cb({ error: 'room not found', message: "La partie n'a pas été trouvée." });
+    if(room.status === 'finished') return cb && cb({ error: 'game_over', message: "La partie est terminée." });
     // enforce sender identity from socket (don't trust client-supplied playerId)
     const senderId = socket.data.playerId;
-    if(!senderId) return cb && cb({ error: 'not joined' });
+    if(!senderId) return cb && cb({ error: 'not joined', message: "Vous n'avez pas rejoint la partie." });
     // enforce one card per player per turn when the game is playing
     try{
       const board = room.boardState;
@@ -1442,10 +1442,10 @@ io.on('connection', (socket) => {
         const roomPlayer = room.players.find(p => p.id === senderId);
         const playerColorShort = (roomPlayer && roomPlayer.color && roomPlayer.color[0]) || null;
         // only allow playing a card on your turn
-        if(board.turn !== playerColorShort) return cb && cb({ error: 'not your turn' });
+        if(board.turn !== playerColorShort) return cb && cb({ error: 'not your turn', message: "Ce n'est pas à votre tour de jouer." });
         // track card plays per turn (not per board version) so effects like "double move" don't allow extra card plays
         room._cardPlayedThisTurn = room._cardPlayedThisTurn || {};
-        if(room._cardPlayedThisTurn[senderId]) return cb && cb({ error: 'card_already_played_this_turn' });
+        if(room._cardPlayedThisTurn[senderId]) return cb && cb({ error: 'card_already_played_this_turn', message: "Vous avez déjà joué une carte ce tour." });
       }
       
     }catch(e){ console.error('card play pre-check error', e); }
@@ -1469,7 +1469,7 @@ io.on('connection', (socket) => {
         const targetPiece = (board && board.pieces || []).find(p => p.square === targetCandidate);
         if(!board || !targetCandidate || !targetPiece || targetPiece.color !== playerColorShort){
           // nothing should happen if there's no selected piece or the selected piece isn't owned by the player
-          return cb && cb({ error: 'no valid target' });
+          return cb && cb({ error: 'no valid target', message: "Aucune cible valide n'a été sélectionnée." });
         }
         // ensure the payload has the resolved target for downstream handling
         payload = payload || {};
@@ -1485,7 +1485,7 @@ io.on('connection', (socket) => {
       // find by unique id or by cardId (first match)
       const idx = hand.findIndex(c => (c.id && c.id === (payload && payload.id)) || (c.cardId && c.cardId === cardId) || (c.id && c.id === cardId));
       if(idx === -1){
-        return cb && cb({ error: 'you do not have that card' });
+        return cb && cb({ error: 'you do not have that card', message: "Vous ne possedez pas cette carte." });
       }
       const removed = hand.splice(idx,1)[0];
       room.hands[senderId] = hand;
@@ -1605,7 +1605,7 @@ io.on('connection', (socket) => {
               room.discard = room.discard || [];
               for(let i = room.discard.length - 1; i >= 0; i--){ if(room.discard[i] && room.discard[i].id === (removed && removed.id)){ room.discard.splice(i,1); break; } }
             }catch(e){ console.error('restore removed card error', e); }
-            return cb && cb({ error: 'no valid target' });
+            return cb && cb({ error: 'no valid target', message: "Aucune cible valide n'a été sélectionnée." });
           }
           // apply permanent adoubement effect (bind to piece id so it persists when the piece moves)
           room.activeCardEffects = room.activeCardEffects || [];
@@ -1632,7 +1632,7 @@ io.on('connection', (socket) => {
               room.discard = room.discard || [];
               for(let i = room.discard.length - 1; i >= 0; i--){ if(room.discard[i] && room.discard[i].id === (removed && removed.id)){ room.discard.splice(i,1); break; } }
             }catch(e){ console.error('restore removed card error', e); }
-            return cb && cb({ error: 'no valid target' });
+            return cb && cb({ error: 'no valid target', message: "Aucune cible valide n'a été sélectionnée." });
           }
           // create a persistent doppelganger effect bound to the selected piece
           try{
@@ -1664,7 +1664,7 @@ io.on('connection', (socket) => {
                   room.discard = room.discard || [];
                   for(let i = room.discard.length - 1; i >= 0; i--){ if(room.discard[i] && room.discard[i].id === (removed && removed.id)){ room.discard.splice(i,1); break; } }
                 }catch(e){ console.error('restore removed card error', e); }
-                return cb && cb({ error: 'no valid target' });
+                return cb && cb({ error: 'no valid target', message: "Aucune cible valide n'a été sélectionnée." });
               }
               // apply permanent folie effect (bind to piece id so it persists when the piece moves)
               room.activeCardEffects = room.activeCardEffects || [];
@@ -1691,7 +1691,7 @@ io.on('connection', (socket) => {
               room.discard = room.discard || [];
               for(let i = room.discard.length - 1; i >= 0; i--){ if(room.discard[i] && room.discard[i].id === (removed && removed.id)){ room.discard.splice(i,1); break; } }
             }catch(e){ console.error('restore removed card error', e); }
-            return cb && cb({ error: 'no valid target' });
+            return cb && cb({ error: 'no valid target', message: "Aucune cible valide n'a été sélectionnée." });
           }
           // apply permanent fortification effect (bind to piece id so it persists when the piece moves)
           room.activeCardEffects = room.activeCardEffects || [];
@@ -1718,7 +1718,7 @@ io.on('connection', (socket) => {
               room.discard = room.discard || [];
               for(let i = room.discard.length - 1; i >= 0; i--){ if(room.discard[i] && room.discard[i].id === (removed && removed.id)){ room.discard.splice(i,1); break; } }
             }catch(e){ console.error('restore removed card error', e); }
-            return cb && cb({ error: 'no valid target' });
+            return cb && cb({ error: 'no valid target', message: "Aucune cible valide n'a été sélectionnée." });
           }
           // find the owner (player) of the targeted piece
           const targetOwner = (room.players || []).find(p => (p.color && p.color[0]) === targetPiece.color) || null;
@@ -1742,7 +1742,7 @@ io.on('connection', (socket) => {
             // validate target exists and belongs to the opponent and is a queen
             if(!board || !target || !targetPiece || targetPiece.color === playerColorShort || !targetPiece.type || targetPiece.type.toLowerCase() !== 'q'){
               // invalid target: do NOT restore the removed card (card is consumed). Return error but card remains in discard.
-              return cb && cb({ error: 'no valid target' });
+              return cb && cb({ error: 'no valid target', message: "Aucune cible valide n'a été sélectionnée." });
             }
             // perform downgrade: change piece type to pawn
             try{
@@ -1776,7 +1776,7 @@ io.on('connection', (socket) => {
                 room.discard = room.discard || [];
                 for(let i = room.discard.length - 1; i >= 0; i--){ if(room.discard[i] && room.discard[i].id === (removed && removed.id)){ room.discard.splice(i,1); break; } }
               }catch(_){ }
-              return cb && cb({ error: 'no valid source selected' });
+              return cb && cb({ error: 'no valid source selected', message: "Aucune source valide n'a été sélectionnée." });
             }
             // bind sniper effect to the piece id (one-time use)
             room.activeCardEffects = room.activeCardEffects || [];
@@ -1795,12 +1795,12 @@ io.on('connection', (socket) => {
             const targetPiece = (board && board.pieces || []).find(p => p.square === target);
             if(!board || !target || !targetPiece){
               // invalid target: do not restore card (consume) and return error
-              return cb && cb({ error: 'no valid target' });
+              return cb && cb({ error: 'no valid target', message: "Aucune cible valide n'a été sélectionnée." });
             }
             // do not allow kings to be affected
             if(targetPiece.type && targetPiece.type.toLowerCase() === 'k'){
               // consume card but report invalid
-              return cb && cb({ error: 'cannot_target_king' });
+              return cb && cb({ error: 'cannot_target_king', message: "Vous ne pouvez pas cibler un roi." });
             }
             // find owner of the targeted piece
             const targetOwner = (room.players || []).find(p => (p.color && p.color[0]) === targetPiece.color) || null;
@@ -1831,7 +1831,7 @@ io.on('connection', (socket) => {
             if(!board || !source || !target || !srcPiece || !tgtPiece || srcPiece.color !== playerColorShort || tgtPiece.color === playerColorShort){
               // invalid target(s): restore removed card to hand and abort
               try{ room.hands = room.hands || {}; room.hands[senderId] = room.hands[senderId] || []; if(removed) room.hands[senderId].push(removed); room.discard = room.discard || []; for(let i = room.discard.length - 1; i >= 0; i--){ if(room.discard[i] && room.discard[i].id === (removed && removed.id)){ room.discard.splice(i,1); break; } } }catch(e){ console.error('restore removed card error', e); }
-              return cb && cb({ error: 'no valid targets' });
+              return cb && cb({ error: 'no valid targets', message: "Aucune cible valide n'a été sélectionnée." });
             }
             // swap their squares
             try{
@@ -1875,7 +1875,7 @@ io.on('connection', (socket) => {
               room.discard = room.discard || [];
               for(let i = room.discard.length - 1; i >= 0; i--){ if(room.discard[i] && room.discard[i].id === (removed && removed.id)){ room.discard.splice(i,1); break; } }
             }catch(e){ console.error('restore removed card error', e); }
-            return cb && cb({ error: 'no valid target' });
+            return cb && cb({ error: 'no valid target', message: "Aucune cible valide n'a été sélectionnée." });
           }
           // apply a temporary teleport effect bound to the piece id for one owner turn
           room.activeCardEffects = room.activeCardEffects || [];
@@ -1898,7 +1898,7 @@ io.on('connection', (socket) => {
               room.discard = room.discard || [];
               for(let i = room.discard.length - 1; i >= 0; i--){ if(room.discard[i] && room.discard[i].id === (removed && removed.id)){ room.discard.splice(i,1); break; } }
             }catch(e){ }
-            return cb && cb({ error: 'no board to flip' });
+            return cb && cb({ error: 'no board to flip', message: "Aucun plateau à retourner." });
           }
           // swap piece colors
           // helper: square <-> coords
@@ -1997,7 +1997,7 @@ io.on('connection', (socket) => {
                 room.discard = room.discard || [];
                 for(let i = room.discard.length - 1; i >= 0; i--){ if(room.discard[i] && room.discard[i].id === (removed && removed.id)){ room.discard.splice(i,1); break; } }
               }catch(e){ console.error('restore removed card error', e); }
-              return cb && cb({ error: 'no valid target' });
+              return cb && cb({ error: 'no valid target', message: "Aucune cible valide n'a été sélectionnée." });
             }
             // compute affected squares: target + neighbors
             function neighbors(sq){
@@ -2083,7 +2083,7 @@ io.on('connection', (socket) => {
                 room.discard = room.discard || [];
                 for(let i = room.discard.length - 1; i >= 0; i--){ if(room.discard[i] && room.discard[i].id === (removed && removed.id)){ room.discard.splice(i,1); break; } }
               }catch(e){ console.error('restore removed card error', e); }
-              return cb && cb({ error: 'no valid corner piece selected' });
+              return cb && cb({ error: 'no valid corner piece selected', message: "Aucun coin valide n'a été sélectionné." });
             }
             // find available destination corners (empty)
             const emptyCorners = corners.filter(c => { return !(board.pieces || []).some(p => p.square === c); });
@@ -2098,7 +2098,7 @@ io.on('connection', (socket) => {
                 room.discard = room.discard || [];
                 for(let i = room.discard.length - 1; i >= 0; i--){ if(room.discard[i] && room.discard[i].id === (removed && removed.id)){ room.discard.splice(i,1); break; } }
               }catch(e){ console.error('restore removed card error', e); }
-              return cb && cb({ error: 'no empty destination corner available' });
+              return cb && cb({ error: 'no empty destination corner available', message: "Aucun coin de destination vide n'est disponible." });
             }
             // instead of teleporting immediately, record an effect that grants this piece the ability
             // to move to any of the available corner squares for one turn
@@ -2124,7 +2124,7 @@ io.on('connection', (socket) => {
                 room.discard = room.discard || [];
                 for(let i = room.discard.length - 1; i >= 0; i--){ if(room.discard[i] && room.discard[i].id === (removed && removed.id)){ room.discard.splice(i,1); break; } }
               }catch(_){ }
-              return cb && cb({ error: 'no pieces to shuffle' });
+              return cb && cb({ error: 'no pieces to shuffle', message: "Aucune pièce à mélanger." });
             }
             // gather pieces and compute a random set of distinct destination squares across the whole board
             const pieces = board.pieces;
@@ -2180,7 +2180,7 @@ io.on('connection', (socket) => {
                 room.discard = room.discard || [];
                 for(let i = room.discard.length - 1; i >= 0; i--){ if(room.discard[i] && room.discard[i].id === (removed && removed.id)){ room.discard.splice(i,1); break; } }
               }catch(_){ }
-              return cb && cb({ error: 'no pieces to transform' });
+              return cb && cb({ error: 'no pieces to transform', message: "Aucune pièce à transformer." });
             }
             const pieces = board.pieces;
             const transformChoices = ['N','B','R'];
@@ -2227,7 +2227,7 @@ io.on('connection', (socket) => {
                 room.discard = room.discard || [];
                 for(let i = room.discard.length - 1; i >= 0; i--){ if(room.discard[i] && room.discard[i].id === (removed && removed.id)){ room.discard.splice(i,1); break; } }
               }catch(e){ console.error('restore removed card error', e); }
-              return cb && cb({ error: 'no valid target' });
+              return cb && cb({ error: 'no valid target', message: "Aucune cible valide n'a été sélectionnée." });
             }
             // apply invisible effect bound to the piece id so only the owner can see it
             room.activeCardEffects = room.activeCardEffects || [];
@@ -2253,7 +2253,7 @@ io.on('connection', (socket) => {
               if(!board || !targetPlayer || targetPlayer.id === senderId){
                 // restore removed card to hand and abort
                 try{ room.hands = room.hands || {}; room.hands[senderId] = room.hands[senderId] || []; if(removed) room.hands[senderId].push(removed); room.discard = room.discard || []; for(let i = room.discard.length-1;i>=0;i--){ if(room.discard[i] && room.discard[i].id === (removed && removed.id)){ room.discard.splice(i,1); break; } } }catch(e){}
-                return cb && cb({ error: 'no valid target player' });
+                return cb && cb({ error: 'no valid target player', message: "Aucun joueur cible valide n'a été sélectionné." });
               }
               // compute list of all squares (each square veiled individually)
               const width = board.width || 8;
@@ -2505,7 +2505,7 @@ io.on('connection', (socket) => {
               // try to remove the removed card instance from discard (last occurrence)
               for(let i = room.discard.length - 1; i >= 0; i--){ if(room.discard[i] && room.discard[i].id === (removed && removed.id)){ room.discard.splice(i,1); break; } }
             }catch(e){ console.error('restore removed card error', e); }
-            return cb && cb({ error: 'no valid target' });
+            return cb && cb({ error: 'no valid target', message: "Aucune cible valide n'a été sélectionnée." });
           }
           // apply the rebond effect (also record pieceId so it can be identified after moves)
           room.activeCardEffects = room.activeCardEffects || [];

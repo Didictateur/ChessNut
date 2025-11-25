@@ -409,7 +409,7 @@
       });
 
       socket.emit('room:join', { roomId, playerId }, (resp)=>{
-        if(resp && resp.error){ log('join error', resp); alert(resp.error); return; }
+  if(resp && resp.error){ log('join error', resp); alert(resp.message || resp.error); return; }
         log('Rejoint room', resp);
         // remember assigned id/color from server
         if(resp.playerId){
@@ -698,7 +698,7 @@
             if(!occ || occ.color === myShort){ log('select an enemy piece (second)'); return; }
             // emit swap payload: sourceSquare + targetSquare
             socket.emit('card:play', { roomId, playerId: myPlayerId, cardId: pendingCard.cardId, payload: { sourceSquare: pendingCard.firstTarget, targetSquare: square } }, (resp)=>{
-              if(resp && resp.error){ log('card:play error', resp); alert(resp.error); }
+              if(resp && resp.error){ log('card:play error', resp); alert(resp.message || resp.error); }
               else { log('inversion played', resp); }
             });
             // cleanup visuals
@@ -710,7 +710,7 @@
             if(occupied){ log('square not empty for mine placement'); return; }
             // send mine placement
             socket.emit('card:play', { roomId, playerId: myPlayerId, cardId: pendingCard.cardId, payload: { targetSquare: square } }, (resp)=>{
-              if(resp && resp.error){ log('card:play error', resp); alert(resp.error); }
+              if(resp && resp.error){ log('card:play error', resp); alert(resp.message || resp.error); }
               else { log('card played with target', resp); }
             });
             pendingCard = null; clearTargetHighlights(); return;
@@ -719,7 +719,7 @@
             if(!piece || piece.color !== myShort){ log('select one of your pieces'); return; }
             if(piece.type && piece.type.toLowerCase() === 'k'){ log('cannot select king'); return; }
             socket.emit('card:play', { roomId, playerId: myPlayerId, cardId: pendingCard.cardId, payload: { targetSquare: square } }, (resp)=>{
-              if(resp && resp.error){ log('card:play error', resp); alert(resp.error); }
+              if(resp && resp.error){ log('card:play error', resp); alert(resp.message || resp.error); }
               else { log('card played with target', resp); }
             });
             pendingCard = null; clearTargetHighlights(); return;
@@ -736,7 +736,7 @@
                 pendingCard = null; clearTargetHighlights(); return;
               }
               socket.emit('card:play', { roomId, playerId: myPlayerId, cardId: pendingCard.cardId, payload: { targetSquare: square, promotion: promotionChoice } }, (resp)=>{
-                if(resp && resp.error){ log('card:play error', resp); alert(resp.error); }
+                if(resp && resp.error){ log('card:play error', resp); alert(resp.message || resp.error); }
                 else { log('card played with promotion', resp); }
               });
               pendingCard = null; clearTargetHighlights();
@@ -747,7 +747,7 @@
             if(!occ || occ.color === myShort){ log('select an enemy piece'); return; }
             if(occ.type && occ.type.toLowerCase() === 'k'){ log('cannot select king'); return; }
             socket.emit('card:play', { roomId, playerId: myPlayerId, cardId: pendingCard.cardId, payload: { targetSquare: square } }, (resp)=>{
-              if(resp && resp.error){ log('card:play error', resp); alert(resp.error); }
+              if(resp && resp.error){ log('card:play error', resp); alert(resp.message || resp.error); }
               else { log('card played with target', resp);
                 // after server applied the card effect, request legal moves for the selected piece so the client
                 // will receive the updated legal moves (including teleport to empty squares)
@@ -761,7 +761,7 @@
             const occ = currentBoardState && Array.isArray(currentBoardState.pieces) && currentBoardState.pieces.find(p => p.square === square);
             if(!occ || occ.color === myShort || !occ.type || occ.type.toLowerCase() !== 'q'){ log('select an enemy queen'); return; }
             socket.emit('card:play', { roomId, playerId: myPlayerId, cardId: pendingCard.cardId, payload: { targetSquare: square } }, (resp)=>{
-              if(resp && resp.error){ log('card:play error', resp); alert(resp.error); }
+              if(resp && resp.error){ log('card:play error', resp); alert(resp.message || resp.error); }
               else { log('card played with target', resp);
                 try{ setSelection(square); }catch(_){ }
               }
@@ -795,7 +795,7 @@
           const myShort = (myColor && myColor[0]) || '';
           if(!currentBoardState || currentBoardState.turn !== myShort){ log('not your turn'); return; }
           socket.emit('game:move', { roomId, from, to }, (resp)=>{
-            if(resp && resp.error){ log('move error', resp); alert(resp.error); }
+            if(resp && resp.error){ log('move error', resp); alert(resp.message || resp.error); }
             else { log('move sent', resp); }
           });
           return;
@@ -1136,7 +1136,7 @@
               if(opponents.length === 1){
                 const targetPlayerId = opponents[0];
                 socket.emit('card:play', { roomId, playerId: myPlayerId, cardId: cid, payload: { targetPlayerId } }, (resp)=>{
-                  if(resp && resp.error){ log('card:play error', resp); alert(resp.error); }
+                  if(resp && resp.error){ log('card:play error', resp); alert(resp.message || resp.error); }
                   else { log('card played (steal card)', resp); }
                 });
                 return;
@@ -1145,7 +1145,7 @@
               showStealModal(handCounts, (targetPlayerId)=>{
                 if(!targetPlayerId) return; // canceled
                 socket.emit('card:play', { roomId, playerId: myPlayerId, cardId: cid, payload: { targetPlayerId } }, (resp)=>{
-                  if(resp && resp.error){ log('card:play error', resp); alert(resp.error); }
+                  if(resp && resp.error){ log('card:play error', resp); alert(resp.message || resp.error); }
                   else { log('card played (steal card)', resp); }
                 });
               });
@@ -1160,7 +1160,7 @@
           // immediate-play card (no target required)
           const payload = {};
           socket.emit('card:play', { roomId, playerId: myPlayerId, cardId: cid, payload }, (resp)=>{
-            if(resp && resp.error){ log('card:play error', resp); alert(resp.error); }
+            if(resp && resp.error){ log('card:play error', resp); alert(resp.message || resp.error); }
             else { log('card played', resp); }
           });
         }
@@ -1184,7 +1184,7 @@
           if(!socket) return;
           drawBtn.disabled = true;
           socket.emit('player:draw', { roomId }, (resp)=>{
-            if(resp && resp.error){ log('player:draw error', resp); alert(resp.error); drawBtn.disabled = false; return; }
+            if(resp && resp.error){ log('player:draw error', resp); alert(resp.message || resp.error); drawBtn.disabled = false; return; }
             log('player:draw ok', resp);
             // server will send room:update which will hide/disable the button as needed
           });

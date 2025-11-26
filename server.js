@@ -52,7 +52,7 @@ function sendRoomUpdate(room){
       handsOwn: (room.hands && room.hands[p.id]) ? room.hands[p.id] : [],
       handCounts
     });
-    // Create a per-recipient boardState view that only hides pieces targeted by an 'invisible' effect
+  // Create a per-recipient boardState view that only hides pieces targeted by an 'invisible' effect
     try{
       if(base.boardState && base.boardState.pieces && Array.isArray(base.boardState.pieces)){
         const filtered = Object.assign({}, base.boardState);
@@ -73,6 +73,16 @@ function sendRoomUpdate(room){
           }catch(_){ return true; }
         });
         payload.boardState = filtered;
+        // If a 'tous_memes' effect is active for another player, mask pieces as kings for this recipient
+        try{
+          const effects = room.activeCardEffects || [];
+          const tous = effects.find(e => e && e.type === 'tous_memes' && e.playerId && e.playerId !== p.id);
+          if(tous && payload.boardState && Array.isArray(payload.boardState.pieces)){
+            const masked = JSON.parse(JSON.stringify(payload.boardState));
+            masked.pieces = masked.pieces.map(pc => { const c = Object.assign({}, pc); c.type = 'K'; return c; });
+            payload.boardState = masked;
+          }
+        }catch(_){ }
       } else {
         payload.boardState = base.boardState || null;
       }
@@ -290,11 +300,11 @@ function buildDefaultDeck(){
     ['la parrure','Une reine est dégradée en pion'],
     // ['tricherie','Choisis une carte de la pioche parmis trois'],
     ['tout ou rien','Une pièce choisie ne peut maintenant se déplacer que si elle capture.'],
-    // ['tous les mêmes','Au yeux de l ennemie, toutes les pièces se ressemblent pendant 2 tours.'],
+    ['tous les mêmes','Au yeux de l ennemie, toutes les pièces se ressemblent pendant 2 tours.'],
     // ['petit pion','Le joueur choisit un pion. À partir du prochain tour, il est promu en reine dès qu il capture un pièce non pion.'],
     ['révolution','Tous les pions sont aléatoirement changés en Cavalier, Fou ou Tour et les Cavaliers, Fous et Tours sont changés en pions.'],
     ["doppelganger","Choisis une pièce. À partir de maintenant, devient chacune des pièces qu'elle capture."],
-    // ['kurby','Choisis une pièce. À sa prochaine capture, récupère les mouvements de la pièce capturée.'],
+    // ['kurby','Choisis une pièce. À sa prochaine capture, récupère tous les mouvements de la pièce capturée.'],
     // ["cachotier", "La prochaine carte jouée ne sera pas révélée à l'adversaire."],
   ];
   function cap(s){ if(!s) return s; s = String(s).trim(); return s.charAt(0).toUpperCase() + s.slice(1); }
@@ -306,8 +316,8 @@ function buildDefaultDeck(){
     const cardId = ascii.replace(/[^a-z0-9]+/gi,'_').toLowerCase();
     // Use deterministic id equal to the slug so clients and server agree on identifiers across requests
     const id = cardId;
-    // mark some cards as hidden so their play isn't revealed publicly (mines, totems, immunities)
-    const hidden = /mine|totem|immun/i.test(cardId);
+  // mark some cards as hidden so their play isn't revealed publicly (mines, totems, immunities)
+  const hidden = /mine|totem|invisible|immun|carte_sans_effet/i.test(cardId);
     return { id, cardId, title: cap(normalized), description: desc, hidden: !!hidden };
   });
 }
@@ -1343,7 +1353,22 @@ io.on('connection', (socket) => {
     // compute legal moves for the selected square (allow capturing king)
     let moves = [];
     try{
-      if(square) moves = computeLegalMoves(room, square) || [];
+      if(square){
+        // if the selecting player is affected by a 'tous_memes' effect (i.e. another player applied it),
+        // compute moves on a temporary board where all pieces are kings so the selector sees king-like behavior
+        const effects = room.activeCardEffects || [];
+        const isAffectedByTous = effects.some(e => e && e.type === 'tous_memes' && e.playerId && e.playerId !== playerId);
+        if(isAffectedByTous){
+          const tempRoom = Object.assign({}, room);
+          tempRoom.boardState = JSON.parse(JSON.stringify(room.boardState || {}));
+          if(Array.isArray(tempRoom.boardState.pieces)){
+            tempRoom.boardState.pieces = tempRoom.boardState.pieces.map(pc => { const c = Object.assign({}, pc); c.type = 'K'; return c; });
+          }
+          moves = computeLegalMoves(tempRoom, square) || [];
+        } else {
+          moves = computeLegalMoves(room, square) || [];
+        }
+      }
     }catch(e){
       console.error('computeLegalMoves error', e);
       moves = [];
@@ -2367,6 +2392,16 @@ io.on('connection', (socket) => {
             try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect }); }catch(_){ }
             played.payload = Object.assign({}, payload, { applied: 'double_move', moves: effect.remainingMoves });
           }catch(e){ console.error('double_move effect error', e); }
+        }
+        // 'tous les mêmes' : make all pieces appear as kings to the opponent for N opponent turns
+        else if((typeof cardId === 'string' && cardId.indexOf('tous') !== -1 && cardId.indexOf('meme') !== -1)){
+          try{
+            room.activeCardEffects = room.activeCardEffects || [];
+            const effect = { id: played.id, type: 'tous_memes', playerId: senderId, ts: Date.now(), remainingTurns: (payload && payload.turns) || 2, decrementOn: 'opponent' };
+            room.activeCardEffects.push(effect);
+            try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect }); }catch(_){ }
+            played.payload = Object.assign({}, payload, { applied: 'tous_memes', appliedToPlayer: senderId });
+          }catch(e){ console.error('tous_memes effect error', e); }
         }
   // vol de pièce: transfer ownership of a targeted enemy piece to the playing player
   // Note: do NOT handle "vole ... carte" here (steal-a-card) — that is handled by a separate branch below.

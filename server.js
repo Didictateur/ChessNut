@@ -317,7 +317,7 @@ function buildDefaultDeck(){
     // ['vacances','Choisie une pièce qui sort du plateau pendant deux tours. Ce après quoi elle tente de revenir: si la case est occupée, alors la pièce vacancière est capturée par la pièce occupant la case.'],
 
   // a reflechir
-    ['empathie','On retourne le plateau'],
+    ['empathie','On retourne le plateau'], // pendant X tours ?
     // ['effet domino', "La pièce désigner peut rejouer tant qu'elle capture"]
     // ['reversi','Si deux pions encadrent parfaitement une pièce adverse, cette dernière change de camp'],
     // ['plus on est de fous','Si le joueur possède deux fous dans la même diagonale, alors toutes les pièces adverses encadrées par ces deux fous sont capturés'],
@@ -1958,8 +1958,8 @@ io.on('connection', (socket) => {
           try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect }); }catch(_){ }
         }catch(e){ console.error('teleport effect error', e); }
         }
-      // changement de camp / flip sides: swap the camps so each player controls the other's pieces
-      else if((typeof cardId === 'string' && (cardId.indexOf('changement') !== -1 || cardId.indexOf('changer') !== -1 || cardId.indexOf('change') !== -1 || cardId.indexOf('camp') !== -1)) || cardId === 'changement_de_camp'){
+  // empathie / changement de camp (alias 'empathie'): flip the board so players control the other's pieces
+  else if((typeof cardId === 'string' && (cardId.indexOf('changement') !== -1 || cardId.indexOf('changer') !== -1 || cardId.indexOf('change') !== -1 || cardId.indexOf('camp') !== -1 || cardId.indexOf('empath') !== -1)) || cardId === 'changement_de_camp' || cardId === 'empathie'){
         try{
           const board = room.boardState;
           if(!board || !Array.isArray(board.pieces)){
@@ -2008,13 +2008,13 @@ io.on('connection', (socket) => {
           if(board.turn) board.turn = (board.turn === 'w' ? 'b' : (board.turn === 'b' ? 'w' : board.turn));
           // bump board version
           board.version = (board.version || 0) + 1;
-          // emit an effect to notify clients
-          const effect = { id: played.id, type: 'changement_de_camp', playerId: senderId, ts: Date.now() };
+          // emit an effect to notify clients (type 'empathie' to match renamed card)
+          const effect = { id: played.id, type: 'empathie', playerId: senderId, ts: Date.now() };
           room.activeCardEffects = room.activeCardEffects || [];
           room.activeCardEffects.push(effect);
-          played.payload = Object.assign({}, payload, { applied: 'changement_de_camp' });
+          played.payload = Object.assign({}, payload, { applied: 'empathie' });
           try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect }); }catch(_){ }
-        }catch(e){ console.error('changement de camp error', e); }
+        }catch(e){ console.error('empathie / changement de camp error', e); }
       }
         // promotion: promote one of your pawns to a queen
         else if(cardId === 'promotion' || cardId === 'promote' || (typeof cardId === 'string' && (cardId.indexOf('promotion') !== -1 || cardId.indexOf('promot') !== -1 || cardId.indexOf('promouvoir') !== -1))){

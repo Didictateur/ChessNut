@@ -378,6 +378,8 @@
                   if(cid === 'adoubement' || titleRaw.indexOf('adoub') !== -1) imgSrc = '/assets/img/cards/adoubement.png';
                   if(cid === 'folie' || titleRaw.indexOf('folie') !== -1 || titleRaw.indexOf('fou') !== -1) imgSrc = '/assets/img/cards/folie.png';
                   if(cid === 'fortification' || titleRaw.indexOf('fortification') !== -1 || titleRaw.indexOf('fortif') !== -1) imgSrc = '/assets/img/cards/fortification.png';
+                  if(cid === 'rebond' || titleRaw.indexOf('rebond') !== -1) imgSrc = '/assets/img/cards/rebond.png';
+                  if(cid === 'anneau' || titleRaw.indexOf('anneau') !== -1) imgSrc = '/assets/img/cards/anneau.png';
                   if(imgSrc){ const img = document.createElement('img'); img.src = imgSrc; img.alt = c.title || cid || 'card'; img.className = 'card-art-img'; img.style.width='100%'; img.style.height='100%'; img.style.objectFit='cover'; art.appendChild(img); }
                 }catch(e){}
                 top.appendChild(art);

@@ -306,6 +306,7 @@ function buildDefaultDeck(){
     ["doppelganger","Choisis une pièce. À partir de maintenant, devient chacune des pièces qu'elle capture."],
     // ['kurby','Choisis une pièce. À sa prochaine capture, récupère tous les mouvements de la pièce capturée.'],
     // ["cachotier", "La prochaine carte jouée ne sera pas révélée à l'adversaire."],
+    // ["intrication quantique","Deux pièces sont intriquées. Quand l'une bouge, l'autre bouge de la même manière."],
   ];
   function cap(s){ if(!s) return s; s = String(s).trim(); return s.charAt(0).toUpperCase() + s.slice(1); }
   return cards.map(([title,desc])=>{

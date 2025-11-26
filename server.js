@@ -141,7 +141,12 @@ function maybeDrawAtTurnStart(room, playerId){
   try{
     if(!room) return;
     if(room.autoDraw){
-      drawCardForPlayer(room, playerId);
+      const drawn = drawCardForPlayer(room, playerId);
+      // if nothing was drawn (deck empty, hand full, or noRemise), still push a room update
+      // so clients get the freshest state and don't remain out-of-sync.
+      if(!drawn){
+        try{ sendRoomUpdate(room); }catch(_){ }
+      }
     } else {
       // ensure clients get the updated room state even if no draw happens
       sendRoomUpdate(room);
@@ -1314,6 +1319,17 @@ io.on('connection', (socket) => {
       sendRoomUpdate(room);
       return cb && cb({ ok: true, deckCount: room.deck.length });
     }catch(err){ console.error('room:deck:set error', err); return cb && cb({ error: 'server_error' }); }
+  });
+
+  // Client-requested refresh: allow client to ask server to resend the personalized room:update
+  socket.on('room:refresh', ({ roomId }, cb) => {
+    try{
+      const room = rooms.get(roomId);
+      if(!room) return cb && cb({ error: 'room not found' });
+      // only send personalized updates (sendRoomUpdate handles per-client privacy)
+      sendRoomUpdate(room);
+      return cb && cb({ ok: true });
+    }catch(e){ console.error('room:refresh error', e); return cb && cb({ error: 'server_error' }); }
   });
 
   socket.on('disconnect', () => {

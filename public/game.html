@@ -147,6 +147,27 @@
       }catch(_){ }
     }
 
+    // Robust card:play emitter with refresh fallback.
+    // Sometimes the client or network misses the room:update after playing a card —
+    // this helper emits card:play and requests a room refresh if no ack/update is received.
+    function emitCardPlay(payload, cb){
+      try{
+        if(!socket) return cb && cb({ error: 'no_socket' });
+        let acked = false;
+        const timer = setTimeout(()=>{
+          if(!acked){
+            try{ socket.emit('room:refresh', { roomId }, ()=>{}); }catch(_){ }
+          }
+        }, 1500);
+        socket.emit('card:play', payload, (resp)=>{
+          acked = true; try{ clearTimeout(timer); }catch(_){ }
+          // ask server to push a fresh room:update to ensure UIs are in sync
+          try{ socket.emit('room:refresh', { roomId }, ()=>{}); }catch(_){ }
+          if(cb) cb(resp);
+        });
+      }catch(e){ if(cb) cb({ error: 'emit_failed' }); }
+    }
+
     // play a short shuffle animation (shake + fade) when pieces are mixed
     function playShuffleAnimation(){
       if(!boardEl) return;
@@ -749,7 +770,7 @@
             const occ = currentBoardState && Array.isArray(currentBoardState.pieces) && currentBoardState.pieces.find(p => p.square === square);
             if(!occ || occ.color === myShort){ log('select an enemy piece (second)'); return; }
             // emit swap payload: sourceSquare + targetSquare
-            socket.emit('card:play', { roomId, playerId: myPlayerId, cardId: pendingCard.cardId, payload: { sourceSquare: pendingCard.firstTarget, targetSquare: square } }, (resp)=>{
+            emitCardPlay({ roomId, playerId: myPlayerId, cardId: pendingCard.cardId, payload: { sourceSquare: pendingCard.firstTarget, targetSquare: square } }, (resp)=>{
               if(resp && resp.error){ log('card:play error', resp); showToast(resp.message || resp.error, { background: 'rgba(200,60,60,0.95)' }); }
               else { log('inversion played', resp); }
             });
@@ -761,7 +782,7 @@
             const occupied = currentBoardState && Array.isArray(currentBoardState.pieces) && currentBoardState.pieces.find(p => p.square === square);
             if(occupied){ log('square not empty for mine placement'); return; }
             // send mine placement
-            socket.emit('card:play', { roomId, playerId: myPlayerId, cardId: pendingCard.cardId, payload: { targetSquare: square } }, (resp)=>{
+            emitCardPlay({ roomId, playerId: myPlayerId, cardId: pendingCard.cardId, payload: { targetSquare: square } }, (resp)=>{
               if(resp && resp.error){ log('card:play error', resp); showToast(resp.message || resp.error, { background: 'rgba(200,60,60,0.95)' }); }
               else { log('card played with target', resp); }
             });
@@ -770,10 +791,10 @@
             const piece = currentBoardState && Array.isArray(currentBoardState.pieces) && currentBoardState.pieces.find(p => p.square === square);
             if(!piece || piece.color !== myShort){ log('select one of your pieces'); return; }
             if(piece.type && piece.type.toLowerCase() === 'k'){ log('cannot select king'); return; }
-            socket.emit('card:play', { roomId, playerId: myPlayerId, cardId: pendingCard.cardId, payload: { targetSquare: square } }, (resp)=>{
-              if(resp && resp.error){ log('card:play error', resp); showToast(resp.message || resp.error, { background: 'rgba(200,60,60,0.95)' }); }
-              else { log('card played with target', resp); }
-            });
+      emitCardPlay({ roomId, playerId: myPlayerId, cardId: pendingCard.cardId, payload: { targetSquare: square } }, (resp)=>{
+        if(resp && resp.error){ log('card:play error', resp); showToast(resp.message || resp.error, { background: 'rgba(200,60,60,0.95)' }); }
+        else { log('card played with target', resp); }
+      });
             pendingCard = null; clearTargetHighlights(); return;
           } else if(req === 'owned_pawn'){
             // must be one of your pawns — show promotion choice modal before sending
@@ -787,7 +808,7 @@
                 // canceled
                 pendingCard = null; clearTargetHighlights(); return;
               }
-              socket.emit('card:play', { roomId, playerId: myPlayerId, cardId: pendingCard.cardId, payload: { targetSquare: square, promotion: promotionChoice } }, (resp)=>{
+              emitCardPlay({ roomId, playerId: myPlayerId, cardId: pendingCard.cardId, payload: { targetSquare: square, promotion: promotionChoice } }, (resp)=>{
                 if(resp && resp.error){ log('card:play error', resp); showToast(resp.message || resp.error, { background: 'rgba(200,60,60,0.95)' }); }
                 else { log('card played with promotion', resp); }
               });
@@ -798,7 +819,7 @@
             const occ = currentBoardState && Array.isArray(currentBoardState.pieces) && currentBoardState.pieces.find(p => p.square === square);
             if(!occ || occ.color === myShort){ log('select an enemy piece'); return; }
             if(occ.type && occ.type.toLowerCase() === 'k'){ log('cannot select king'); return; }
-            socket.emit('card:play', { roomId, playerId: myPlayerId, cardId: pendingCard.cardId, payload: { targetSquare: square } }, (resp)=>{
+            emitCardPlay({ roomId, playerId: myPlayerId, cardId: pendingCard.cardId, payload: { targetSquare: square } }, (resp)=>{
               if(resp && resp.error){ log('card:play error', resp); showToast(resp.message || resp.error, { background: 'rgba(200,60,60,0.95)' }); }
               else { log('card played with target', resp);
                 // after server applied the card effect, request legal moves for the selected piece so the client
@@ -812,7 +833,7 @@
           else if(req === 'enemy_queen'){
             const occ = currentBoardState && Array.isArray(currentBoardState.pieces) && currentBoardState.pieces.find(p => p.square === square);
             if(!occ || occ.color === myShort || !occ.type || occ.type.toLowerCase() !== 'q'){ log('select an enemy queen'); return; }
-            socket.emit('card:play', { roomId, playerId: myPlayerId, cardId: pendingCard.cardId, payload: { targetSquare: square } }, (resp)=>{
+            emitCardPlay({ roomId, playerId: myPlayerId, cardId: pendingCard.cardId, payload: { targetSquare: square } }, (resp)=>{
               if(resp && resp.error){ log('card:play error', resp); showToast(resp.message || resp.error, { background: 'rgba(200,60,60,0.95)' }); }
               else { log('card played with target', resp);
                 try{ setSelection(square); }catch(_){ }
@@ -824,7 +845,7 @@
             const occ = currentBoardState && Array.isArray(currentBoardState.pieces) && currentBoardState.pieces.find(p => p.square === square);
             if(!occ){ log('select a piece'); return; }
             if(occ.type && occ.type.toLowerCase() === 'k'){ log('cannot select king'); return; }
-            socket.emit('card:play', { roomId, playerId: myPlayerId, cardId: pendingCard.cardId, payload: { targetSquare: square } }, (resp)=>{
+            emitCardPlay({ roomId, playerId: myPlayerId, cardId: pendingCard.cardId, payload: { targetSquare: square } }, (resp)=>{
               if(resp && resp.error){ log('card:play error', resp); showToast(resp.message || resp.error, { background: 'rgba(200,60,60,0.95)' }); }
               else { log('card played with target', resp); }
             });
@@ -1189,16 +1210,16 @@
               const opponents = Object.keys(handCounts || {}).filter(pid => pid !== myPlayerId);
               if(opponents.length === 1){
                 const targetPlayerId = opponents[0];
-                socket.emit('card:play', { roomId, playerId: myPlayerId, cardId: cid, payload: { targetPlayerId } }, (resp)=>{
+                emitCardPlay({ roomId, playerId: myPlayerId, cardId: cid, payload: { targetPlayerId } }, (resp)=>{
                       if(resp && resp.error){ log('card:play error', resp); showToast(resp.message || resp.error, { background: 'rgba(200,60,60,0.95)' }); }
                       else { log('card played (steal card)', resp); }
                     });
                 return;
               }
               // show modal to pick which player to steal from
-              showStealModal(handCounts, (targetPlayerId)=>{
+                showStealModal(handCounts, (targetPlayerId)=>{
                 if(!targetPlayerId) return; // canceled
-                socket.emit('card:play', { roomId, playerId: myPlayerId, cardId: cid, payload: { targetPlayerId } }, (resp)=>{
+                emitCardPlay({ roomId, playerId: myPlayerId, cardId: cid, payload: { targetPlayerId } }, (resp)=>{
                   if(resp && resp.error){ log('card:play error', resp); showToast(resp.message || resp.error, { background: 'rgba(200,60,60,0.95)' }); }
                   else { log('card played (steal card)', resp); }
                 });
@@ -1213,7 +1234,7 @@
           }
           // immediate-play card (no target required)
           const payload = {};
-            socket.emit('card:play', { roomId, playerId: myPlayerId, cardId: cid, payload }, (resp)=>{
+            emitCardPlay({ roomId, playerId: myPlayerId, cardId: cid, payload }, (resp)=>{
             if(resp && resp.error){ log('card:play error', resp); showToast(resp.message || resp.error, { background: 'rgba(200,60,60,0.95)' }); }
             else { log('card played', resp); }
           });

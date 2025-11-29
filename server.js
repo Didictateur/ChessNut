@@ -257,36 +257,144 @@ function checkAndHandleVictory(room){
   }catch(e){ console.error('checkAndHandleVictory error', e); return null; }
 }
 
-// Build a default deck from README list. Each card has a unique id, cardId (slug), title and description.
+// Each card has a unique id, cardId (slug), title and description.
 function buildDefaultDeck(){
   const cards = [
-    ['rebondir sur les bords','Les déplacements en diagonales de la pièce sélectionnée peuvent rebondir une fois sur les bords'],
-    ['adoubement','La pièce sélectionnée peut maintenant faire les déplacements du cavalier en plus'],
-    ['folie','La pièce sélectionnée peut maintenant faire les déplacements du fou en plus'],
-    ['fortification','La pièce sélectionnée peut maintenant faire les déplacements de la tour en plus'],
-    ["l'anneau","Le plateau devient un anneau pendant un tour"],
-    ['brouillard de guerre','Les joueur ne peuvent voir que au alentour de leurs pièces pendant 4 tours'],
-    ['jouer deux fois','Le joueur peut déplacer deux pièces'],
-    ["totem d'immunité","Annule l'effet de la prochaine carte jouée par l'adversaire"],
-    ['placement de mines','Le joueur place une mine sur une case vide sans la révéler au joueur adverse. Une pièce qui se pose dessus explose et est capturée par le joueur ayant placé la mine'],
-    ['vole d une pièce','Désigne une pièce non roi qui change de camp.\n\nCompte comme un mouvement'],
-    ['promotion','Un pion au choix est promu'],
-    ['vole d une carte','Vole une carte aléatoirement au joueur adverse'],
-    ['resurection','Ressucite la dernière pièce perdue'],
-    ['carte sans effet',"N'a aucun effet"],
-    ['kamikaz','Détruit une de ses pièces, détruisant toutes les pièces adjacentes.\n\nCompte comme un mouvement'],
-    ['invisible',"Une des pièces devient invisible pour l'adversaire"],
-    ["coin coin","Possibilité de se téléporter depuis un coin vers n'importe quel autre coin"],
-    ['téléportation',"Téléporte n'importe quelle pièce de son camp sur une case vide"],
-    ["toucher c'est jouer","Toucher une pièce adverse qu'il sera obligé de jouer"],
-    ['sniper','Capturer une pièce sans avoir à bouger la pièce capturante'],
-    ['inversion',"Échange la position d'une pièce avec une pièce adverse.\n\nCompte comme un mouvement"],
-    ['mélange','La position de toutes les pièces sont échangées aléatoirement'],
-    ['la parrure','Une reine est dégradée en pion'],
-    ['tout ou rien','Une pièce choisie ne peut maintenant se déplacer que si elle capture.'],
-    ['tous les mêmes','Au yeux de l ennemie, toutes les pièces se ressemblent pendant 2 tours.'],
-    ['révolution','Tous les pions sont aléatoirement changés en Cavalier, Fou ou Tour et les Cavaliers, Fous et Tours sont changés en pions.'],
-    ["doppelganger","Choisis une pièce. À partir de maintenant, devient chacune des pièces qu'elle capture."],
+    [
+      'rebondir sur les bords',
+      'Les déplacements en diagonales de la pièce sélectionnée peuvent rebondir une fois sur les bords',
+      'rebond'
+    ],
+    [
+      'adoubement',
+      'La pièce sélectionnée peut maintenant faire les déplacements du cavalier en plus',
+      'adoubement'
+    ],
+    [
+      'folie',
+      'La pièce sélectionnée peut maintenant faire les déplacements du fou en plus',
+      'folie'
+    ],
+    [
+      'fortification',
+      'La pièce sélectionnée peut maintenant faire les déplacements de la tour en plus',
+      'fortification'
+    ],
+    [
+      "l'anneau",
+      "Le plateau devient un anneau pendant un tour",
+      "anneau"
+    ],
+    [
+      'brouillard de guerre',
+      'Les joueur ne peuvent voir que au alentour de leurs pièces pendant 4 tours',
+      'brouillard'
+    ],
+    [
+      'jouer deux fois',
+      'Le joueur peut déplacer deux pièces',
+      'double'
+    ],
+    [
+      "totem d'immunité",
+      "Annule l'effet de la prochaine carte jouée par l'adversaire",
+      "totem"
+    ],
+    [
+      'placement de mines',
+      'Le joueur place une mine sur une case vide sans la révéler au joueur adverse. Une pièce qui se pose dessus explose et est capturée par le joueur ayant placé la mine',
+      'mine'
+    ],
+    [
+      "vole d'une pièce",
+      'Désigne une pièce non roi qui change de camp.\n\nCompte comme un mouvement',
+      'vole_piece'
+    ],
+    [
+      'promotion',
+      'Un pion au choix est promu',
+      'promotion'
+    ],
+    [
+      "vole d'une carte",
+      'Vole une carte aléatoirement au joueur adverse',
+      'vole_carte'
+    ],
+    [
+      'resurection',
+      'Ressucite la dernière pièce perdue',
+      'resurection'
+    ],
+    [
+      'carte sans effet',
+      "N'a aucun effet",
+      'sans_effet'
+    ],
+    [
+      'kamikaze',
+      'Détruit une de ses pièces, détruisant toutes les pièces adjacentes.\n\nCompte comme un mouvement',
+      'kamikaze'
+    ],
+    [
+      'invisible',
+      "Une des pièces devient invisible pour l'adversaire",
+      'invisible'
+    ],
+    [
+      "coin coin",
+      "Possibilité de se téléporter depuis un coin vers n'importe quel autre coin",
+      'coincoin'
+    ],
+    [
+      'téléportation',
+      "Téléporte n'importe quelle pièce de son camp sur une case vide",
+      'teleportation'
+    ],
+    [
+      "toucher c'est jouer",
+      "Toucher une pièce adverse qu'il sera obligé de jouer",
+      'toucher'
+    ],
+    [
+      'sniper',
+      'Capturer une pièce sans avoir à bouger la pièce capturante',
+      'sniper'
+    ],
+    [
+      'inversion',
+      "Échange la position d'une pièce avec une pièce adverse.\n\nCompte comme un mouvement",
+      'inversion'
+    ],
+    [
+      'mélange',
+      'La position de toutes les pièces sont échangées aléatoirement',
+      'melange'
+    ],
+    [
+      'la parrure',
+      'Une reine est dégradée en pion',
+      'parrure'
+    ],
+    [
+      'tout ou rien',
+      'Une pièce choisie ne peut maintenant se déplacer que si elle capture.',
+      'tout'
+    ],
+    [
+      'tous les mêmes',
+      'Au yeux de l ennemie, toutes les pièces se ressemblent pendant 2 tours.',
+      'pareil'
+    ],
+    [
+      'révolution',
+      'Tous les pions sont aléatoirement changés en Cavalier, Fou ou Tour et les Cavaliers, Fous et Tours sont changés en pions.',
+      'revolution'
+    ],
+    [
+      "doppelganger",
+      "Choisis une pièce. À partir de maintenant, devient chacune des pièces qu'elle capture.",
+      'doppelganger'
+    ],
 
   // facile et intéresssant
     // ["intrication quantique","Deux pièces sont intriquées. Quand l'une bouge, l'autre bouge de la même manière."],
@@ -322,7 +430,11 @@ function buildDefaultDeck(){
     // ['vacances','Choisie une pièce qui sort du plateau pendant deux tours. Ce après quoi elle tente de revenir: si la case est occupée, alors la pièce vacancière est capturée par la pièce occupant la case.'],
 
   // a reflechir
-    ['empathie','On retourne le plateau'], // pendant X tours ?
+    [
+      'empathie',
+      'On retourne le plateau',
+      'empathie'
+    ], // pendant X tours ?
     // ['effet domino', "La pièce désigner peut rejouer tant qu'elle capture"]
     // ['reversi','Si deux pions encadrent parfaitement une pièce adverse, cette dernière change de camp'],
     // ['plus on est de fous','Si le joueur possède deux fous dans la même diagonale, alors toutes les pièces adverses encadrées par ces deux fous sont capturés'],
@@ -331,60 +443,44 @@ function buildDefaultDeck(){
     // ['agrandir le plateau','Rajoute une rangée dans toutes les directions'],
   ];
   function cap(s){ if(!s) return s; s = String(s).trim(); return s.charAt(0).toUpperCase() + s.slice(1); }
-  return cards.map(([title,desc])=>{
-    const normalized = (title||'').toString().trim();
-    // generate an ASCII-friendly slug by removing diacritics before replacing non-alphanumerics
-    let ascii = normalized;
-    try{ ascii = ascii.normalize('NFD').replace(/\p{Diacritic}/gu, ''); }catch(e){ /* ignore if normalize unsupported */ }
-    const cardId = ascii.replace(/[^a-z0-9]+/gi,'_').toLowerCase();
-    // Use deterministic id equal to the slug so clients and server agree on identifiers across requests
-    const id = cardId;
-  // mark some cards as hidden so their play isn't revealed publicly (mines, totems, immunities)
-  const hidden = /mine|totem|invisible|immun|carte_sans_effet/i.test(cardId);
-    return { id, cardId, title: cap(normalized), description: desc, hidden: !!hidden };
+  return cards.map(([title,desc,id])=>{
+    const cardTitle = title;
+    const cardDesc = desc;
+    const cardId = id;
+    const hidden = /mine|totem|invisible|immun|carte_sans_effet/i.test(cardId);
+    return { id: cardId, title: cardTitle, description: cardDesc, hidden: !!hidden };
   });
 }
 
-// draw a random card from room.deck and assign to player hand (respect max hand size 5)
 function drawCardForPlayer(room, playerId){
   if(!room) return null;
-  // ensure deck exists for legacy rooms
   room.deck = room.deck || buildDefaultDeck();
   room.hands = room.hands || {};
   room.deck = room.deck || [];
   const hand = room.hands[playerId] || [];
-  // avoid drawing more than once for the same board version
   room._lastDrawForPlayer = room._lastDrawForPlayer || {};
   const boardVersion = (room.boardState && room.boardState.version) || null;
   if(boardVersion !== null && room._lastDrawForPlayer[playerId] === boardVersion){
-    // already drew for this version
     return null;
   }
   if(hand.length >= 5) return null; // hand full
   if(room.deck.length === 0){
-    // if deck empty, try to refill from discard and shuffle — unless 'noRemise' is enabled
     if(!room.noRemise && room.discard && room.discard.length > 0){
-      // move all discard into deck
       room.deck = room.discard.splice(0).concat(room.deck || []);
-      // simple Fisher-Yates shuffle
       for(let i = room.deck.length - 1; i > 0; i--){
         const j = Math.floor(Math.random() * (i + 1));
         const tmp = room.deck[i]; room.deck[i] = room.deck[j]; room.deck[j] = tmp;
       }
-      // notify players that the deck was reshuffled
       (room.players || []).forEach(p => { if(p.socketId) io.to(p.socketId).emit('deck:reshuffled', { roomId: room.id, deckCount: room.deck.length }); });
     }
   }
-  if(room.deck.length === 0) return null; // no cards even after reshuffle
-  // shuffle deck before drawing (always shuffle to ensure randomness)
+  if(room.deck.length === 0) return null;
   for(let i = room.deck.length - 1; i > 0; i--){
     const j = Math.floor(Math.random() * (i + 1));
     const tmp = room.deck[i]; room.deck[i] = room.deck[j]; room.deck[j] = tmp;
   }
-  // pick random index from the freshly shuffled deck
   const idx = Math.floor(Math.random() * room.deck.length);
   const card = room.deck.splice(idx,1)[0];
-  // normalize title capitalization just in case this deck was created earlier with inconsistent casing
   if(card && card.title){
     card.title = String(card.title).trim();
     card.title = card.title.charAt(0).toUpperCase() + card.title.slice(1);
@@ -392,36 +488,25 @@ function drawCardForPlayer(room, playerId){
   room.hands[playerId] = room.hands[playerId] || [];
   room.hands[playerId].push(card);
   if(boardVersion !== null) room._lastDrawForPlayer[playerId] = boardVersion;
-  // emit card drawn and updated room state
-  // send card:drawn only to the recipient
   const recipient = (room.players || []).find(p => p.id === playerId);
   if(recipient && recipient.socketId){
     io.to(recipient.socketId).emit('card:drawn', { playerId, card });
   }
-  // send personalized room updates to all players
   sendRoomUpdate(room);
   return card;
 }
-// Placeholder: compute legal moves for a square in the given room.
-// `boardState` is the canonical JSON representation of the board for this server.
-// Example boardState: { width:8, height:8, turn:'w', version:1, pieces: [{ square:'e2', type:'P', color:'w', id:'w_p1' }, ... ] }
 function computeLegalMoves(room, square){
-  // Basic pseudo-legal move generator for standard chess-like pieces.
-  // - Does not perform check detection (moves that leave king in check are allowed).
-  // - Does not implement castling or en-passant.
-  // - Returns moves as array of { from, to }.
   if(!room || !room.boardState || !square) return [];
   const state = room.boardState;
   const width = state.width || 8;
   const height = state.height || 8;
 
-  // helpers
   function squareToCoord(sq){
     if(!sq) return null;
     const s = String(sq).trim().toLowerCase();
     if(!/^[a-z][1-9][0-9]*$/.test(s)) return null;
     const file = s.charCodeAt(0) - 'a'.charCodeAt(0);
-    const rank = parseInt(s.slice(1),10) - 1; // 0-indexed
+    const rank = parseInt(s.slice(1),10) - 1;
     return { x: file, y: rank };
   }
   function coordToSquare(x,y){
@@ -436,30 +521,15 @@ function computeLegalMoves(room, square){
 
   const piece = getPieceAt(square);
   if(!piece) return [];
-  const color = piece.color; // 'w' or 'b'
+  const color = piece.color;
   const fromCoord = squareToCoord(square);
   if(!fromCoord) return [];
   const moves = [];
 
-  // add move helper
-  function pushIfEmptyOrCapture(tx,ty){
-    if(!isInside(tx,ty)) return false;
-    const toSq = coordToSquare(tx,ty);
-    const occupant = getPieceAt(toSq);
-    if(!occupant){
-      moves.push({ from: square, to: toSq });
-      return true; // can continue sliding
-    }
-    // capture allowed if different color
-    if(occupant.color !== color){
-      moves.push({ from: square, to: toSq });
-    }
-    return false; // blocked
-  }
-
   const x = fromCoord.x, y = fromCoord.y;
   const type = (piece.type || '').toUpperCase();
-  // If this piece has been granted corner-teleport moves by 'coincoin', include those allowed squares
+
+  // coin coin
   try{
     const coin = (room.activeCardEffects || []).find(e => e && e.type === 'coincoin' && ((e.pieceId && e.pieceId === piece.id) || e.pieceSquare === square));
     if(coin && Array.isArray(coin.allowedSquares) && coin.allowedSquares.length > 0){
@@ -766,12 +836,8 @@ function startingBoardState8(){
 
 app.post('/rooms', (req, res) => {
   const id = uuidv4().slice(0, 8);
-  // allow optional board size in request body (default 8)
   const size = (req.body && parseInt(req.body.size, 10)) || 8;
-  // For standard 8x8 we initialize a boardState JSON as the canonical board state.
   const boardState = size === 8 ? startingBoardState8() : null;
-  // hostId will be set when the first player joins
-  // initialize a deck for this room
   const deck = buildDefaultDeck();
   rooms.set(id, { id, boardState, players: [], status: 'waiting', hostId: null, size, cards: {}, playedCards: [], removalTimers: new Map(), deck, hands: {}, autoDraw: false, noRemise: false });
   res.json({ roomId: id, size });
@@ -793,13 +859,11 @@ io.on('connection', (socket) => {
     if (!room) return cb && cb({ error: 'room not found', message: "Aucune salle trouvée." });
   const assignedId = playerId || uuidv4();
 
-    // If this player was pending removal (disconnect during navigation), cancel removal
     if(room.removalTimers && room.removalTimers.has(assignedId)){
       clearTimeout(room.removalTimers.get(assignedId));
       room.removalTimers.delete(assignedId);
     }
 
-    // If playerId corresponds to an existing player, treat this as a reconnection
     let existing = room.players.find(p => p.id === assignedId);
 
     let color;
@@ -810,24 +874,17 @@ io.on('connection', (socket) => {
       color = room.players.length === 0 ? 'white' : 'black';
       room.players.push({ id: assignedId, socketId: socket.id, color });
     }
-    // ensure hands map exists
     room.hands = room.hands || {};
-    // ensure deck exists for legacy rooms
     if(!room.deck) room.deck = buildDefaultDeck();
-    // Note: starter card removed. Previously the first joining player received an 'Agrandir le plateau' starter card here.
-    // The starter card was removed to avoid duplicate/unused cards in gameplay.
     socket.join(roomId);
     socket.data.roomId = roomId;
     socket.data.playerId = assignedId;
 
-    // set hostId when first player joins
     if (!room.hostId) room.hostId = assignedId;
 
 
     sendRoomUpdate(room);
 
-    // If the game is already playing and it's this player's turn, attempt to draw (useful on reconnect)
-    // Only draw if the player's hand is currently empty to avoid double-drawing (e.g. initial granted cards)
     try{
         if(room.status === 'playing' && room.boardState && room.boardState.turn){
         const myPlayer = room.players.find(p => p.id === assignedId);
@@ -841,32 +898,24 @@ io.on('connection', (socket) => {
     cb && cb({ ok: true, color, roomId, playerId: assignedId, hostId: room.hostId });
   });
 
-  // Allow a client to voluntarily leave a room (immediate removal). This differs from
-  // disconnect which waits briefly to allow quick reconnects.
   socket.on('room:leave', ({ roomId }, cb) => {
     try{
       const room = rooms.get(roomId || socket.data.roomId);
       const playerId = socket.data.playerId;
       if(!room) return cb && cb({ error: 'room not found', message: "Aucune salle trouvée." });
       if(!playerId) return cb && cb({ error: 'not joined', message: "Vous n'avez pas rejoint la salle." });
-      // remove player immediately
       room.players = (room.players || []).filter(p => p.id !== playerId);
-      // if the host left, promote the next player
       if(room.hostId && !room.players.find(p => p.id === room.hostId)){
         room.hostId = room.players[0] ? room.players[0].id : null;
       }
-      // if fewer than 2 players remain, mark the room waiting
       if((room.players || []).length < 2 && room.status === 'playing') room.status = 'waiting';
-      // leave socket.io room and clear socket data
       try{ socket.leave(room.id); }catch(_){ }
       try{ socket.data.roomId = null; }catch(_){ }
-      // notify remaining players
       try{ sendRoomUpdate(room); }catch(_){ }
       return cb && cb({ ok: true });
     }catch(e){ console.error('room:leave error', e); return cb && cb({ error: 'server_error' }); }
   });
 
-  // Host can toggle automatic drawing in the waiting room. Only the host may change this setting.
   socket.on('room:auto_draw:set', ({ roomId, enabled }, cb) => {
     const room = rooms.get(roomId);
     if(!room) return cb && cb({ error: 'room not found', message: "Aucune salle trouvée." });
@@ -874,13 +923,11 @@ io.on('connection', (socket) => {
     if(!sender) return cb && cb({ error: 'not joined', message: "Vous n'avez pas rejoint la salle." });
     if(room.hostId !== sender) return cb && cb({ error: 'only the host can change auto-draw', message: "Seul l'hôte peut changer le dessin automatique." });
     room.autoDraw = !!enabled;
-    // Broadcast updated room state to all participants
     try{ sendRoomUpdate(room); }catch(_){ }
     try{ io.to(room.id).emit('room:auto_draw:changed', { roomId: room.id, enabled: room.autoDraw }); }catch(_){ }
     return cb && cb({ ok: true, autoDraw: room.autoDraw });
   });
 
-  // Host can toggle the 'no remise' flag (prevent reshuffling discard into deck). Only the host may change this setting.
   socket.on('room:no_remise:set', ({ roomId, enabled }, cb) => {
     const room = rooms.get(roomId);
     if(!room) return cb && cb({ error: 'room not found', message: "Aucune salle trouvée." });
@@ -888,7 +935,6 @@ io.on('connection', (socket) => {
     if(!sender) return cb && cb({ error: 'not joined', message: "Vous n'avez pas rejoint la salle." });
     if(room.hostId !== sender) return cb && cb({ error: 'only the host can change no-remise', message: "Seul l'hôte peut changer le no-remise." });
     room.noRemise = !!enabled;
-    // Broadcast updated room state to all participants
     try{ sendRoomUpdate(room); }catch(_){ }
     try{ io.to(room.id).emit('room:no_remise:changed', { roomId: room.id, enabled: room.noRemise }); }catch(_){ }
     return cb && cb({ ok: true, noRemise: room.noRemise });
@@ -897,10 +943,7 @@ io.on('connection', (socket) => {
   socket.on('game:move', ({ roomId, from, to, promotion }, cb) => {
     const room = rooms.get(roomId);
     if (!room) return cb && cb({ error: 'room not found', message: "Aucune salle trouvée." });
-    // don't allow moves in finished games
     if(room.status === 'finished') return cb && cb({ error: 'game_over', message: "La partie est terminée." });
-    // Basic move handling: validate turn, validate piece ownership, validate target is one of computeLegalMoves,
-    // apply the move to room.boardState, handle captures, flip turn and broadcast the updated board.
     try{
       const senderId = socket.data.playerId;
       if(!senderId) return cb && cb({ error: 'not joined', message: "Vous n'avez pas rejoint la salle." });
@@ -909,21 +952,16 @@ io.on('connection', (socket) => {
       if(!room.boardState) return cb && cb({ error: 'no board state', message: "Aucun état de plateau disponible." });
 
       const board = room.boardState;
-      // determine player's color short form ('w'|'b')
       const playerColorShort = (roomPlayer.color && roomPlayer.color[0]) || null;
       if(!playerColorShort) return cb && cb({ error: 'invalid player color' });
 
-      // must be player's turn
       if(board.turn !== playerColorShort) return cb && cb({ error: 'not your turn', message: "Ce n'est pas à votre tour de jouer." });
 
-      // find piece at 'from'
       const pieces = board.pieces || [];
       const moving = pieces.find(p => p.square === from);
       if(!moving) return cb && cb({ error: 'no piece at source' });
       if(moving.color !== playerColorShort) return cb && cb({ error: 'not your piece', message: "Vous ne pouvez pas déplacer une pièce adverse." });
 
-      // Enforce 'toucher' restriction: if there is an active 'toucher' effect targeting this player,
-      // they may ONLY move the specified piece(s).
       try{
         const effects = room.activeCardEffects || [];
         const toucher = effects.find(e => e && e.type === 'toucher' && e.playerId === senderId);
@@ -932,24 +970,21 @@ io.on('connection', (socket) => {
         }
       }catch(_){ }
 
-      // Enforce 'tout ou rien' restriction: if the moving piece is under 'tout_ou_rien', it may only move if the move captures
+      // tout ou rien
       try{
         const effects2 = room.activeCardEffects || [];
         const tout = effects2.find(e => e && e.type === 'tout_ou_rien' && e.pieceId === moving.id);
             if(tout){
-          // only allow moves that capture an occupied square
           const targetIndexCheck = pieces.findIndex(p => p.square === to);
           if(targetIndexCheck === -1){
-            return cb && cb({ error: 'must_capture_to_move', message: "Mouvement impossible : cette pièce ne peut se déplacer que pour capturer une pièce adverse." });
+            return cb && cb({ error: 'must_capture_to_move', message: "Mouvement impossible : cette pièce ne peut se déplacer que pour capturer une pièce adverse." });
           }
         }
       }catch(_){ }
 
-      // validate that 'to' is among legal moves
       const legal = computeLegalMoves(room, from) || [];
       const ok = legal.some(m => m.to === to);
       if(!ok) return cb && cb({ error: 'illegal move', message: "Mouvement illégal." });
-      // If any brouillard is active in the room, disallow moving onto squares that the player cannot see
       try{
         const hasBrouillard = (room.activeCardEffects || []).some(e => e && e.type === 'brouillard');
         if(hasBrouillard){
@@ -960,19 +995,15 @@ io.on('connection', (socket) => {
         }
       }catch(_){ }
 
-      // apply move: remove any piece on target (capture)
       const targetIndex = pieces.findIndex(p => p.square === to);
-  // sniper: special-case capture without moving when an active sniper effect is bound to the moving piece
-  let sniperTriggered = false;
-  // remember captured piece for post-capture reactions (like doppelganger)
-  let capturedPieceForReactions = null;
+      let sniperTriggered = false;
+      let capturedPieceForReactions = null;
+      // sniper
       if(targetIndex >= 0){
-        // check for sniper effect bound to the moving piece for this player
         try{
           room.activeCardEffects = room.activeCardEffects || [];
           const sniperIdx = room.activeCardEffects.findIndex(e => e && e.type === 'sniper' && e.pieceId === moving.id && e.playerId === senderId);
           if(sniperIdx !== -1){
-            // perform sniper capture: remove target piece and record it for potential resurrection
             const capturedPiece = pieces.splice(targetIndex, 1)[0];
               capturedPieceForReactions = capturedPiece;
             try{
@@ -981,7 +1012,6 @@ io.on('connection', (socket) => {
               room.captured.push({ id: uuidv4().slice(0,8), piece: capturedPiece, originalOwnerId: (originalOwner && originalOwner.id) || null, capturedBy: senderId, ts: Date.now() });
               try{ if(capturedPiece && capturedPiece.invisible) delete capturedPiece.invisible; }catch(_){ }
             }catch(_){ /* ignore bookkeeping errors */ }
-            // remove any invisible effects targeting the captured piece/square
             try{
               for(let ei = room.activeCardEffects.length - 1; ei >= 0; ei--){
                 const ev = room.activeCardEffects[ei];
@@ -992,14 +1022,12 @@ io.on('connection', (socket) => {
                 }
               }
             }catch(_){ }
-            // consume the sniper effect (one-time)
             try{
               const removedEffect = room.activeCardEffects.splice(sniperIdx, 1)[0];
               try{ io.to(room.id).emit('card:effect:removed', { roomId: room.id, effectId: removedEffect && removedEffect.id, type: 'sniper', playerId: removedEffect && removedEffect.playerId }); }catch(_){ }
             }catch(_){ }
             sniperTriggered = true;
             } else {
-            // no sniper: normal capture
             const capturedPiece = pieces.splice(targetIndex, 1)[0];
               capturedPieceForReactions = capturedPiece;
             try{
@@ -1008,8 +1036,6 @@ io.on('connection', (socket) => {
               room.captured.push({ id: uuidv4().slice(0,8), piece: capturedPiece, originalOwnerId: (originalOwner && originalOwner.id) || null, capturedBy: senderId, ts: Date.now() });
               try{ if(capturedPiece && capturedPiece.invisible) delete capturedPiece.invisible; }catch(_){ }
             }catch(_){ /* ignore bookkeeping errors */ }
-            // If there were any 'invisible' effects targeting the captured piece or its square,
-            // remove them so the square does not remain hidden for non-owners when another piece arrives.
             try{
               for(let ei = room.activeCardEffects.length - 1; ei >= 0; ei--){
                 const ev = room.activeCardEffects[ei];
@@ -1022,64 +1048,53 @@ io.on('connection', (socket) => {
             }catch(_){ }
           }
         }catch(_){
-          // fallback: perform normal capture
           const capturedPiece = pieces.splice(targetIndex, 1)[0];
             capturedPieceForReactions = capturedPiece;
           try{ room.captured = room.captured || []; const originalOwner = (room.players || []).find(p => (p.color && p.color[0]) === capturedPiece.color); room.captured.push({ id: uuidv4().slice(0,8), piece: capturedPiece, originalOwnerId: (originalOwner && originalOwner.id) || null, capturedBy: senderId, ts: Date.now() }); }catch(_){ }
         }
   }
-  // If a capture happened, and the moving piece has a doppelganger effect bound, adopt captured type
+
+  // doppelganger
   if(capturedPieceForReactions){
     try{
       room.activeCardEffects = room.activeCardEffects || [];
       const doppel = room.activeCardEffects.find(e => e && e.type === 'doppelganger' && e.pieceId === moving.id);
       if(doppel && capturedPieceForReactions && typeof capturedPieceForReactions.type !== 'undefined'){
-        // change the moving piece's type to the captured piece's type (preserve color)
         moving.type = capturedPieceForReactions.type;
         if(capturedPieceForReactions.promoted) {
           moving.promoted = true;
         } else if(moving.promoted){
           try{ delete moving.promoted; }catch(_){ }
         }
-        // update recorded square for the effect so it follows the piece
         doppel.pieceSquare = to;
         try{ io.to(room.id).emit('card:effect:updated', { roomId: room.id, effect: doppel }); }catch(_){ }
         try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect: Object.assign({}, doppel, { appliedType: capturedPieceForReactions.type }) }); }catch(_){ }
       }
     }catch(_){ }
   }
-  // move the piece only if sniper didn't trigger
+
   if(!sniperTriggered){ moving.square = to; }
 
-      // consume any active card effects bound to this piece (rebondir is one-time and should be removed)
-      // also update any persistent effects (like adoubement) to track the piece's new square so they remain active
       try{
         room.activeCardEffects = room.activeCardEffects || [];
-        // iterate backwards so we can splice safely
         for(let i = room.activeCardEffects.length - 1; i >= 0; i--){
           const e = room.activeCardEffects[i];
-          // remove one-time rebondir if it refers to this piece (by pieceId or by its old square)
-          if(e.type === 'rebondir' && (e.pieceSquare === from || (e.pieceId && e.pieceId === moving.id))){
+          if(e.type === 'rebond' && (e.pieceSquare === from || (e.pieceId && e.pieceId === moving.id))){
             room.activeCardEffects.splice(i,1);
             continue;
           }
-          // if the effect is bound to the piece id, update its recorded square so the effect persists after moves
           if(e.pieceId && e.pieceId === moving.id){
             e.pieceSquare = to;
           }
         }
       }catch(e){ console.error('consuming card effects error', e); }
 
-      // Check for hidden mines at the destination square. If a mine belonging to another player
-      // is present, detonate it: remove the moving piece and consume the mine. The mine location
-      // is kept private (only the owner sees it in their `minesOwn`), but detonations are public.
+      // mine
       try{
         room.activeCardEffects = room.activeCardEffects || [];
         for(let i = room.activeCardEffects.length - 1; i >= 0; i--){
           const e = room.activeCardEffects[i];
           if(e && e.type === 'mine' && e.square === to){
-            // detonate for any piece that lands on the mine (owner included)
-            // remove the moving piece from the board and record it as captured by the mine owner
             const rmIdx = pieces.findIndex(p => p.id === moving.id);
             if(rmIdx >= 0){
               const capturedPiece = pieces.splice(rmIdx, 1)[0];
@@ -1089,22 +1104,17 @@ io.on('connection', (socket) => {
                 room.captured.push({ id: uuidv4().slice(0,8), piece: capturedPiece, originalOwnerId: (originalOwner && originalOwner.id) || null, capturedBy: e.playerId, ts: Date.now() });
               }catch(_){ }
             }
-            // consume the mine
             try{ room.activeCardEffects.splice(i,1); }catch(_){ }
-            // broadcast detonation to the room (informational)
             try{ io.to(roomId).emit('mine:detonated', { roomId: room.id, ownerId: e.playerId, detonatorId: senderId, square: to, piece: moving }); }catch(_){ }
-            // privately inform the owner as well with effect id and piece details
             try{ const owner = (room.players||[]).find(p => p.id === e.playerId); if(owner && owner.socketId) io.to(owner.socketId).emit('mine:detonated:private', { roomId: room.id, effectId: e.id, square: to, piece: moving }); }catch(_){ }
-            // a mine was found/handled; break (only one mine per square expected)
             break;
           }
         }
       }catch(err){ console.error('mine detonation error', err); }
 
-      // advance board version
       board.version = (board.version || 0) + 1;
 
-      // Update brouillard play counters: if any brouillard is active, increment the move count for the moving player.
+      // Update brouillard play counts
       try{
         room.activeCardEffects = room.activeCardEffects || [];
         for(let ei = room.activeCardEffects.length - 1; ei >= 0; ei--){
@@ -1114,7 +1124,6 @@ io.on('connection', (socket) => {
             ev.playCounts = ev.playCounts || {};
             ev.playCounts[senderId] = (ev.playCounts[senderId] || 0) + 1;
             try{ io.to(room.id).emit('card:effect:updated', { roomId: room.id, effect: ev }); }catch(_){ }
-            // expire the brouillard when ALL players have reached the threshold of plays
             const threshold = 2;
             const players = room.players || [];
             let allReached = true;
@@ -1122,56 +1131,45 @@ io.on('connection', (socket) => {
             if(allReached){
               try{ room.activeCardEffects.splice(ei,1); }catch(_){ }
               try{ io.to(room.id).emit('card:effect:removed', { roomId: room.id, effectId: ev.id, type: ev.type, playerId: ev.playerId }); }catch(_){ }
-              // broadcast updated room state so clients remove veils
               try{ sendRoomUpdate(room); }catch(_){ }
             }
           }catch(_){ }
         }
       }catch(e){ console.error('brouillard playcount update error', e); }
 
-      // Check victory (king capture) before further turn bookkeeping. If game ended, broadcast move and game:over and return.
+      // victory check
       try{
         const end = checkAndHandleVictory(room);
         if(end && end.over){
           const moved = { playerId: senderId, from, to };
           try{ io.to(roomId).emit('move:moved', moved); }catch(_){ }
-          // send personalized updates (room:update) so clients can refresh final board
           try{ sendRoomUpdate(room); }catch(_){ }
           return cb && cb({ ok: true, moved, gameOver: end });
         }
       }catch(_){ }
 
-      // If the player was granted a free move by playing a card just now (room._freeMoveFor), consume it
-      // and mark that we should end the turn after this move. We DO NOT treat it like a 'double_move' —
-      // instead it is the player's one move for the turn and should cause normal end-of-turn bookkeeping.
+      // double move
       let consumedDoubleMove = false;
       let freeMoveConsumed = false;
       try{
         if(room && room._freeMoveFor && room._freeMoveFor === senderId){
-          // consume the free-move token and remember to end the turn after this move
           freeMoveConsumed = true;
           try{ delete room._freeMoveFor; }catch(_){ room._freeMoveFor = null; }
           try{ io.to(room.id).emit('card:free_move_consumed', { roomId: room.id, playerId: senderId }); }catch(_){ }
         }
       }catch(e){ /* ignore */ }
 
-      // Attempt to consume a double-move effect for the moving player. If present, this allows the player
-      // to make an additional move without flipping the turn. We represent that effect as:
-      // { type: 'double_move', playerId, remainingMoves }
       try{
         room.activeCardEffects = room.activeCardEffects || [];
         for(let i = room.activeCardEffects.length - 1; i >= 0; i--){
           const e = room.activeCardEffects[i];
-          if(e.type === 'double_move' && e.playerId === senderId){
-            // compute remaining moves after consuming one
+          if(e.type === 'double' && e.playerId === senderId){
             const newRemaining = (typeof e.remainingMoves === 'number') ? (e.remainingMoves - 1) : ((e.remainingMoves || 2) - 1);
-            // update or remove depending on remaining count
             if(newRemaining > 0){
               e.remainingMoves = newRemaining;
-              consumedDoubleMove = true; // still have extra moves, so don't flip the turn
+              consumedDoubleMove = true;
               try{ io.to(room.id).emit('card:effect:updated', { roomId: room.id, effect: e }); }catch(_){ }
             } else {
-              // used up: remove the effect and emit removal
               try{
                 room.activeCardEffects.splice(i,1);
               }catch(_){ }
@@ -1182,34 +1180,26 @@ io.on('connection', (socket) => {
         }
       }catch(err){ console.error('double_move consume error', err); }
 
-      // If the player didn't consume a double-move effect, flip turn and decrement per-turn effects
       if(!consumedDoubleMove){
         board.turn = (board.turn === 'w') ? 'b' : 'w';
 
-        // decrement remainingTurns for any time-limited effects that belong to the player who just finished their turn
         try{
           room.activeCardEffects = room.activeCardEffects || [];
           for(let i = room.activeCardEffects.length - 1; i >= 0; i--){
             const e = room.activeCardEffects[i];
             if(typeof e.remainingTurns === 'number'){
-              // determine whether this effect should be decremented when the player who just finished their turn is `senderId`.
               let shouldDecrement = false;
               if(e.decrementOn === 'opponent'){
-                // decrement when the finished-turn player is NOT the effect owner
                 shouldDecrement = (e.playerId !== senderId);
               } else if(e.decrementOn === 'owner'){
-                // decrement only when the finished-turn player is the effect owner (legacy/default behavior)
                 shouldDecrement = (e.playerId === senderId);
               } else {
-                // default: existing semantics (decrement on the owner's turn)
                 shouldDecrement = (e.playerId === senderId);
               }
               if(shouldDecrement){
                 e.remainingTurns = e.remainingTurns - 1;
-                // emit informative event when effect is decremented/removed
                 try{ io.to(room.id).emit('card:effect:updated', { roomId: room.id, effect: e }); }catch(_){ }
                 if(e.remainingTurns <= 0){
-                  // remove expired effect
                   room.activeCardEffects.splice(i,1);
                   try{ io.to(room.id).emit('card:effect:removed', { roomId: room.id, effectId: e.id, type: e.type, playerId: e.playerId }); }catch(_){ }
                 }
@@ -1218,34 +1208,27 @@ io.on('connection', (socket) => {
           }
         }catch(e){ console.error('updating temporary effects error', e); }
 
-        // reset per-turn card-play flags because turn changed
         try{ room._cardPlayedThisTurn = {}; }catch(_){}
       }
 
-      // at this point the board has been updated (and possibly the turn flipped)
-      // determine next player and perform their draw BEFORE broadcasting the move, so the draw happens at the start of their turn
-  const moved = { playerId: senderId, from, to };
+      const moved = { playerId: senderId, from, to };
       try{
           if(!consumedDoubleMove){
-          const nextColor = board.turn; // 'w' or 'b'
+          const nextColor = board.turn;
           const nextPlayer = room.players.find(p => (p.color && p.color[0]) === nextColor);
           if(nextPlayer){
-            // draw for next player (respect room.autoDraw)
             maybeDrawAtTurnStart(room, nextPlayer.id);
           } else {
-            // ensure room state is broadcast
             sendRoomUpdate(room);
           }
         } else {
-          // the same player still has an extra move; do not draw a new card now — just broadcast the updated room state
           sendRoomUpdate(room);
         }
       }catch(e){
         console.error('draw-at-start-of-turn error', e);
       }
 
-      // now broadcast the move to all clients (move event separate from room:update)
-    io.to(roomId).emit('move:moved', moved);
+      io.to(roomId).emit('move:moved', moved);
 
       return cb && cb({ ok: true, moved });
     }catch(err){
@@ -1254,28 +1237,22 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Host can start the game explicitly
   socket.on('game:start', ({ roomId }, cb) => {
     const room = rooms.get(roomId);
     if (!room) return cb && cb({ error: 'room not found', message: "La partie n'a pas été trouvée." });
 
-    // verify sender is the host (first player)
     const senderId = socket.data.playerId;
     if (!senderId) return cb && cb({ error: 'not joined', message: "Vous n'avez pas rejoint la partie." });
     if (room.players.length < 2) return cb && cb({ error: 'need 2 players to start', message: "Il faut 2 joueurs pour commencer." });
-    // verify sender is the host (explicit hostId)
     if (!room.hostId || room.hostId !== senderId) return cb && cb({ error: 'only host can start', message: "Seul l'hôte peut commencer la partie." });
 
-  room.status = 'playing';
-  // Do not broadcast the raw boardState to all sockets (use per-recipient sendRoomUpdate to enforce invisibility)
-  io.to(roomId).emit('game:started', { roomId });
-  sendRoomUpdate(room);
+    room.status = 'playing';
+    io.to(roomId).emit('game:started', { roomId });
+    sendRoomUpdate(room);
 
-    // draw initial card for the player to move (beginning of their turn)
-    // If the player already has a card (for instance the special starter card), skip the automatic draw
     try{
       if(room.boardState && room.boardState.turn){
-        const firstColor = room.boardState.turn; // 'w' or 'b'
+        const firstColor = room.boardState.turn;
         const firstPlayer = room.players.find(p => (p.color && p.color[0]) === firstColor);
         if(firstPlayer){
           const hasHand = room.hands && room.hands[firstPlayer.id] && room.hands[firstPlayer.id].length > 0;
@@ -1289,7 +1266,6 @@ io.on('connection', (socket) => {
     cb && cb({ ok: true });
   });
 
-  // Host can set a custom deck for the room (selected list of card ids). Only host may change it.
   socket.on('room:deck:set', ({ roomId, selected }, cb) => {
     const room = rooms.get(roomId);
     if(!room) return cb && cb({ error: 'room not found', message: "Aucune salle trouvée." });
@@ -1297,36 +1273,28 @@ io.on('connection', (socket) => {
     if(!sender) return cb && cb({ error: 'not joined', message: "Vous n'avez pas rejoint la salle." });
     if(room.hostId !== sender) return cb && cb({ error: 'only host can set deck', message: "Seul l'hôte peut définir la pioche." });
     try{
-      // selected is expected to be an array of card identifiers (either id or cardId)
       const sel = Array.isArray(selected) ? selected : [];
-      // Build a lookup from the canonical default deck and current room deck
       const master = buildDefaultDeck();
       const pool = (room.deck && Array.isArray(room.deck) && room.deck.length) ? room.deck.concat(master) : master;
       const byId = {};
       pool.forEach(c => { if(c && c.id) byId[c.id] = c; if(c && c.cardId) byId[c.cardId] = c; });
-      // Map selected ids to card objects, preserving order. If a selected id is unknown, ignore it.
       const newDeck = [];
       sel.forEach(sid => { const c = byId[sid]; if(c) newDeck.push(Object.assign({}, c)); });
       if(newDeck.length === 0){
-        // empty selection -> revert to default deck
         room.deck = buildDefaultDeck();
       } else {
         room.deck = newDeck;
       }
-      // reset discard and hands so the new deck applies for the upcoming game
       room.discard = room.discard || [];
-      // inform players
       sendRoomUpdate(room);
       return cb && cb({ ok: true, deckCount: room.deck.length });
     }catch(err){ console.error('room:deck:set error', err); return cb && cb({ error: 'server_error' }); }
   });
 
-  // Client-requested refresh: allow client to ask server to resend the personalized room:update
   socket.on('room:refresh', ({ roomId }, cb) => {
     try{
       const room = rooms.get(roomId);
       if(!room) return cb && cb({ error: 'room not found' });
-      // only send personalized updates (sendRoomUpdate handles per-client privacy)
       sendRoomUpdate(room);
       return cb && cb({ ok: true });
     }catch(e){ console.error('room:refresh error', e); return cb && cb({ error: 'server_error' }); }
@@ -1337,12 +1305,10 @@ io.on('connection', (socket) => {
     if (!roomId) return;
     const room = rooms.get(roomId);
     if (!room) return;
-    // delay removal to allow fast reconnects (e.g. navigation between pages)
     const playerId = socket.data.playerId;
     if(playerId && room.removalTimers){
       const t = setTimeout(()=>{
         room.players = room.players.filter(p => p.id !== playerId);
-        // if the host left, promote the next player to host (or null)
         if (room.hostId && !room.players.find(p => p.id === room.hostId)) {
           room.hostId = room.players[0] ? room.players[0].id : null;
         }
@@ -1352,7 +1318,6 @@ io.on('connection', (socket) => {
       }, 5000);
       room.removalTimers.set(playerId, t);
     } else {
-      // fallback: immediate removal
       room.players = room.players.filter(p => p.socketId !== socket.id);
       if (room.players.length < 2 && room.status === 'playing') room.status = 'waiting';
       if (room.hostId && !room.players.find(p => p.id === room.hostId)) {
@@ -1362,9 +1327,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // delegates to `computeLegalMoves` which is a stub you should implement.
-  // legalMoves API removed (movement UI disabled)
-  // Re-add legalMoves API to compute and return pseudo-legal moves for a square.
   socket.on('game:legalMoves', ({ roomId, square }, cb) => {
     const room = rooms.get(roomId);
     if (!room) return cb && cb({ error: 'room not found', message: "La partie n'a pas été trouvée." });
@@ -1377,21 +1339,16 @@ io.on('connection', (socket) => {
     }
   });
 
-  // propagate selection made by one client to the other clients in the same room
   socket.on('game:select', ({ roomId, square }, cb) => {
     const room = rooms.get(roomId);
     if(!room) return cb && cb({ error: 'room not found', message: "La partie n'a pas été trouvée." });
     const playerId = socket.data.playerId || null;
-    // remember last selected square for this socket so cards that need a target can use it
     try{ socket.data.lastSelectedSquare = square || null; }catch(e){}
-    // compute legal moves for the selected square (allow capturing king)
     let moves = [];
     try{
       if(square){
-        // if the selecting player is affected by a 'tous_memes' effect (i.e. another player applied it),
-        // compute moves on a temporary board where all pieces are kings so the selector sees king-like behavior
         const effects = room.activeCardEffects || [];
-        const isAffectedByTous = effects.some(e => e && e.type === 'tous_memes' && e.playerId && e.playerId !== playerId);
+        const isAffectedByTous = effects.some(e => e && e.type === 'pareil' && e.playerId && e.playerId !== playerId);
         if(isAffectedByTous){
           const tempRoom = Object.assign({}, room);
           tempRoom.boardState = JSON.parse(JSON.stringify(room.boardState || {}));
@@ -1407,8 +1364,8 @@ io.on('connection', (socket) => {
       console.error('computeLegalMoves error', e);
       moves = [];
     }
-    // Enforce 'toucher' restriction: if the selecting player is affected by a 'toucher' effect,
-    // they may only move the targeted piece. If they select another piece, show no moves.
+
+    // toucher
     try{
       const effects = room.activeCardEffects || [];
       const toucherEffects = effects.filter(e => e && e.type === 'toucher' && e.playerId === playerId);
@@ -1420,21 +1377,16 @@ io.on('connection', (socket) => {
         }
       }
     }catch(_){ /* ignore enforcement errors */ }
-    // send selection to the selecting client WITH moves, but broadcast selection WITHOUT moves to other clients
     try{
-      // send to selecting socket (include moves)
       socket.emit('game:select', { playerId, square, moves });
-      // (pending-target flow removed) — server no longer auto-applies pending card targets on selection
-      // notify other sockets in the room about the selection but without revealing the legal moves
       socket.to(roomId).emit('game:select', { playerId, square, moves: [] });
     }catch(e){
-      // fallback: broadcast to all (shouldn't normally happen)
       io.to(roomId).emit('game:select', { playerId, square, moves: [] });
     }
     cb && cb({ ok: true });
   });
 
-  // Manual draw by player (consumes the player's turn). Only valid when autoDraw is disabled.
+  // manual draw
   socket.on('player:draw', ({ roomId }, cb) => {
     const room = rooms.get(roomId);
     if(!room) return cb && cb({ error: 'room not found', message: "La partie n'a pas été trouvée." });
@@ -1446,29 +1398,20 @@ io.on('connection', (socket) => {
     const roomPlayer = room.players.find(p => p.id === senderId);
     if(!roomPlayer) return cb && cb({ error: 'player not in room', message: "Vous n'êtes pas dans cette partie." });
     const playerColorShort = (roomPlayer.color && roomPlayer.color[0]) || null;
-    // must be player's turn
     if(board.turn !== playerColorShort) return cb && cb({ error: 'not your turn', message: "Ce n'est pas à votre tour de jouer." });
-    // manual draw only allowed when autoDraw is disabled
     if(room.autoDraw) return cb && cb({ error: 'auto_draw_enabled', message: "Le tirage manuel n'est pas autorisé." });
-    // do not allow drawing if player already played a card this turn
     room._cardPlayedThisTurn = room._cardPlayedThisTurn || {};
     if(room._cardPlayedThisTurn[senderId]) return cb && cb({ error: 'card_already_played_this_turn', message: "Vous avez déjà joué une carte ce tour." });
 
     try{
-      // perform the draw (this will emit card:drawn privately and send personalized room:update)
       const drawn = drawCardForPlayer(room, senderId);
       if(!drawn){
-        // nothing drawn (hand full or deck empty)
         return cb && cb({ error: 'no_card_drawn', message: "Aucune carte n'a été tirée." });
       }
-      // drawing consumes the player's turn: advance board version and mark that the player used their action
       board.version = (board.version || 0) + 1;
       room._cardPlayedThisTurn = room._cardPlayedThisTurn || {};
-      // mark that this player has used their card/draw action this turn (prevents playing a card after drawing)
       room._cardPlayedThisTurn[senderId] = true;
-      // flip turn to the next player
       board.turn = (board.turn === 'w') ? 'b' : 'w';
-      // decrement remainingTurns for time-limited effects that belong to the player who just finished their turn
       try{
         room.activeCardEffects = room.activeCardEffects || [];
         for(let i = room.activeCardEffects.length - 1; i >= 0; i--){
@@ -1491,25 +1434,19 @@ io.on('connection', (socket) => {
         }
       }catch(e){ console.error('decrement-after-draw error', e); }
 
-  // note: do NOT clear room._cardPlayedThisTurn here; it should be reset at endTurnAfterCard
-
-      // at this point it's the next player's turn; perform start-of-turn draw if autoDraw enabled
       const nextColor = board.turn;
       const nextPlayer = (room.players || []).find(p => (p.color && p.color[0]) === nextColor);
       if(nextPlayer){ try{ maybeDrawAtTurnStart(room, nextPlayer.id); }catch(_){ sendRoomUpdate(room); } }
       else { sendRoomUpdate(room); }
 
-  // notify room that the player drew and ended their turn (do NOT reveal card contents)
   try{ io.to(room.id).emit('player:drew', { roomId: room.id, playerId: senderId }); }catch(_){ }
       return cb && cb({ ok: true, card: drawn });
     }catch(err){ console.error('player:draw error', err); return cb && cb({ error: 'server_error' }); }
   });
 
-  // Simple cards API via sockets: list/play
   socket.on('card:list', ({ roomId }, cb) => {
     const room = rooms.get(roomId);
     if(!room) return cb && cb({ error: 'room not found', message: "La partie n'a pas été trouvée." });
-    // return available card types (placeholder)
     const available = [
       { id: 'invert', name: 'Invert Turn', description: 'Swap movement directions for one move' },
       { id: 'teleport', name: 'Teleport', description: 'Move one piece to any empty square' }
@@ -1521,33 +1458,28 @@ io.on('connection', (socket) => {
     const room = rooms.get(roomId);
     if(!room) return cb && cb({ error: 'room not found', message: "La partie n'a pas été trouvée." });
     if(room.status === 'finished') return cb && cb({ error: 'game_over', message: "La partie est terminée." });
-    // enforce sender identity from socket (don't trust client-supplied playerId)
     const senderId = socket.data.playerId;
     if(!senderId) return cb && cb({ error: 'not joined', message: "Vous n'avez pas rejoint la partie." });
-    // enforce one card per player per turn when the game is playing
     try{
       const board = room.boardState;
       if(room.status === 'playing' && board){
         const roomPlayer = room.players.find(p => p.id === senderId);
         const playerColorShort = (roomPlayer && roomPlayer.color && roomPlayer.color[0]) || null;
-        // only allow playing a card on your turn
         if(board.turn !== playerColorShort) return cb && cb({ error: 'not your turn', message: "Ce n'est pas à votre tour de jouer." });
-        // track card plays per turn (not per board version) so effects like "double move" don't allow extra card plays
         room._cardPlayedThisTurn = room._cardPlayedThisTurn || {};
         if(room._cardPlayedThisTurn[senderId]) return cb && cb({ error: 'card_already_played_this_turn', message: "Vous avez déjà joué une carte ce tour." });
       }
       
     }catch(e){ console.error('card play pre-check error', e); }
-    // store played card and apply card effects when applicable
     const played = { id: uuidv4().slice(0,8), playerId: senderId, cardId, payload, ts: Date.now() };
     room.playedCards = room.playedCards || [];
 
-    // Pre-check for targetted cards (rebondir, adoubement, folie, fortification): require a selected target owned by the player
+    // cards needing target
     try{
-      const isRebond = (typeof cardId === 'string') && (cardId.indexOf('rebondir') !== -1 || cardId.indexOf('rebond') !== -1);
-      const isAdoub = (typeof cardId === 'string') && (cardId.indexOf('adoub') !== -1 || cardId.indexOf('adoubement') !== -1);
-      const isFolie = (typeof cardId === 'string') && (cardId.indexOf('folie') !== -1 || cardId.indexOf('fou') !== -1);
-      const isFort = (typeof cardId === 'string') && (cardId.indexOf('fortification') !== -1 || cardId.indexOf('fortif') !== -1);
+      const isRebond = (typeof cardId === 'string') && (cardId.indexOf('rebond') !== -1);
+      const isAdoub = (typeof cardId === 'string') && (cardId.indexOf('adoubement') !== -1);
+      const isFolie = (typeof cardId === 'string') && (cardId.indexOf('folie') !== -1);
+      const isFort = (typeof cardId === 'string') && (cardId.indexOf('fortification') !== -1);
       const isTargetCard = isRebond || isAdoub || isFolie || isFort;
       if(isTargetCard){
         const board = room.boardState;
@@ -1557,21 +1489,17 @@ io.on('connection', (socket) => {
         const playerColorShort = (roomPlayer && roomPlayer.color && roomPlayer.color[0]) || null;
         const targetPiece = (board && board.pieces || []).find(p => p.square === targetCandidate);
         if(!board || !targetCandidate || !targetPiece || targetPiece.color !== playerColorShort){
-          // nothing should happen if there's no selected piece or the selected piece isn't owned by the player
           return cb && cb({ error: 'no valid target', message: "Aucune cible valide n'a été sélectionnée." });
         }
-        // ensure the payload has the resolved target for downstream handling
         payload = payload || {};
         payload.targetSquare = targetCandidate;
         played.payload = Object.assign({}, payload);
       }
     }catch(e){ console.error('target card pre-check error', e); }
 
-    // remove the played card from the player's hand and move it to discard
     try{
       room.hands = room.hands || {};
       const hand = room.hands[senderId] || [];
-      // find by unique id or by cardId (first match)
       const idx = hand.findIndex(c => (c.id && c.id === (payload && payload.id)) || (c.cardId && c.cardId === cardId) || (c.id && c.id === cardId));
       if(idx === -1){
         return cb && cb({ error: 'you do not have that card', message: "Vous ne possedez pas cette carte." });
@@ -1579,41 +1507,33 @@ io.on('connection', (socket) => {
       const removed = hand.splice(idx,1)[0];
       room.hands[senderId] = hand;
       room.discard = room.discard || [];
-      // Respect the room.noRemise flag: when true, do NOT move the played card into the discard pile.
       if(!room.noRemise){
         room.discard.push(removed);
-        // attach the removed card object to the played record for informational broadcast
         played.card = removed;
         played._discarded = true;
       } else {
-        // still attach the card instance for informational purposes but note it wasn't discarded
         played.card = removed;
         played._discarded = false;
       }
-  // normalize cardId to the card's slug when the client passed an instance id
-  cardId = (removed && removed.cardId) || cardId;
+      
+    cardId = (removed && removed.cardId) || cardId;
     }catch(e){
       console.error('card removal error', e);
     }
 
-  // ===== Totem check: if any totem is active protecting a player other than the sender,
-  // the totem is consumed and this played card is canceled (no effect applied) =====
+  // totem
   try{
     const active = room.activeCardEffects || [];
-    const totems = active.filter(e => e && (e.type === 'totem' || e.type === 'totem_immunity'));
+    const totems = active.filter(e => e && (e.type === 'totem'));
     if(totems && totems.length){
-      // find a totem protecting someone other than the current sender
       const blocking = totems.find(t => t && t.playerId && t.playerId !== senderId);
       if(blocking){
         try{
-          // remove the totem effect from room
           room.activeCardEffects = (room.activeCardEffects || []).filter(e => !(e && e.id === blocking.id));
         }catch(_){ }
         try{ io.to(room.id).emit('card:effect:removed', { roomId: room.id, effectId: blocking.id, type: 'totem', playerId: blocking.playerId }); }catch(_){ }
         try{ io.to(room.id).emit('card:play_blocked', { roomId: room.id, played, blockedBy: 'totem', protectedPlayerId: blocking.playerId }); }catch(_){ }
-        // private notification to the player who attempted the play
         try{ socket.emit('card:play_blocked:private', { ok: true, blocked: true, reason: 'totem', protectedPlayerId: blocking.playerId, message: 'Votre carte a été annulée par un totem d\'immunité.' }); }catch(_){ }
-        // optional: notify the protected player that their totem was consumed
         try{
           const protectedPlayer = (room.players || []).find(p => p && p.id === blocking.playerId);
           if(protectedPlayer && protectedPlayer.socketId){
@@ -1626,67 +1546,18 @@ io.on('connection', (socket) => {
     }
   }catch(e){ console.error('totem immunity check error', e); }
 
-  // Implement specific card effects here
-  // Convention: For cards that require a target, if the target is invalid the card is consumed by default
-  // (player loses the card). If you want a different behavior for a specific card, explicitly restore
-  // the removed card to the player's hand in that branch. This keeps UX consistent across cards.
-    try{
-  if(cardId === 'agrandir_plateau' || cardId === 'expand_board' || (typeof cardId === 'string' && cardId.indexOf('agrandir') !== -1)){
-        // Expand the board by adding one file/column on the left and right and one rank on top and bottom.
-        const board = room.boardState;
-        if(board && board.width && board.height){
-          const oldW = board.width;
-          const oldH = board.height;
-          const newW = oldW + 2;
-          const newH = oldH + 2;
-
-          // helper: parse square -> coords (0-indexed)
-          function squareToCoord(sq){
-            if(!sq) return null;
-            const s = String(sq).trim().toLowerCase();
-            if(!/^[a-z][1-9][0-9]*$/.test(s)) return null;
-            const file = s.charCodeAt(0) - 'a'.charCodeAt(0);
-            const rank = parseInt(s.slice(1),10) - 1;
-            return { x: file, y: rank };
-          }
-          function coordToSquare(x,y){
-            return String.fromCharCode('a'.charCodeAt(0) + x) + (y+1);
-          }
-
-          // shift every piece by +1 file and +1 rank
-          (board.pieces || []).forEach(p => {
-            const c = squareToCoord(p.square);
-            if(!c) return;
-            const nx = c.x + 1;
-            const ny = c.y + 1;
-            p.square = coordToSquare(nx, ny);
-          });
-
-          board.width = newW;
-          board.height = newH;
-          board.version = (board.version || 0) + 1;
-
-          // record effect details on payload for clients
-          played.payload = Object.assign({}, payload, { applied: 'agrandir_plateau', oldWidth: oldW, oldHeight: oldH, newWidth: newW, newHeight: newH });
-        }
-      } else if(cardId === 'tronquer_plateau' || cardId === 'tronquer_le_plateau' || (typeof cardId === 'string' && cardId.indexOf('tronquer') !== -1)){
-        // Tronquer (trim) is currently disabled: record the play but do not modify the board.
-        // Historically this code computed the occupied bounding box and rewrote board.pieces/width/height.
-        // That behavior caused unintended piece removals in some edge cases, so trimming is commented out for now.
-        played.payload = Object.assign({}, payload, { applied: 'tronquer_plateau', note: 'disabled - trimming commented out by developer' });
-      }
-      // adoubement: grant a permanent knight-move ability to the targeted piece
-      else if(cardId === 'adoubement' || (typeof cardId === 'string' && cardId.indexOf('adoub') !== -1)){
+  // board modification cards
+  try{
+      // adoubement
+      if(cardId === 'adoubement'){
         try{
           const board = room.boardState;
           let target = payload && payload.targetSquare;
           if(!target){ try{ target = socket.data && socket.data.lastSelectedSquare; }catch(e){ target = null; } }
-          // validate target exists and belongs to the player
           const roomPlayer = room.players.find(p => p.id === senderId);
           const playerColorShort = (roomPlayer && roomPlayer.color && roomPlayer.color[0]) || null;
           const targetPiece = (board && board.pieces || []).find(p => p.square === target);
           if(!board || !target || !targetPiece || targetPiece.color !== playerColorShort){
-            // restore removed card to hand and remove from discard if necessary
             try{
               room.hands = room.hands || {};
               room.hands[senderId] = room.hands[senderId] || [];
@@ -1696,14 +1567,14 @@ io.on('connection', (socket) => {
             }catch(e){ console.error('restore removed card error', e); }
             return cb && cb({ error: 'no valid target', message: "Aucune cible valide n'a été sélectionnée." });
           }
-          // apply permanent adoubement effect (bind to piece id so it persists when the piece moves)
           room.activeCardEffects = room.activeCardEffects || [];
           room.activeCardEffects.push({ id: played.id, type: 'adoubement', pieceId: targetPiece.id, pieceSquare: target, playerId: senderId });
           played.payload = Object.assign({}, payload, { applied: 'adoubement', appliedTo: target });
         }catch(e){ console.error('adoubement effect error', e); }
           }
-      // doppelganger (minimal): require selecting one of your pieces when playing the card; record target but do not apply any effect
-      else if((typeof cardId === 'string' && cardId.indexOf('doppelganger') !== -1) || cardId === 'doppelganger'){
+      
+      // doppelganger
+      else if(cardId === 'doppelganger'){
         try{
           const board = room.boardState;
           let target = payload && payload.targetSquare;
@@ -1711,9 +1582,7 @@ io.on('connection', (socket) => {
           const roomPlayer = room.players.find(p => p.id === senderId);
           const playerColorShort = (roomPlayer && roomPlayer.color && roomPlayer.color[0]) || null;
           const targetPiece = (board && board.pieces || []).find(p => p.square === target);
-          // validate target exists and belongs to the player
           if(!board || !target || !targetPiece || targetPiece.color !== playerColorShort){
-            // restore removed card to hand and abort
             try{
               room.hands = room.hands || {};
               room.hands[senderId] = room.hands[senderId] || [];
@@ -1723,29 +1592,24 @@ io.on('connection', (socket) => {
             }catch(e){ console.error('restore removed card error', e); }
             return cb && cb({ error: 'no valid target', message: "Aucune cible valide n'a été sélectionnée." });
           }
-          // create a persistent doppelganger effect bound to the selected piece
           try{
             room.activeCardEffects = room.activeCardEffects || [];
             const effect = { id: played.id, type: 'doppelganger', pieceId: targetPiece.id, pieceSquare: target, playerId: senderId };
             room.activeCardEffects.push(effect);
-            // inform clients that the effect was applied so they can show badges/UI
             try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect }); }catch(_){ }
             played.payload = Object.assign({}, payload, { applied: 'doppelganger', appliedTo: target });
           }catch(e){ console.error('apply persistent doppelganger error', e); played.payload = Object.assign({}, payload, { applied: 'doppelganger', appliedTo: target }); }
         }catch(e){ console.error('doppelganger minimal apply error', e); }
       }
-          // folie: grant permanent bishop-move ability to the targeted piece
           else if(cardId === 'folie' || (typeof cardId === 'string' && cardId.indexOf('folie') !== -1)){
             try{
               const board = room.boardState;
               let target = payload && payload.targetSquare;
               if(!target){ try{ target = socket.data && socket.data.lastSelectedSquare; }catch(e){ target = null; } }
-              // validate target exists and belongs to the player
               const roomPlayer = room.players.find(p => p.id === senderId);
               const playerColorShort = (roomPlayer && roomPlayer.color && roomPlayer.color[0]) || null;
               const targetPiece = (board && board.pieces || []).find(p => p.square === target);
               if(!board || !target || !targetPiece || targetPiece.color !== playerColorShort){
-                // restore removed card to hand and remove from discard if necessary
                 try{
                   room.hands = room.hands || {};
                   room.hands[senderId] = room.hands[senderId] || [];
@@ -1755,24 +1619,22 @@ io.on('connection', (socket) => {
                 }catch(e){ console.error('restore removed card error', e); }
                 return cb && cb({ error: 'no valid target', message: "Aucune cible valide n'a été sélectionnée." });
               }
-              // apply permanent folie effect (bind to piece id so it persists when the piece moves)
               room.activeCardEffects = room.activeCardEffects || [];
               room.activeCardEffects.push({ id: played.id, type: 'folie', pieceId: targetPiece.id, pieceSquare: target, playerId: senderId });
               played.payload = Object.assign({}, payload, { applied: 'folie', appliedTo: target });
             }catch(e){ console.error('folie effect error', e); }
       }
-      // fortification: grant permanent rook-move ability to the targeted piece
-      else if(cardId === 'fortification' || (typeof cardId === 'string' && cardId.indexOf('fortification') !== -1)){
+
+      // fortification
+      else if(cardId === 'fortification'){
         try{
           const board = room.boardState;
           let target = payload && payload.targetSquare;
           if(!target){ try{ target = socket.data && socket.data.lastSelectedSquare; }catch(e){ target = null; } }
-          // validate target exists and belongs to the player
           const roomPlayer = room.players.find(p => p.id === senderId);
           const playerColorShort = (roomPlayer && roomPlayer.color && roomPlayer.color[0]) || null;
           const targetPiece = (board && board.pieces || []).find(p => p.square === target);
           if(!board || !target || !targetPiece || targetPiece.color !== playerColorShort){
-            // restore removed card to hand and remove from discard if necessary
             try{
               room.hands = room.hands || {};
               room.hands[senderId] = room.hands[senderId] || [];
@@ -1782,14 +1644,14 @@ io.on('connection', (socket) => {
             }catch(e){ console.error('restore removed card error', e); }
             return cb && cb({ error: 'no valid target', message: "Aucune cible valide n'a été sélectionnée." });
           }
-          // apply permanent fortification effect (bind to piece id so it persists when the piece moves)
           room.activeCardEffects = room.activeCardEffects || [];
           room.activeCardEffects.push({ id: played.id, type: 'fortification', pieceId: targetPiece.id, pieceSquare: target, playerId: senderId });
           played.payload = Object.assign({}, payload, { applied: 'fortification', appliedTo: target });
         }catch(e){ console.error('fortification effect error', e); }
       }
-      // toucher c'est jouer: force the targeted player to move only the chosen piece on their next turn
-      else if((typeof cardId === 'string' && cardId.indexOf('toucher') !== -1) || cardId === 'toucher_cest_jouer'){
+
+      // toucher
+      else if(cardId === 'toucher'){
         try{
           const board = room.boardState;
           let target = payload && payload.targetSquare;
@@ -1797,9 +1659,7 @@ io.on('connection', (socket) => {
           const roomPlayer = room.players.find(p => p.id === senderId);
           const playerColorShort = (roomPlayer && roomPlayer.color && roomPlayer.color[0]) || null;
           const targetPiece = (board && board.pieces || []).find(p => p.square === target);
-          // validate target exists and belongs to the opponent
           if(!board || !target || !targetPiece || targetPiece.color === playerColorShort){
-            // invalid target: restore removed card to hand and abort
             try{
               room.hands = room.hands || {};
               room.hands[senderId] = room.hands[senderId] || [];
@@ -1809,9 +1669,7 @@ io.on('connection', (socket) => {
             }catch(e){ console.error('restore removed card error', e); }
             return cb && cb({ error: 'no valid target', message: "Aucune cible valide n'a été sélectionnée." });
           }
-          // find the owner (player) of the targeted piece
           const targetOwner = (room.players || []).find(p => (p.color && p.color[0]) === targetPiece.color) || null;
-          // create a one-turn effect that forces the targetOwner to move only this piece on their next turn
           room.activeCardEffects = room.activeCardEffects || [];
           const effect = { id: played.id, type: 'toucher', playerId: (targetOwner && targetOwner.id) || null, pieceId: targetPiece.id, pieceSquare: targetPiece.square, remainingTurns: 1, decrementOn: 'owner', imposedBy: senderId, ts: Date.now() };
           room.activeCardEffects.push(effect);
@@ -1819,8 +1677,9 @@ io.on('connection', (socket) => {
           try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect }); }catch(_){ }
         }catch(e){ console.error('toucher effect error', e); }
         }
-        // la parrure: downgrade an enemy queen to a pawn (selected target must be an enemy queen)
-        else if((typeof cardId === 'string' && cardId.indexOf('parrure') !== -1) || cardId === 'la_parrure'){
+
+        // parrure
+        else if(cardId === 'parrure'){
           try{
             const board = room.boardState;
             let target = payload && payload.targetSquare;
@@ -1828,36 +1687,29 @@ io.on('connection', (socket) => {
             const roomPlayer = room.players.find(p => p.id === senderId);
             const playerColorShort = (roomPlayer && roomPlayer.color && roomPlayer.color[0]) || null;
             const targetPiece = (board && board.pieces || []).find(p => p.square === target);
-            // validate target exists and belongs to the opponent and is a queen
             if(!board || !target || !targetPiece || targetPiece.color === playerColorShort || !targetPiece.type || targetPiece.type.toLowerCase() !== 'q'){
-              // invalid target: do NOT restore the removed card (card is consumed). Return error but card remains in discard.
               return cb && cb({ error: 'no valid target', message: "Aucune cible valide n'a été sélectionnée." });
             }
-            // perform downgrade: change piece type to pawn
             try{
               targetPiece.type = 'p';
               if(targetPiece.promoted) delete targetPiece.promoted;
-              // bump board version so clients react to the board mutation
               try{ board.version = (board.version || 0) + 1; }catch(_){ }
               played.payload = Object.assign({}, payload, { applied: 'parrure', appliedTo: target });
               try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect: { id: played.id, type: 'parrure', pieceId: targetPiece.id, pieceSquare: targetPiece.square, playerId: senderId } }); }catch(_){ }
             }catch(e){ console.error('parrure apply error', e); }
           }catch(e){ console.error('parrure effect error', e); }
         }
-        // sniper: bind a one-time sniper effect to one of your pieces.
-        // After playing this card the owner selects one of their pieces; the effect is recorded and
-        // when that piece later makes a capturing move, the capture is performed without moving the capturer.
-        else if((typeof cardId === 'string' && cardId.indexOf('sniper') !== -1) || cardId === 'sniper'){
+
+        // sniper
+        else if(cardId === 'sniper'){
           try{
             const board = room.boardState;
-            // client may send selected piece in payload.targetSquare (legacy owned selection) or payload.sourceSquare
             let source = (payload && payload.sourceSquare) || (payload && payload.targetSquare) || null;
             if(!source){ try{ source = socket.data && socket.data.lastSelectedSquare; }catch(e){ source = null; } }
             const roomPlayer = room.players.find(p => p.id === senderId);
             const playerColorShort = (roomPlayer && roomPlayer.color && roomPlayer.color[0]) || null;
             const srcPiece = (board && board.pieces || []).find(p => p.square === source);
             if(!board || !source || !srcPiece || srcPiece.color !== playerColorShort){
-              // invalid target: restore card to hand and abort
               try{
                 room.hands = room.hands || {};
                 room.hands[senderId] = room.hands[senderId] || [];
@@ -1867,7 +1719,6 @@ io.on('connection', (socket) => {
               }catch(_){ }
               return cb && cb({ error: 'no valid source selected', message: "Aucune source valide n'a été sélectionnée." });
             }
-            // bind sniper effect to the piece id (one-time use)
             room.activeCardEffects = room.activeCardEffects || [];
             const effect = { id: played.id, type: 'sniper', playerId: senderId, pieceId: srcPiece.id, pieceSquare: srcPiece.square, remainingUses: 1, imposedBy: senderId, ts: Date.now() };
             room.activeCardEffects.push(effect);
@@ -1875,39 +1726,35 @@ io.on('connection', (socket) => {
             try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect }); }catch(_){ }
           }catch(e){ console.error('sniper binding error', e); }
         }
-        // tout ou rien: choose a piece; that piece may only move if it captures (one owner turn)
-        else if((typeof cardId === 'string' && cardId.indexOf('tout') !== -1 && cardId.indexOf('rien') !== -1) || cardId === 'tout_ou_rien'){
+
+        // tout ou rien
+        else if(cardId === 'tout'){
           try{
             const board = room.boardState;
             let target = payload && payload.targetSquare;
             if(!target){ try{ target = socket.data && socket.data.lastSelectedSquare; }catch(e){ target = null; } }
             const targetPiece = (board && board.pieces || []).find(p => p.square === target);
             if(!board || !target || !targetPiece){
-              // invalid target: do not restore card (consume) and return error
               return cb && cb({ error: 'no valid target', message: "Aucune cible valide n'a été sélectionnée." });
             }
-            // do not allow kings to be affected
             if(targetPiece.type && targetPiece.type.toLowerCase() === 'k'){
-              // consume card but report invalid
               return cb && cb({ error: 'cannot_target_king', message: "Vous ne pouvez pas cibler un roi." });
             }
-            // find owner of the targeted piece
             const targetOwner = (room.players || []).find(p => (p.color && p.color[0]) === targetPiece.color) || null;
             room.activeCardEffects = room.activeCardEffects || [];
-            // Make 'tout_ou_rien' permanent until explicitly removed by another effect
             const effect = { id: played.id, type: 'tout_ou_rien', playerId: (targetOwner && targetOwner.id) || null, pieceId: targetPiece.id, pieceSquare: targetPiece.square, imposedBy: senderId, ts: Date.now() };
             room.activeCardEffects.push(effect);
             played.payload = Object.assign({}, payload, { applied: 'tout_ou_rien', appliedTo: target });
             try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect }); }catch(_){ }
           }catch(e){ console.error('tout_ou_rien effect error', e); }
         }
-        // inversion: pick one of your pieces, then pick an enemy piece — swap their squares
-        else if((typeof cardId === 'string' && cardId.indexOf('inversion') !== -1) || cardId === 'inversion'){
+
+        // inversion
+        else if(cardId === 'inversion'){
           try{
             const board = room.boardState;
             const payloadSrc = payload && payload.sourceSquare;
             const payloadTgt = payload && payload.targetSquare;
-            // fallback to lastSelectedSquare for source if client didn't provide both
             let source = payloadSrc || null;
             let target = payloadTgt || null;
             if(!source){ try{ source = socket.data && socket.data.lastSelectedSquare; }catch(_){ source = null; } }
@@ -1916,19 +1763,15 @@ io.on('connection', (socket) => {
             const playerColorShort = (roomPlayer && roomPlayer.color && roomPlayer.color[0]) || null;
             const srcPiece = (board && board.pieces || []).find(p => p.square === source);
             const tgtPiece = (board && board.pieces || []).find(p => p.square === target);
-            // validate both pieces exist and belong respectively to player and opponent
             if(!board || !source || !target || !srcPiece || !tgtPiece || srcPiece.color !== playerColorShort || tgtPiece.color === playerColorShort){
-              // invalid target(s): restore removed card to hand and abort
               try{ room.hands = room.hands || {}; room.hands[senderId] = room.hands[senderId] || []; if(removed) room.hands[senderId].push(removed); room.discard = room.discard || []; for(let i = room.discard.length - 1; i >= 0; i--){ if(room.discard[i] && room.discard[i].id === (removed && removed.id)){ room.discard.splice(i,1); break; } } }catch(e){ console.error('restore removed card error', e); }
               return cb && cb({ error: 'no valid targets', message: "Aucune cible valide n'a été sélectionnée." });
             }
-            // swap their squares
             try{
               const sSquare = srcPiece.square;
               const tSquare = tgtPiece.square;
               srcPiece.square = tSquare;
               tgtPiece.square = sSquare;
-              // update any activeCardEffects that reference squares
               try{
                 room.activeCardEffects = room.activeCardEffects || [];
                 room.activeCardEffects.forEach(e => {
@@ -1938,25 +1781,23 @@ io.on('connection', (socket) => {
                   }catch(_){ }
                 });
               }catch(_){ }
-              // bump board version
               try{ board.version = (board.version || 0) + 1; }catch(_){ }
               played.payload = Object.assign({}, payload, { applied: 'inversion', from: source, to: target });
               try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect: { id: played.id, type: 'inversion', swapped: [srcPiece.id, tgtPiece.id], playerId: senderId } }); }catch(_){ }
             }catch(e){ console.error('inversion apply error', e); }
           }catch(e){ console.error('inversion effect error', e); }
       }
-      // teleportation: allow the selected piece to move to any empty square for one turn
-      else if((typeof cardId === 'string' && (cardId.indexOf('teleport') !== -1 || cardId.indexOf('t_l_portation') !== -1 || cardId.indexOf('t_lportation') !== -1)) || cardId === 'teleport'){
+
+      // teleportation
+      else if(cardId === 'teleportation'){
         try{
           const board = room.boardState;
           let target = payload && payload.targetSquare;
           if(!target){ try{ target = socket.data && socket.data.lastSelectedSquare; }catch(e){ target = null; } }
-          // validate target exists and belongs to the player
           const roomPlayer = room.players.find(p => p.id === senderId);
           const playerColorShort = (roomPlayer && roomPlayer.color && roomPlayer.color[0]) || null;
           const targetPiece = (board && board.pieces || []).find(p => p.square === target);
           if(!board || !target || !targetPiece || targetPiece.color !== playerColorShort){
-            // restore removed card to hand and remove from discard if necessary
             try{
               room.hands = room.hands || {};
               room.hands[senderId] = room.hands[senderId] || [];
@@ -1966,7 +1807,6 @@ io.on('connection', (socket) => {
             }catch(e){ console.error('restore removed card error', e); }
             return cb && cb({ error: 'no valid target', message: "Aucune cible valide n'a été sélectionnée." });
           }
-          // apply a temporary teleport effect bound to the piece id for one owner turn
           room.activeCardEffects = room.activeCardEffects || [];
           const effect = { id: played.id, type: 'teleport', pieceId: targetPiece.id, pieceSquare: target, playerId: senderId, remainingTurns: 1, decrementOn: 'owner' };
           room.activeCardEffects.push(effect);
@@ -1974,12 +1814,12 @@ io.on('connection', (socket) => {
           try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect }); }catch(_){ }
         }catch(e){ console.error('teleport effect error', e); }
         }
-  // empathie / changement de camp (alias 'empathie'): flip the board so players control the other's pieces
-  else if((typeof cardId === 'string' && (cardId.indexOf('changement') !== -1 || cardId.indexOf('changer') !== -1 || cardId.indexOf('change') !== -1 || cardId.indexOf('camp') !== -1 || cardId.indexOf('empath') !== -1)) || cardId === 'changement_de_camp' || cardId === 'empathie'){
+
+      // empathie
+      else if(cardId === 'empathie'){
         try{
           const board = room.boardState;
           if(!board || !Array.isArray(board.pieces)){
-            // nothing to do; restore card
             try{
               room.hands = room.hands || {};
               room.hands[senderId] = room.hands[senderId] || [];
@@ -1989,22 +1829,16 @@ io.on('connection', (socket) => {
             }catch(e){ }
             return cb && cb({ error: 'no board to flip', message: "Aucun plateau à retourner." });
           }
-          // swap piece colors
-          // helper: square <-> coords
           function squareToCoord(sq){ if(!sq) return null; const s = String(sq).trim().toLowerCase(); if(!/^[a-z][1-9][0-9]*$/.test(s)) return null; const file = s.charCodeAt(0) - 'a'.charCodeAt(0); const rank = parseInt(s.slice(1),10) - 1; return { x: file, y: rank }; }
           function coordToSquare(x,y){ if(x<0||y<0||!board.width||!board.height) return null; if(x<0||y<0||x>=board.width||y>=board.height) return null; return String.fromCharCode('a'.charCodeAt(0) + x) + (y+1); }
-          // perform 180° rotation and swap piece colors
           const w = board.width || 8; const h = board.height || 8;
           (board.pieces || []).forEach(p => {
             try{
-              // rotate square
               const c = squareToCoord(p.square);
               if(c){ const nx = (w - 1) - c.x; const ny = (h - 1) - c.y; const ns = coordToSquare(nx, ny); if(ns) p.square = ns; }
-              // swap colour
               p.color = (p.color === 'w' ? 'b' : (p.color === 'b' ? 'w' : p.color));
             }catch(_){ }
           });
-          // also rotate/adjust any active effect squares (pieceSquare, square, allowedSquares)
           try{
             room.activeCardEffects = room.activeCardEffects || [];
             room.activeCardEffects.forEach(e => {
@@ -2018,13 +1852,9 @@ io.on('connection', (socket) => {
               }catch(_){ }
             });
           }catch(_){ }
-          // swap players' assigned colors (so UIs re-orient)
           (room.players || []).forEach(pl => { try{ pl.color = (pl.color === 'white' ? 'black' : (pl.color === 'black' ? 'white' : pl.color)); }catch(_){ } });
-          // flip whose turn it is (since colors swapped)
           if(board.turn) board.turn = (board.turn === 'w' ? 'b' : (board.turn === 'b' ? 'w' : board.turn));
-          // bump board version
           board.version = (board.version || 0) + 1;
-          // emit an effect to notify clients (type 'empathie' to match renamed card)
           const effect = { id: played.id, type: 'empathie', playerId: senderId, ts: Date.now() };
           room.activeCardEffects = room.activeCardEffects || [];
           room.activeCardEffects.push(effect);
@@ -2032,8 +1862,9 @@ io.on('connection', (socket) => {
           try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect }); }catch(_){ }
         }catch(e){ console.error('empathie / changement de camp error', e); }
       }
-        // promotion: promote one of your pawns to a queen
-        else if(cardId === 'promotion' || cardId === 'promote' || (typeof cardId === 'string' && (cardId.indexOf('promotion') !== -1 || cardId.indexOf('promot') !== -1 || cardId.indexOf('promouvoir') !== -1))){
+        
+      // promotion
+        else if(cardId === 'promotion'){
           try{
             const board = room.boardState;
             let target = payload && payload.targetSquare;
@@ -2041,21 +1872,16 @@ io.on('connection', (socket) => {
             const roomPlayer = room.players.find(p => p.id === senderId);
             const playerColorShort = (roomPlayer && roomPlayer.color && roomPlayer.color[0]) || null;
             const targetPiece = (board && board.pieces || []).find(p => p.square === target);
-            // validate target exists and belongs to the player and is a pawn
             if(!board || !target || !targetPiece || targetPiece.color !== playerColorShort || (targetPiece.type && String(targetPiece.type).toLowerCase() !== 'p')){
-              // Invalid target: consume the card and notify owner (promotion failed)
               played.payload = Object.assign({}, payload, { applied: 'promotion_failed', attemptedTo: target });
               try{ const owner = (room.players || []).find(p => p.id === senderId); if(owner && owner.socketId) io.to(owner.socketId).emit('card:effect:applied', { roomId: room.id, effect: { id: played.id, type: 'promotion_failed', playerId: senderId, square: target, ts: Date.now() } }); }catch(_){ }
             } else {
-              // mutate the piece: promote to chosen piece (default to queen)
               const oldType = targetPiece.type;
               const chosen = (payload && (payload.promotion || payload.targetPromotion || payload.promoteTo)) || 'q';
               const mapping = { q: 'q', r: 'r', b: 'b', n: 'n' };
               const toType = mapping[String(chosen).toLowerCase()] || 'q';
               targetPiece.type = toType;
-              // optional flag to indicate promotion
               targetPiece.promoted = true;
-              // emit applied effect for clients to show special UI if desired
               try{
                 const effect = { id: played.id, type: 'promotion', pieceId: targetPiece.id, pieceSquare: target, playerId: senderId, ts: Date.now() };
                 room.activeCardEffects = room.activeCardEffects || [];
@@ -2066,19 +1892,17 @@ io.on('connection', (socket) => {
             }
           }catch(e){ console.error('promotion effect error', e); }
         }
-        // kamikaz: destroy one of your pieces and all adjacent pieces
-        else if(cardId === 'kamikaz' || (typeof cardId === 'string' && cardId.indexOf('kamikaz') !== -1)){
+
+        // kamikaze
+        else if(cardId === 'kamikaze'){
           try{
             const board = room.boardState;
-            // determine target square from payload or last selected
             let target = payload && payload.targetSquare;
             if(!target){ try{ target = socket.data && socket.data.lastSelectedSquare; }catch(e){ target = null; } }
             const roomPlayer = room.players.find(p => p.id === senderId);
             const playerColorShort = (roomPlayer && roomPlayer.color && roomPlayer.color[0]) || null;
             const targetPiece = (board && board.pieces || []).find(p => p.square === target);
-            // validate target exists and belongs to the player
             if(!board || !target || !targetPiece || targetPiece.color !== playerColorShort){
-              // restore removed card to hand and abort
               try{
                 room.hands = room.hands || {};
                 room.hands[senderId] = room.hands[senderId] || [];
@@ -2088,7 +1912,6 @@ io.on('connection', (socket) => {
               }catch(e){ console.error('restore removed card error', e); }
               return cb && cb({ error: 'no valid target', message: "Aucune cible valide n'a été sélectionnée." });
             }
-            // compute affected squares: target + neighbors
             function neighbors(sq){
               if(!sq) return [];
               const m = String(sq).toLowerCase().match(/^([a-z])([0-9]+)$/i);
@@ -2106,7 +1929,6 @@ io.on('connection', (socket) => {
             }
             const affected = neighbors(target);
             const removedPieces = [];
-            // remove pieces on affected squares and record them as captured by sender
             for(let i = (board.pieces || []).length - 1; i >= 0; i--){
               const p = board.pieces[i];
               if(p && affected.indexOf(p.square) !== -1){
@@ -2119,26 +1941,20 @@ io.on('connection', (socket) => {
                 removedPieces.push({ id: cp.id, square: cp.square, type: cp.type, color: cp.color });
               }
             }
-            // bump board version and record effect
             board.version = (board.version || 0) + 1;
             const effect = { id: played.id, type: 'kamikaz', playerId: senderId, targetSquare: target, affectedSquares: affected, removed: removedPieces, ts: Date.now() };
             room.activeCardEffects = room.activeCardEffects || [];
             room.activeCardEffects.push(effect);
             try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect }); }catch(_){ }
-            // reuse the mine detonation animation on clients for kamikaz: show the same explosion visual
             try{ io.to(room.id).emit('mine:detonated', { roomId: room.id, square: target }); }catch(_){ }
             played.payload = Object.assign({}, payload, { applied: 'kamikaz', appliedTo: target, affected: affected, removedCount: removedPieces.length });
-            // After applying kamikaz, check for victory (kings may have been removed).
             try{
               const end = checkAndHandleVictory(room);
               if(end && end.over){
-                // if game over, broadcast final state and stop further turn changes
                 try{ sendRoomUpdate(room); }catch(_){ }
               } else {
-                // normal behavior: the player immediately loses their turn
                 if(board){
                   board.turn = (board.turn === 'w') ? 'b' : 'w';
-                  // draw for the next player at the start of their turn
                   const nextColor = board.turn;
                   const nextPlayer = (room.players || []).find(p => (p.color && p.color[0]) === nextColor);
                   if(nextPlayer){ try{ maybeDrawAtTurnStart(room, nextPlayer.id); }catch(_){ } }
@@ -2147,8 +1963,9 @@ io.on('connection', (socket) => {
             }catch(_){ }
           }catch(e){ console.error('kamikaz effect error', e); }
         }
-        // coin coin: teleport one of your pieces from a corner to another empty corner
-        else if((typeof cardId === 'string' && (cardId.indexOf('coin') !== -1 || cardId.indexOf('coincoin') !== -1)) || cardId === 'coin_coin'){
+
+        // coin coin
+        else if(cardId === 'coincoin'){
           try{
             const board = room.boardState;
             let source = payload && payload.targetSquare;
@@ -2156,15 +1973,12 @@ io.on('connection', (socket) => {
             const roomPlayer = room.players.find(p => p.id === senderId);
             const playerColorShort = (roomPlayer && roomPlayer.color && roomPlayer.color[0]) || null;
             const piece = (board && board.pieces || []).find(p => p.square === source);
-            // determine corner squares for the current board
             const w = (board && board.width) || 8;
             const h = (board && board.height) || 8;
             const left = 'a';
             const right = String.fromCharCode('a'.charCodeAt(0) + (w - 1));
             const corners = [ left + '1', left + String(h), right + '1', right + String(h) ];
-            // validate source exists, belongs to the player and is on a corner
             if(!board || !source || !piece || piece.color !== playerColorShort || corners.indexOf(source) === -1){
-              // invalid target: restore card to hand and abort
               try{
                 room.hands = room.hands || {};
                 room.hands[senderId] = room.hands[senderId] || [];
@@ -2174,12 +1988,9 @@ io.on('connection', (socket) => {
               }catch(e){ console.error('restore removed card error', e); }
               return cb && cb({ error: 'no valid corner piece selected', message: "Aucun coin valide n'a été sélectionné." });
             }
-            // find available destination corners (empty)
             const emptyCorners = corners.filter(c => { return !(board.pieces || []).some(p => p.square === c); });
-            // remove the source corner from choices
             const destChoices = emptyCorners.filter(c => c !== source);
             if(!destChoices || destChoices.length === 0){
-              // nothing to teleport to: restore card
               try{
                 room.hands = room.hands || {};
                 room.hands[senderId] = room.hands[senderId] || [];
@@ -2189,23 +2000,20 @@ io.on('connection', (socket) => {
               }catch(e){ console.error('restore removed card error', e); }
               return cb && cb({ error: 'no empty destination corner available', message: "Aucun coin de destination vide n'est disponible." });
             }
-            // instead of teleporting immediately, record an effect that grants this piece the ability
-            // to move to any of the available corner squares for one turn
             const effect = { id: played.id, type: 'coincoin', playerId: senderId, pieceId: piece.id, pieceSquare: source, allowedSquares: destChoices.slice(0), remainingTurns: 1, ts: Date.now() };
             room.activeCardEffects = room.activeCardEffects || [];
             room.activeCardEffects.push(effect);
-            // bump version so clients refresh legal moves when they request them
             board.version = (board.version || 0) + 1;
             try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect }); }catch(_){ }
             played.payload = Object.assign({}, payload, { applied: 'coincoin', from: source, allowed: destChoices.slice(0) });
           }catch(e){ console.error('coincoin effect error', e); }
         }
-        // mélange: permute aléatoirement la position de toutes les pièces (échange entre cases occupées)
-        else if((typeof cardId === 'string' && (cardId.indexOf('melange') !== -1 || cardId.indexOf('m\u00E9lange') !== -1 || cardId.indexOf('m\u00E9l') !== -1)) || cardId === 'melange' || cardId === 'm\u00E9lange'){
+
+        // mélange
+        else if(cardId === 'melange'){
           try{
             const board = room.boardState;
             if(!board || !Array.isArray(board.pieces) || board.pieces.length === 0){
-              // nothing to do; restore card
               try{
                 room.hands = room.hands || {};
                 room.hands[senderId] = room.hands[senderId] || [];
@@ -2215,30 +2023,22 @@ io.on('connection', (socket) => {
               }catch(_){ }
               return cb && cb({ error: 'no pieces to shuffle', message: "Aucune pièce à mélanger." });
             }
-            // gather pieces and compute a random set of distinct destination squares across the whole board
             const pieces = board.pieces;
             const w = board.width || 8; const h = board.height || 8;
-            // build full list of all squares on the board
             const allSquares = [];
             for(let yy = 0; yy < h; yy++){
               for(let xx = 0; xx < w; xx++){
                 allSquares.push(String.fromCharCode('a'.charCodeAt(0) + xx) + (yy + 1));
               }
             }
-            // if there are fewer available squares than pieces (shouldn't happen), abort gracefully
             if(allSquares.length < pieces.length){
-              // can't place all pieces uniquely; leave board unchanged
               played.payload = Object.assign({}, payload, { applied: 'melange_failed', reason: 'board_too_small' });
             } else {
-              // Fisher-Yates shuffle the full board squares and take first N distinct
               for(let i = allSquares.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); const tmp = allSquares[i]; allSquares[i] = allSquares[j]; allSquares[j] = tmp; }
               const dests = allSquares.slice(0, pieces.length);
-              // assign destinations to pieces in random order
               const newSquareByPieceId = {};
               for(let i = 0; i < pieces.length; i++){ const p = pieces[i]; newSquareByPieceId[p.id] = dests[i]; }
-              // apply new squares
               pieces.forEach(p => { try{ p.square = newSquareByPieceId[p.id] || p.square; }catch(_){ } });
-              // update any active effects that are bound to pieces (by pieceId) so their pieceSquare follows
               try{
                 room.activeCardEffects = room.activeCardEffects || [];
                 room.activeCardEffects.forEach(e => {
@@ -2247,7 +2047,6 @@ io.on('connection', (socket) => {
                 });
               }catch(_){ }
               played.payload = Object.assign({}, payload, { applied: 'melange', count: pieces.length });
-              // bump board version and notify clients
               board.version = (board.version || 0) + 1;
               const effect = { id: played.id, type: 'melange', playerId: senderId, ts: Date.now(), note: 'pieces shuffled' };
               room.activeCardEffects = room.activeCardEffects || [];
@@ -2256,12 +2055,12 @@ io.on('connection', (socket) => {
             }
           }catch(e){ console.error('melange error', e); }
         }
-        // révolution: transform pawns into (knight|bishop|rook) randomly, and knights/bishops/rooks into pawns
-        else if((typeof cardId === 'string' && (cardId.indexOf('revol') !== -1 || cardId.indexOf('r\u00E9vol') !== -1)) || cardId === 'revolution' || cardId === 'r\u00E9volution'){
+
+        // révolution
+        else if(cardId === 'revolution'){
           try{
             const board = room.boardState;
             if(!board || !Array.isArray(board.pieces) || board.pieces.length === 0){
-              // nothing to do; restore card
               try{
                 room.hands = room.hands || {};
                 room.hands[senderId] = room.hands[senderId] || [];
@@ -2279,26 +2078,24 @@ io.on('connection', (socket) => {
               if(!p || !p.type) continue;
               const t = ('' + p.type).toUpperCase();
               if(t === 'P'){
-                // pawn -> random among N,B,R
                 const choice = transformChoices[Math.floor(Math.random() * transformChoices.length)];
                 p.type = choice;
                 if(p.promoted) try{ delete p.promoted; }catch(_){ }
                 mapping.push({ id: p.id, from: 'P', to: choice });
               } else if(t === 'N' || t === 'B' || t === 'R'){
-                // knight/bishop/rook -> pawn
                 p.type = 'P';
                 if(p.promoted) try{ delete p.promoted; }catch(_){ }
                 mapping.push({ id: p.id, from: t, to: 'P' });
               }
             }
-            // bump version so clients refresh legal moves when they request them
             board.version = (board.version || 0) + 1;
             try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect: { id: played.id, type: 'revolution', mapping } }); }catch(_){ }
             played.payload = Object.assign({}, payload, { applied: 'revolution', mapping });
           }catch(e){ console.error('revolution effect error', e); }
         }
-        // invisible: make one of your pieces invisible to the opponent for a number of turns
-        else if(cardId === 'invisible' || (typeof cardId === 'string' && cardId.indexOf('invis') !== -1)){
+
+        // invisible
+        else if(cardId === 'invisible'){
           try{
             const board = room.boardState;
             let target = payload && payload.targetSquare;
@@ -2306,9 +2103,7 @@ io.on('connection', (socket) => {
             const roomPlayer = room.players.find(p => p.id === senderId);
             const playerColorShort = (roomPlayer && roomPlayer.color && roomPlayer.color[0]) || null;
             const targetPiece = (board && board.pieces || []).find(p => p.square === target);
-            // validate target exists and belongs to the player
             if(!board || !target || !targetPiece || targetPiece.color !== playerColorShort){
-              // restore removed card to hand and remove from discard if necessary
               try{
                 room.hands = room.hands || {};
                 room.hands[senderId] = room.hands[senderId] || [];
@@ -2318,21 +2113,19 @@ io.on('connection', (socket) => {
               }catch(e){ console.error('restore removed card error', e); }
               return cb && cb({ error: 'no valid target', message: "Aucune cible valide n'a été sélectionnée." });
             }
-            // apply invisible effect bound to the piece id so only the owner can see it
             room.activeCardEffects = room.activeCardEffects || [];
-            // Mark the piece object itself as invisible so the flag follows the piece when it moves
             try{ targetPiece.invisible = true; }catch(_){ }
-            // Permanent invisible effect: do NOT set remainingTurns — the effect persists until explicitly removed by another action.
             const effect = { id: played.id, type: 'invisible', pieceId: targetPiece.id, pieceSquare: target, playerId: senderId, ts: Date.now() };
             room.activeCardEffects.push(effect);
             try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect }); }catch(_){ }
             played.payload = Object.assign({}, payload, { applied: 'invisible', appliedTo: target });
           }catch(e){ console.error('invisible effect error', e); }
         }
-    else if(cardId === 'brouillard_de_guerre' || (typeof cardId === 'string' && cardId.indexOf('brouillard') !== -1)){
-      try{
+
+      // brouillard
+      else if(cardId === 'brouillard'){
+        try{
               const board = room.boardState;
-              // determine target player id: payload.targetPlayerId or the opponent
               let targetPlayerId = payload && payload.targetPlayerId;
               if(!targetPlayerId){
                 const opp = (room.players || []).find(p => p.id !== senderId);
@@ -2340,11 +2133,9 @@ io.on('connection', (socket) => {
               }
               const targetPlayer = (room.players || []).find(p => p.id === targetPlayerId);
               if(!board || !targetPlayer || targetPlayer.id === senderId){
-                // restore removed card to hand and abort
                 try{ room.hands = room.hands || {}; room.hands[senderId] = room.hands[senderId] || []; if(removed) room.hands[senderId].push(removed); room.discard = room.discard || []; for(let i = room.discard.length-1;i>=0;i--){ if(room.discard[i] && room.discard[i].id === (removed && removed.id)){ room.discard.splice(i,1); break; } } }catch(e){}
                 return cb && cb({ error: 'no valid target player', message: "Aucun joueur cible valide n'a été sélectionné." });
               }
-              // compute list of all squares (each square veiled individually)
               const width = board.width || 8;
               const height = board.height || 8;
               const all = [];
@@ -2353,9 +2144,7 @@ io.on('connection', (socket) => {
                   all.push(String.fromCharCode('a'.charCodeAt(0) + xx) + (yy+1));
                 }
               }
-              // record brouillard effect for target player with veiledSquares
               room.activeCardEffects = room.activeCardEffects || [];
-              // initialize playCounts so we can expire brouillard after each player played N times
               const playCounts = {};
               try{ (room.players || []).forEach(pl => { if(pl && pl.id) playCounts[pl.id] = 0; }); }catch(_){ }
               const effect = { id: played.id, type: 'brouillard', playerId: targetPlayer.id, ts: Date.now(), remainingTurns: (payload && payload.turns) || 4, veiledSquares: all, playCounts };
@@ -2364,10 +2153,10 @@ io.on('connection', (socket) => {
               played.payload = Object.assign({}, payload, { applied: 'brouillard', appliedToPlayer: targetPlayer.id });
             }catch(e){ console.error('brouillard effect error', e); }
         }
-        // anneau: make the board horizontally wrap for the playing player's pieces for this turn
-        else if(cardId === 'anneau' || (typeof cardId === 'string' && cardId.indexOf('anneau') !== -1)){
+
+        // anneau
+        else if(cardId === 'anneau'){
           try{
-            // record an anneau effect scoped to the player so their pieces gain wrap behavior
             room.activeCardEffects = room.activeCardEffects || [];
             const effect = { id: played.id, type: 'anneau', playerId: senderId, ts: Date.now(), remainingTurns: (payload && payload.turns) || 1 };
             room.activeCardEffects.push(effect);
@@ -2375,51 +2164,44 @@ io.on('connection', (socket) => {
             played.payload = Object.assign({}, payload, { applied: 'anneau' });
           }catch(e){ console.error('anneau effect error', e); }
         }
-        // totem d'immunité: protect the playing player so the next card played by an opponent is canceled
-        else if((typeof cardId === 'string' && (cardId.indexOf('totem') !== -1 || cardId.indexOf('immun') !== -1))){
+
+        // totem
+        else if(cardId === 'totem'){
           try{
             room.activeCardEffects = room.activeCardEffects || [];
-            // create a persistent totem effect bound to the player. It will be removed when it blocks the next opponent card.
             const effect = { id: played.id, type: 'totem', playerId: senderId, ts: Date.now() };
             room.activeCardEffects.push(effect);
             try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect }); }catch(_){ }
             played.payload = Object.assign({}, payload, { applied: 'totem', appliedToPlayer: senderId });
           }catch(e){ console.error('totem effect error', e); }
         }
-        // placement de mines: place a hidden mine on an empty square (hidden from other players)
-        else if((typeof cardId === 'string' && cardId.indexOf('mine') !== -1)){
+
+        //mine
+        else if(cardId === 'mine'){
           try{
             const board = room.boardState;
             let target = payload && payload.targetSquare;
             if(!target){ try{ target = socket.data && socket.data.lastSelectedSquare; }catch(e){ target = null; } }
-            // validate board and empty target
             const targetOccupied = (board && board.pieces || []).find(p => p.square === target);
             if(!board || !target || targetOccupied){
-              // Invalid target: the card is still consumed (player loses the card as requested).
-              // We do not restore the removed card to the player's hand. Record in played payload that the placement failed.
               played.payload = Object.assign({}, payload, { applied: 'mine_failed', attemptedTo: target });
-              // Notify only the owner that the card was used but the mine was not placed
               try{ const owner = (room.players || []).find(p => p.id === senderId); if(owner && owner.socketId) io.to(owner.socketId).emit('card:effect:applied', { roomId: room.id, effect: { id: played.id, type: 'mine_failed', playerId: senderId, square: target, ts: Date.now() } }); }catch(_){ }
-              // continue without creating a mine
             } else {
-            // record mine effect scoped to the player; do NOT broadcast location to other players
             room.activeCardEffects = room.activeCardEffects || [];
             const effect = { id: played.id, type: 'mine', playerId: senderId, square: target, ts: Date.now() };
             room.activeCardEffects.push(effect);
-            // notify only the owner about the mine placement (keep it hidden from opponents)
             try{
               const owner = (room.players || []).find(p => p.id === senderId);
               if(owner && owner.socketId) io.to(owner.socketId).emit('card:effect:applied', { roomId: room.id, effect });
             }catch(_){ }
-            // for the public played record we mark the card as used without revealing the square
             played.payload = Object.assign({}, payload, { applied: 'mine' });
           }
         }catch(e){ console.error('mine placement error', e); }
         }
-        // jouer deux fois: grant the playing player one extra move this turn (does not allow another card play)
-        else if(cardId === 'jouer_deux_fois' || (typeof cardId === 'string' && cardId.indexOf('jouer') !== -1 && cardId.indexOf('deux') !== -1)){
+
+        // jouer deux fois
+        else if(cardId === 'double'){
           try{
-            // record double-move effect scoped to the player
             room.activeCardEffects = room.activeCardEffects || [];
             const effect = { id: played.id, type: 'double_move', playerId: senderId, ts: Date.now(), remainingMoves: (payload && payload.moves) || 2 };
             room.activeCardEffects.push(effect);
@@ -2427,8 +2209,9 @@ io.on('connection', (socket) => {
             played.payload = Object.assign({}, payload, { applied: 'double_move', moves: effect.remainingMoves });
           }catch(e){ console.error('double_move effect error', e); }
         }
-        // 'tous les mêmes' : make all pieces appear as kings to the opponent for N opponent turns
-        else if((typeof cardId === 'string' && cardId.indexOf('tous') !== -1 && cardId.indexOf('meme') !== -1)){
+
+        // tous les même
+        else if(cardId === 'pareil'){
           try{
             room.activeCardEffects = room.activeCardEffects || [];
             const effect = { id: played.id, type: 'tous_memes', playerId: senderId, ts: Date.now(), remainingTurns: (payload && payload.turns) || 2, decrementOn: 'opponent' };
@@ -2437,9 +2220,9 @@ io.on('connection', (socket) => {
             played.payload = Object.assign({}, payload, { applied: 'tous_memes', appliedToPlayer: senderId });
           }catch(e){ console.error('tous_memes effect error', e); }
         }
-  // vol de pièce: transfer ownership of a targeted enemy piece to the playing player
-  // Note: do NOT handle "vole ... carte" here (steal-a-card) — that is handled by a separate branch below.
-  else if((typeof cardId === 'string' && (cardId.indexOf('vol') !== -1 || cardId.indexOf('vole') !== -1 || cardId.indexOf('steal') !== -1) && !(cardId.indexOf('carte') !== -1 || cardId.indexOf('card') !== -1))){
+
+        // vole de pièce
+        else if(cardId === 'vole_piece'){
           try{
             const board = room.boardState;
             let target = payload && payload.targetSquare;
@@ -2447,19 +2230,13 @@ io.on('connection', (socket) => {
             const roomPlayer = room.players.find(p => p.id === senderId);
             const playerColorShort = (roomPlayer && roomPlayer.color && roomPlayer.color[0]) || null;
             const targetPiece = (board && board.pieces || []).find(p => p.square === target);
-            // validate target exists and belongs to the opponent and is not a king
             if(!board || !target || !targetPiece || targetPiece.color === playerColorShort || (targetPiece.type && String(targetPiece.type).toLowerCase() === 'k')){
-              // Invalid target: by convention the card is consumed and not restored. Record failure in payload
               played.payload = Object.assign({}, payload, { applied: 'steal_failed', attemptedTo: target });
-              // Notify only the owner that the card was used but the steal did not happen
               try{ const owner = (room.players || []).find(p => p.id === senderId); if(owner && owner.socketId) io.to(owner.socketId).emit('card:effect:applied', { roomId: room.id, effect: { id: played.id, type: 'steal_failed', playerId: senderId, square: target, ts: Date.now() } }); }catch(_){ }
-              // continue without creating a steal effect
             } else {
-            // perform the theft: change piece color to the player's color
             const oldColor = targetPiece.color;
             targetPiece.color = playerColorShort;
 
-            // record a steal effect so clients can track it if needed
             room.activeCardEffects = room.activeCardEffects || [];
             const originalOwner = (room.players || []).find(p => (p.color && p.color[0]) === oldColor);
             const effect = { id: played.id, type: 'steal', pieceId: targetPiece.id, pieceSquare: target, fromColor: oldColor, toPlayerId: senderId, originalOwnerId: originalOwner && originalOwner.id, playerId: senderId, ts: Date.now() };
@@ -2467,7 +2244,6 @@ io.on('connection', (socket) => {
             try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect }); }catch(_){ }
 
             played.payload = Object.assign({}, payload, { applied: 'steal', appliedTo: target, fromColor: oldColor });
-            // after performing a piece-theft, the playing player immediately loses their turn
             try{
               if(board){
                 board.turn = (board.turn === 'w') ? 'b' : 'w';
@@ -2480,61 +2256,54 @@ io.on('connection', (socket) => {
             }
           }catch(e){ console.error('steal effect error', e); }
         }
-        // vole d'une carte: steal one random card from the target player's hand
-        else if((typeof cardId === 'string' && cardId.indexOf('vole') !== -1 && (cardId.indexOf('carte') !== -1 || cardId.indexOf('card') !== -1))){
+
+        // vole d'une carte
+        else if(cardId === 'vole_carte'){
           try{
-            // determine target player id: payload.targetPlayerId or pick the opponent
             let targetPlayerId = payload && payload.targetPlayerId;
             if(!targetPlayerId){ const opp = (room.players || []).find(p => p.id !== senderId); targetPlayerId = opp && opp.id; }
             const targetPlayer = (room.players || []).find(p => p.id === targetPlayerId);
             if(!targetPlayer || targetPlayer.id === senderId){
-              // invalid target: consume card and notify owner
               played.payload = Object.assign({}, payload, { applied: 'steal_card_failed', attemptedTo: targetPlayerId });
               try{ const owner = (room.players || []).find(p => p.id === senderId); if(owner && owner.socketId) io.to(owner.socketId).emit('card:effect:applied', { roomId: room.id, effect: { id: played.id, type: 'steal_card_failed', playerId: senderId, targetPlayerId, ts: Date.now() } }); }catch(_){ }
             } else {
               room.hands = room.hands || {};
               const victimHand = room.hands[targetPlayerId] || [];
               if(!victimHand || victimHand.length === 0){
-                // nothing to steal
                 played.payload = Object.assign({}, payload, { applied: 'steal_card_failed_empty', attemptedTo: targetPlayerId });
                 try{ const owner = (room.players || []).find(p => p.id === senderId); if(owner && owner.socketId) io.to(owner.socketId).emit('card:effect:applied', { roomId: room.id, effect: { id: played.id, type: 'steal_card_failed_empty', playerId: senderId, targetPlayerId, ts: Date.now() } }); }catch(_){ }
               } else {
-                // pick random card from victim
                 const idx = Math.floor(Math.random() * victimHand.length);
                 const stolen = victimHand.splice(idx,1)[0];
-                // give to stealer
                 room.hands[senderId] = room.hands[senderId] || [];
                 room.hands[senderId].push(stolen);
                 played.payload = Object.assign({}, payload, { applied: 'steal_card', stolenFrom: targetPlayerId, stolenCardId: stolen.cardId || stolen.id });
-                // inform the stealer privately about the stolen card details
                 try{ const stealer = (room.players || []).find(p => p.id === senderId); if(stealer && stealer.socketId) io.to(stealer.socketId).emit('card:stolen', { roomId: room.id, from: targetPlayerId, card: stolen }); }catch(_){ }
-                // inform the victim privately that they lost a card (do not reveal which)
                 try{ const victim = (room.players || []).find(p => p.id === targetPlayerId); if(victim && victim.socketId) io.to(victim.socketId).emit('card:lost', { roomId: room.id, lostCount: 1 }); }catch(_){ }
               }
             }
             
           }catch(e){ console.error('steal-card effect error', e); }
           }
-          // carte sans effet: consumed but does nothing
-          else if((typeof cardId === 'string' && (cardId.indexOf('carte_sans_effet') !== -1 || cardId.indexOf('sans_effet') !== -1 || cardId.indexOf('no_effect') !== -1))){
+
+          // carte sans effet
+          else if(cardId === 'sans_effet'){
             try{
-              // no game state change; just inform the owner that the card was consumed with no effect
               played.payload = Object.assign({}, payload, { applied: 'no_effect' });
               try{ const owner = (room.players || []).find(p => p.id === senderId); if(owner && owner.socketId) io.to(owner.socketId).emit('card:effect:applied', { roomId: room.id, effect: { id: played.id, type: 'no_effect', playerId: senderId, ts: Date.now() } }); }catch(_){ }
             }catch(e){ console.error('no_effect card error', e); }
           }
-          // resurrection: bring back one of your captured pieces and place it on an empty square
-          else if((typeof cardId === 'string' && cardId.indexOf('resur') !== -1) || (typeof cardId === 'string' && cardId.indexOf('ressur') !== -1)){
+
+          // resurrection
+          else if(cardId === 'resurection'){
             try{
               const roomPlayer = room.players.find(p => p.id === senderId);
               const playerColorShort = (roomPlayer && roomPlayer.color && roomPlayer.color[0]) || null;
-              // list captured pieces that originally belonged to this player
               const available = (room.captured || []).filter(c => c && c.piece && c.piece.color === playerColorShort);
               if(!available || available.length === 0){
                 played.payload = Object.assign({}, payload, { applied: 'resurrection_failed_no_captured' });
                 try{ const owner = (room.players || []).find(p => p.id === senderId); if(owner && owner.socketId) io.to(owner.socketId).emit('card:effect:applied', { roomId: room.id, effect: { id: played.id, type: 'resurrection_failed_no_captured', playerId: senderId, ts: Date.now() } }); }catch(_){ }
               } else {
-                // allow client to specify which captured entry to resurrect
                 const selectedId = payload && (payload.captureId || payload.capturedId || payload.targetCapturedId || payload.selectedCapturedId);
                 let capturedEntry = null;
                 if(selectedId){
@@ -2542,26 +2311,21 @@ io.on('connection', (socket) => {
                   if(idx !== -1) capturedEntry = room.captured[idx];
                 }
                 if(!capturedEntry){
-                  // fallback: pick the most recently captured of the player's pieces
                   capturedEntry = available[available.length - 1];
                 }
                 if(!capturedEntry){
                   played.payload = Object.assign({}, payload, { applied: 'resurrection_failed_no_valid' });
                   try{ const owner = (room.players || []).find(p => p.id === senderId); if(owner && owner.socketId) io.to(owner.socketId).emit('card:effect:applied', { roomId: room.id, effect: { id: played.id, type: 'resurrection_failed_no_valid', playerId: senderId, ts: Date.now() } }); }catch(_){ }
                 } else {
-                  // placement square
                   let target = payload && payload.targetSquare;
                   if(!target){ try{ target = socket.data && socket.data.lastSelectedSquare; }catch(e){ target = null; } }
                   const board = room.boardState;
                   const occupied = (board && board.pieces || []).find(p => p.square === target);
                   if(!board || !target || occupied){
-                    // invalid placement: consume card but report failure to owner
                     played.payload = Object.assign({}, payload, { applied: 'resurrection_failed_bad_square', attemptedTo: target });
                     try{ const owner = (room.players || []).find(p => p.id === senderId); if(owner && owner.socketId) io.to(owner.socketId).emit('card:effect:applied', { roomId: room.id, effect: { id: played.id, type: 'resurrection_failed_bad_square', playerId: senderId, square: target, ts: Date.now() } }); }catch(_){ }
                   } else {
-                    // remove captured entry from the capture log
                     for(let i = room.captured.length - 1; i >= 0; i--){ if(room.captured[i] && room.captured[i].id === capturedEntry.id){ room.captured.splice(i,1); break; } }
-                    // create a new piece object and place it
                     const orig = capturedEntry.piece || {};
                     const newPiece = Object.assign({}, orig);
                     newPiece.id = ((playerColorShort === 'w') ? 'w_' : 'b_') + (newPiece.type || 'P') + '_' + uuidv4().slice(0,6);
@@ -2570,7 +2334,6 @@ io.on('connection', (socket) => {
                     if(newPiece.promoted) newPiece.promoted = true;
                     board.pieces = board.pieces || [];
                     board.pieces.push(newPiece);
-                    // record effect and broadcast
                     const effect = { id: played.id, type: 'resurrection', pieceId: newPiece.id, pieceType: newPiece.type, placedAt: target, playerId: senderId, ts: Date.now() };
                     room.activeCardEffects = room.activeCardEffects || [];
                     room.activeCardEffects.push(effect);
@@ -2581,32 +2344,28 @@ io.on('connection', (socket) => {
               }
             }catch(e){ console.error('resurrection effect error', e); }
           }
-      // rebondir: grant a one-time bounce ability to a specific piece (targetSquare required in payload)
-      else if(cardId === 'rebondir_sur_les_bords' || cardId === 'rebondir' || (typeof cardId === 'string' && cardId.indexOf('rebondir') !== -1)){
+
+      // rebond:
+      else if(cardId === 'rebond'){
         try{
           const board = room.boardState;
-          // allow the client to either provide payload.targetSquare or rely on the last selected square
           let target = payload && payload.targetSquare;
           if(!target){
             try{ target = socket.data && socket.data.lastSelectedSquare; }catch(e){ target = null; }
           }
-          // validate target exists and belongs to the player; if invalid, restore card to hand and abort
           const roomPlayer = room.players.find(p => p.id === senderId);
           const playerColorShort = (roomPlayer && roomPlayer.color && roomPlayer.color[0]) || null;
           const targetPiece = (board && board.pieces || []).find(p => p.square === target);
           if(!board || !target || !targetPiece || targetPiece.color !== playerColorShort){
-            // restore removed card to hand and remove from discard if necessary
             try{
               room.hands = room.hands || {};
               room.hands[senderId] = room.hands[senderId] || [];
               if(removed) room.hands[senderId].push(removed);
               room.discard = room.discard || [];
-              // try to remove the removed card instance from discard (last occurrence)
               for(let i = room.discard.length - 1; i >= 0; i--){ if(room.discard[i] && room.discard[i].id === (removed && removed.id)){ room.discard.splice(i,1); break; } }
             }catch(e){ console.error('restore removed card error', e); }
             return cb && cb({ error: 'no valid target', message: "Aucune cible valide n'a été sélectionnée." });
           }
-          // apply the rebond effect (also record pieceId so it can be identified after moves)
           room.activeCardEffects = room.activeCardEffects || [];
           room.activeCardEffects.push({ id: played.id, type: 'rebondir', pieceId: targetPiece.id, pieceSquare: target, playerId: senderId });
           played.payload = Object.assign({}, payload, { applied: 'rebondir', appliedTo: target });
@@ -2617,7 +2376,6 @@ io.on('connection', (socket) => {
     }
 
   room.playedCards.push(played);
-  // mark that this player has played a card for this board version (prevents multiple cards per turn)
     try{
     const board = room.boardState;
     if(room.status === 'playing' && board){
@@ -2625,20 +2383,15 @@ io.on('connection', (socket) => {
       room._cardPlayedThisTurn[played.playerId] = true;
     }
   }catch(e){ console.error('mark card played error', e); }
-  // emit card played to entire room (informational)
   io.to(roomId).emit('card:played', played);
-  // After playing a card, either grant a free move OR, for cards that "count as a move" (like inversion),
-  // consume the player's turn immediately (flip turn, decrement per-turn effects, draw for next player).
   try{
-    const countsAsMove = ((typeof cardId === 'string' && cardId.indexOf('inversion') !== -1) || cardId === 'inversion' || (played.payload && played.payload.applied === 'inversion'));
+    const countsAsMove = (cardId === 'inversion');
     if(countsAsMove){
-      // treat this card play as if the player made their move: flip the turn and run per-turn bookkeeping
       try{
         const board = room.boardState;
         if(board){
           board.turn = (board.turn === 'w') ? 'b' : 'w';
 
-          // decrement remainingTurns for any time-limited effects as the finished-turn player is `senderId`
           try{
             room.activeCardEffects = room.activeCardEffects || [];
             for(let i = room.activeCardEffects.length - 1; i >= 0; i--){
@@ -2664,10 +2417,8 @@ io.on('connection', (socket) => {
             }
           }catch(err){ console.error('updating temporary effects error (inversion)', err); }
 
-          // reset per-turn card-play flags because turn changed
           try{ room._cardPlayedThisTurn = {}; }catch(_){ }
 
-          // draw for next player (respect room.autoDraw)
           try{
             const nextColor = board.turn;
             const nextPlayer = room.players.find(p => (p.color && p.color[0]) === nextColor);
@@ -2682,9 +2433,7 @@ io.on('connection', (socket) => {
         }
       }catch(err){ console.error('inversion end-of-turn handling error', err); sendRoomUpdate(room); }
     } else {
-      // default: grant a free move that does NOT consume the player's turn
       room._freeMoveFor = played.playerId; // client may use this flag to enable a free move UI
-      // broadcast updated room state so clients can reflect the free-move opportunity
       sendRoomUpdate(room);
       try{ io.to(room.id).emit('card:free_move_allowed', { roomId: room.id, playerId: played.playerId }); }catch(_){ }
     }
@@ -2699,17 +2448,12 @@ server.listen(PORT, () => {
   console.log(`ChessNut server listening on port ${PORT}`);
 });
 
-// Periodic sweep to ensure victory conditions are detected even if some code path
-// didn't call checkAndHandleVictory after mutating the board. This protects against
-// missed edge-cases (cards, effects or unexpected flows) by validating rooms once
-// per second and emitting `game:over` when appropriate.
 setInterval(() => {
   try{
     for(const [id, room] of rooms.entries()){
       try{
         if(!room) continue;
         if(room.status === 'finished') continue;
-        // run the victory check (it will emit game:over and set room.status when needed)
         const res = checkAndHandleVictory(room);
         if(res && res.over){
           try{ sendRoomUpdate(room); }catch(_){ }

@@ -115,6 +115,19 @@
               if(cid === 'fortification' || title.indexOf('fortification') !== -1 || title.indexOf('fortif') !== -1) imgSrc = '/assets/img/cards/fortification.png';
               if(cid === 'rebond' || title.indexOf('rebond') !== -1) imgSrc = '/assets/img/cards/rebond.png';
               if(cid === 'anneau' || title.indexOf('anneau') !== -1) imgSrc = '/assets/img/cards/anneau.png';
+              if(cid === 'brouillard' || title.indexOf('brouillard') !== -1) imgSrc = '/assets/img/cards/brouillard.png';
+              if(cid === 'coin' || title.indexOf('coin') !== -1) imgSrc = '/assets/img/cards/coincoin.png';
+              if(cid === 'inversion' || title.indexOf('inversion') !== -1) imgSrc = '/assets/img/cards/inversion.png';
+              if(cid === 'invisible' || title.indexOf('invisible') !== -1) imgSrc = '/assets/img/cards/invisible.png';
+              if(cid === 'kamikaz' || title.indexOf('kamikaz') !== -1) imgSrc = '/assets/img/cards/kamikaz.png';
+              if(cid === 'melange' || title.indexOf('melange') !== -1 || title.indexOf('melange') !== -1) imgSrc = '/assets/img/cards/mélange.png';
+              if(cid === 'mine' || title.indexOf('mine') !== -1) imgSrc = '/assets/img/cards/mine.png';
+              if(cid === 'promotion' || title.indexOf('promotion') !== -1) imgSrc = '/assets/img/cards/promotion.png';
+              if(cid === 'resurection' || title.indexOf('resurection') !== -1 || title.indexOf('résurection') !== -1) imgSrc = '/assets/img/cards/resurection.png';
+              if(cid === 'sniper' || title.indexOf('sniper') !== -1) imgSrc = '/assets/img/cards/sniper.png';
+              if(cid === 'totem' || title.indexOf('totem') !== -1) imgSrc = '/assets/img/cards/totem.png';
+              if(cid === 'toucher' || title.indexOf('toucher') !== -1) imgSrc = '/assets/img/cards/toucher.png';
+              if(cid === 'vole' || title.indexOf('vole') !== -1 || title.indexOf('vole') !== -1) imgSrc = '/assets/img/cards/vole_piece.png';
               if(imgSrc){ const img = document.createElement('img'); img.src = imgSrc; img.alt = c.title || cid || 'card'; img.className = 'card-art-img'; img.style.width = '100%'; img.style.height = '100%'; img.style.objectFit = 'cover'; art.appendChild(img); }
             }catch(_){ }
             top.appendChild(art);

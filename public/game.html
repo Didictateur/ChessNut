@@ -192,16 +192,16 @@
     if(id.indexOf('mine') !== -1) return 'empty';
     // revolution is a global immediate effect: it should NOT require any piece selection
     if(id.indexOf('revol') !== -1) return null;
-  // sniper: select one of your pieces to bind the sniper effect (capture later without moving)
-  if(id.indexOf('sniper') !== -1) return 'owned';
-  // doppelganger: select one of your pieces after playing the card (minimal flow)
-  if(id.indexOf('doppel') !== -1) return 'owned';
+    // sniper: select one of your pieces to bind the sniper effect (capture later without moving)
+    if(id.indexOf('sniper') !== -1) return 'owned';
+    // doppelganger: select one of your pieces after playing the card (minimal flow)
+    if(id.indexOf('doppel') !== -1) return 'owned';
     // 'toucher c'est jouer' : require selecting an enemy piece as the card target
-  if(id.indexOf('toucher') !== -1) return 'enemy';
-  // la parrure: select an enemy queen to downgrade to a pawn
-  if(id.indexOf('parrure') !== -1) return 'enemy_queen';
-  // tout ou rien: select a piece (any, except kings) to force it to only move when capturing
-  if(id.indexOf('tout') !== -1 && id.indexOf('rien') !== -1) return 'piece';
+    if(id.indexOf('toucher') !== -1) return 'enemy';
+    // la parrure: select an enemy queen to downgrade to a pawn
+    if(id.indexOf('parrure') !== -1) return 'enemy_queen';
+    // tout ou rien: select a piece (any, except kings) to force it to only move when capturing
+    if(id.indexOf('tout') !== -1 && id.indexOf('rien') !== -1) return 'piece';
     // kamikaz targets one of your pieces (play card, then choose a piece)
     if(id.indexOf('kamikaz') !== -1) return 'owned';
     if(id.indexOf('invis') !== -1 || id.indexOf('invisible') !== -1) return 'owned';

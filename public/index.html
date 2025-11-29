@@ -128,6 +128,10 @@
               if(cid === 'totem' || title.indexOf('totem') !== -1) imgSrc = '/assets/img/cards/totem.png';
               if(cid === 'toucher' || title.indexOf('toucher') !== -1) imgSrc = '/assets/img/cards/toucher.png';
               if(cid === 'vole' || title.indexOf('vole') !== -1 || title.indexOf('vole') !== -1) imgSrc = '/assets/img/cards/vole_piece.png';
+              if(cid === 'jouer_deux_fois' || title.indexOf('jouer deux fois') !== -1) imgSrc = '/assets/img/cards/double.png';
+              if(cid === 'empathie' || title.indexOf('empathie') !== -1) imgSrc = '/assets/img/cards/empathie.png';
+              if(cid === 'parrure' || title.indexOf('parrure') !== -1) imgSrc = '/assets/img/cards/parrure.png';
+              if(cid === 'révolution' || title.indexOf('révolution') !== -1 || title.indexOf('revolution') !== -1) imgSrc = '/assets/img/cards/révolution.png';
               if(imgSrc){ const img = document.createElement('img'); img.src = imgSrc; img.alt = c.title || cid || 'card'; img.className = 'card-art-img'; img.style.width = '100%'; img.style.height = '100%'; img.style.objectFit = 'cover'; art.appendChild(img); }
             }catch(_){ }
             top.appendChild(art);

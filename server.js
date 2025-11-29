@@ -261,137 +261,137 @@ function checkAndHandleVictory(room){
 function buildDefaultDeck(){
   const cards = [
     [
-      'rebondir sur les bords',
+      'Rebondir sur les bords',
       'Les déplacements en diagonales de la pièce sélectionnée peuvent rebondir une fois sur les bords',
       'rebond'
     ],
     [
-      'adoubement',
+      'Adoubement',
       'La pièce sélectionnée peut maintenant faire les déplacements du cavalier en plus',
       'adoubement'
     ],
     [
-      'folie',
+      'Folie',
       'La pièce sélectionnée peut maintenant faire les déplacements du fou en plus',
       'folie'
     ],
     [
-      'fortification',
+      'Fortification',
       'La pièce sélectionnée peut maintenant faire les déplacements de la tour en plus',
       'fortification'
     ],
     [
-      "l'anneau",
+      "L'anneau",
       "Le plateau devient un anneau pendant un tour",
       "anneau"
     ],
     [
-      'brouillard de guerre',
+      'Brouillard de guerre',
       'Les joueur ne peuvent voir que au alentour de leurs pièces pendant 4 tours',
       'brouillard'
     ],
     [
-      'jouer deux fois',
+      'Jouer deux fois',
       'Le joueur peut déplacer deux pièces',
       'double'
     ],
     [
-      "totem d'immunité",
+      "Totem d'immunité",
       "Annule l'effet de la prochaine carte jouée par l'adversaire",
       "totem"
     ],
     [
-      'placement de mines',
+      'Placement de mines',
       'Le joueur place une mine sur une case vide sans la révéler au joueur adverse. Une pièce qui se pose dessus explose et est capturée par le joueur ayant placé la mine',
       'mine'
     ],
     [
-      "vole d'une pièce",
+      "Vole d'une pièce",
       'Désigne une pièce non roi qui change de camp.\n\nCompte comme un mouvement',
       'vole_piece'
     ],
     [
-      'promotion',
+      'Promotion',
       'Un pion au choix est promu',
       'promotion'
     ],
     [
-      "vole d'une carte",
+      "Vole d'une carte",
       'Vole une carte aléatoirement au joueur adverse',
       'vole_carte'
     ],
     [
-      'resurection',
+      'Resurection',
       'Ressucite la dernière pièce perdue',
       'resurection'
     ],
     [
-      'carte sans effet',
+      'Carte sans effet',
       "N'a aucun effet",
       'sans_effet'
     ],
     [
-      'kamikaze',
+      'Kamikaze',
       'Détruit une de ses pièces, détruisant toutes les pièces adjacentes.\n\nCompte comme un mouvement',
       'kamikaze'
     ],
     [
-      'invisible',
+      'Invisible',
       "Une des pièces devient invisible pour l'adversaire",
       'invisible'
     ],
     [
-      "coin coin",
+      "Coin-Coin",
       "Possibilité de se téléporter depuis un coin vers n'importe quel autre coin",
       'coincoin'
     ],
     [
-      'téléportation',
+      'Téléportation',
       "Téléporte n'importe quelle pièce de son camp sur une case vide",
       'teleportation'
     ],
     [
-      "toucher c'est jouer",
+      "Toucher c'est jouer",
       "Toucher une pièce adverse qu'il sera obligé de jouer",
       'toucher'
     ],
     [
-      'sniper',
+      'Sniper',
       'Capturer une pièce sans avoir à bouger la pièce capturante',
       'sniper'
     ],
     [
-      'inversion',
+      'Inversion',
       "Échange la position d'une pièce avec une pièce adverse.\n\nCompte comme un mouvement",
       'inversion'
     ],
     [
-      'mélange',
+      'Mélange',
       'La position de toutes les pièces sont échangées aléatoirement',
       'melange'
     ],
     [
-      'la parrure',
+      'La parrure',
       'Une reine est dégradée en pion',
       'parrure'
     ],
     [
-      'tout ou rien',
+      'Tout ou rien',
       'Une pièce choisie ne peut maintenant se déplacer que si elle capture.',
       'tout'
     ],
     [
-      'tous les mêmes',
+      'Tous les mêmes',
       'Au yeux de l ennemie, toutes les pièces se ressemblent pendant 2 tours.',
       'pareil'
     ],
     [
-      'révolution',
+      'Révolution',
       'Tous les pions sont aléatoirement changés en Cavalier, Fou ou Tour et les Cavaliers, Fous et Tours sont changés en pions.',
       'revolution'
     ],
     [
-      "doppelganger",
+      "Doppelganger",
       "Choisis une pièce. À partir de maintenant, devient chacune des pièces qu'elle capture.",
       'doppelganger'
     ],
@@ -431,7 +431,7 @@ function buildDefaultDeck(){
 
   // a reflechir
     [
-      'empathie',
+      'Empathie',
       'On retourne le plateau',
       'empathie'
     ], // pendant X tours ?

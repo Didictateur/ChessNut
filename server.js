@@ -2046,24 +2046,35 @@ io.on('connection', (socket) => {
             if(allSquares.length < pieces.length){
               played.payload = Object.assign({}, payload, { applied: 'melange_failed', reason: 'board_too_small' });
             } else {
-              for(let i = allSquares.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); const tmp = allSquares[i]; allSquares[i] = allSquares[j]; allSquares[j] = tmp; }
-              const dests = allSquares.slice(0, pieces.length);
-              const newSquareByPieceId = {};
-              for(let i = 0; i < pieces.length; i++){ const p = pieces[i]; newSquareByPieceId[p.id] = dests[i]; }
-              pieces.forEach(p => { try{ p.square = newSquareByPieceId[p.id] || p.square; }catch(_){ } });
-              try{
-                room.activeCardEffects = room.activeCardEffects || [];
-                room.activeCardEffects.forEach(e => {
-                  if(!e) return;
-                  try{ if(e.pieceId && newSquareByPieceId[e.pieceId]){ e.pieceSquare = newSquareByPieceId[e.pieceId]; } }catch(_){ }
-                });
-              }catch(_){ }
-              played.payload = Object.assign({}, payload, { applied: 'melange', count: pieces.length });
+              const occupiedByBlack = {};
+              pieces.forEach(p => { try{ if(p && p.color === 'b' && p.square){ occupiedByBlack[p.square] = true; } }catch(_){ } });
+              const occupiedByWhite = {};
+              pieces.forEach(p => { try{ if(p && p.color === 'w' && p.square){ occupiedByWhite[p.square] = true; } }catch(_){ } });
+              const blackSquares = Object.keys(occupiedByBlack);
+              for(let i = blackSquares.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); const tmp = blackSquares[i]; blackSquares[i] = blackSquares[j]; blackSquares[j] = tmp; }
+              const newBlackSquareByPieceId = {};
+              let blackIndex = 0;
+              pieces.forEach(p => { try{ if(p && p.color === 'b'){ newBlackSquareByPieceId[p.id] = blackSquares[blackIndex] || p.square; blackIndex++; } }catch(_){ } });
+              const whiteSquares = Object.keys(occupiedByWhite);
+              for(let i = whiteSquares.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); const tmp = whiteSquares[i]; whiteSquares[i] = whiteSquares[j]; whiteSquares[j] = tmp; }
+              const newWhiteSquareByPieceId = {};
+              let whiteIndex = 0;
+              pieces.forEach(p => { try{ if(p && p.color === 'w'){ newWhiteSquareByPieceId[p.id] = whiteSquares[whiteIndex] || p.square; whiteIndex++; } }catch(_){ } });
+              pieces.forEach(p => {
+                try{
+                  if(p && p.color === 'b' && newBlackSquareByPieceId[p.id]){
+                    p.square = newBlackSquareByPieceId[p.id];
+                  } else if(p && p.color === 'w' && newWhiteSquareByPieceId[p.id]){
+                    p.square = newWhiteSquareByPieceId[p.id];
+                  }
+                }catch(_){ }
+              });
               board.version = (board.version || 0) + 1;
-              const effect = { id: played.id, type: 'melange', playerId: senderId, ts: Date.now(), note: 'pieces shuffled' };
+              const effect = { id: played.id, type: 'melange', playerId: senderId, ts: Date.now() };
               room.activeCardEffects = room.activeCardEffects || [];
               room.activeCardEffects.push(effect);
               try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect }); }catch(_){ }
+              played.payload = Object.assign({}, payload, { applied: 'melange' });
             }
           }catch(e){ console.error('melange error', e); }
         }

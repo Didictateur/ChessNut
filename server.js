@@ -40,7 +40,9 @@ function sendRoomUpdate(room){
     autoDraw: !!room.autoDraw,
     noRemise: !!room.noRemise,
     deckCount: (room.deck && room.deck.length) || 0,
-    discardCount: (room.discard && room.discard.length) || 0
+    discardCount: (room.discard && room.discard.length) || 0,
+    previousDraws: room._playerDrewPrev || {},
+    playerDrew: room._playerDrew || {},
   };
 
   const handCounts = {};
@@ -134,6 +136,16 @@ function sendRoomUpdate(room){
   });
 }
 
+// Helper to record whether a player drew during their turn and reset the current-turn marker.
+function recordPlayerDrewPrev(room, playerId){
+  try{
+    room._playerDrewPrev = room._playerDrewPrev || {};
+    room._playerDrew = room._playerDrew || {};
+    room._playerDrewPrev[playerId] = !!room._playerDrew[playerId];
+    room._playerDrew[playerId] = false;
+  }catch(_){ }
+}
+
 // Helper: at the start of a player's turn, either perform an automatic draw
 // if room.autoDraw is enabled, or simply broadcast the room state so clients
 // can update UI. This centralizes the auto-draw toggle behavior.
@@ -221,6 +233,15 @@ function endTurnAfterCard(room, senderId){
 
     // reset per-turn card-play flags
     try{ room._cardPlayedThisTurn = {}; }catch(_){ }
+
+    // Shift the per-player draw marker: record whether the sender drew during their just-finished turn
+    try{
+      room._playerDrewPrev = room._playerDrewPrev || {};
+      room._playerDrew = room._playerDrew || {};
+      room._playerDrewPrev[senderId] = !!room._playerDrew[senderId];
+      // clear the current-turn marker for the sender so it will be set anew on their next turn
+      room._playerDrew[senderId] = false;
+    }catch(_){ }
 
     // perform next player's draw (if autoDraw) or at least send room update
     try{ 
@@ -492,6 +513,7 @@ function drawCardForPlayer(room, playerId){
   if(recipient && recipient.socketId){
     io.to(recipient.socketId).emit('card:drawn', { playerId, card });
   }
+  try{ if(room.autoDraw === false){ room._playerDrew = room._playerDrew || {}; room._playerDrew[playerId] = true; } }catch(_){ }
   sendRoomUpdate(room);
   return card;
 }
@@ -1220,7 +1242,14 @@ io.on('connection', (socket) => {
           }
         }catch(e){ console.error('updating temporary effects error', e); }
 
-        try{ room._cardPlayedThisTurn = {}; }catch(_){}
+          try{ room._cardPlayedThisTurn = {}; }catch(_){ }
+          // Record whether the sender drew during this turn so it will be available as "previous turn" for their next turn
+          try{
+            room._playerDrewPrev = room._playerDrewPrev || {};
+            room._playerDrew = room._playerDrew || {};
+            room._playerDrewPrev[senderId] = !!room._playerDrew[senderId];
+            room._playerDrew[senderId] = false;
+          }catch(_){ }
       }
 
       const moved = { playerId: senderId, from, to };
@@ -1416,14 +1445,30 @@ io.on('connection', (socket) => {
     if(room._cardPlayedThisTurn[senderId]) return cb && cb({ error: 'card_already_played_this_turn', message: "Vous avez déjà joué une carte ce tour." });
 
     try{
+      // If the player had drawn on their previous turn, disallow drawing now
+      try{
+        if(room._playerDrewPrev && room._playerDrewPrev[senderId]){
+          try{ console.log('player:draw: rejected because player drew on previous turn (prev marker true) for', senderId); }catch(_){ }
+          return cb && cb({ error: 'drew_last_turn', message: "Vous avez pioché lors de votre précédent tour et ne pouvez pas piocher maintenant." });
+        }
+      }catch(_){ }
+
       const drawn = drawCardForPlayer(room, senderId);
       if(!drawn){
         return cb && cb({ error: 'no_card_drawn', message: "Aucune carte n'a été tirée." });
       }
-      board.version = (board.version || 0) + 1;
-      room._cardPlayedThisTurn = room._cardPlayedThisTurn || {};
-      room._cardPlayedThisTurn[senderId] = true;
-      board.turn = (board.turn === 'w') ? 'b' : 'w';
+    board.version = (board.version || 0) + 1;
+    room._cardPlayedThisTurn = room._cardPlayedThisTurn || {};
+    room._cardPlayedThisTurn[senderId] = true;
+    board.turn = (board.turn === 'w') ? 'b' : 'w';
+    try{ room._cardPlayedThisTurn = {}; }catch(_){ }
+    // Record whether the sender drew during this turn so it is available as "previous turn" for their next turn
+    try{
+      room._playerDrewPrev = room._playerDrewPrev || {};
+      room._playerDrew = room._playerDrew || {};
+      room._playerDrewPrev[senderId] = !!room._playerDrew[senderId];
+      room._playerDrew[senderId] = false;
+    }catch(_){ }
       try{
         room.activeCardEffects = room.activeCardEffects || [];
         for(let i = room.activeCardEffects.length - 1; i >= 0; i--){
@@ -1872,6 +1917,7 @@ io.on('connection', (socket) => {
           room.activeCardEffects.push(effect);
           played.payload = Object.assign({}, payload, { applied: 'empathie' });
           try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect }); }catch(_){ }
+          try{ recordPlayerDrewPrev(room, senderId); }catch(_){ }
         }catch(e){ console.error('empathie / changement de camp error', e); }
       }
         
@@ -1967,6 +2013,7 @@ io.on('connection', (socket) => {
               } else {
                 if(board){
                   board.turn = (board.turn === 'w') ? 'b' : 'w';
+                  try{ recordPlayerDrewPrev(room, senderId); }catch(_){ }
                   const nextColor = board.turn;
                   const nextPlayer = (room.players || []).find(p => (p.color && p.color[0]) === nextColor);
                   if(nextPlayer){ try{ maybeDrawAtTurnStart(room, nextPlayer.id); }catch(_){ } }
@@ -2270,6 +2317,7 @@ io.on('connection', (socket) => {
             try{
               if(board){
                 board.turn = (board.turn === 'w') ? 'b' : 'w';
+                try{ recordPlayerDrewPrev(room, senderId); }catch(_){ }
                 // draw for the next player at the start of their turn
                 const nextColor = board.turn;
                 const nextPlayer = (room.players || []).find(p => (p.color && p.color[0]) === nextColor);
@@ -2414,6 +2462,7 @@ io.on('connection', (socket) => {
         const board = room.boardState;
         if(board){
           board.turn = (board.turn === 'w') ? 'b' : 'w';
+          try{ recordPlayerDrewPrev(room, senderId); }catch(_){ }
 
           try{
             room.activeCardEffects = room.activeCardEffects || [];

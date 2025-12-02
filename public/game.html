@@ -1,1340 +1,2261 @@
 <!doctype html>
 <html>
-<head>
-  <meta charset="utf-8" />
-  <title>ChessNut - Partie</title>
-  <link rel="stylesheet" href="/styles/style.css">
-  <style>
-    /* veil overlay for brouillard effect */
-    .square { position: relative; }
-    .square .veil {
-      position: absolute;
-      left: 0; top: 0; right: 0; bottom: 0;
-      background: rgba(255,255,255,0.95);
-      pointer-events: auto; /* block interactions so veiled squares are not clickable */
-      z-index: 50;
-      cursor: default;
-    }
-    /* activity feed for user-facing logs (card plays) */
-    #activityFeed { max-height: 140px; overflow:auto; padding:8px; background:#fff; border:1px solid #eee; border-radius:6px; font-size:14px; color:#222 }
-    #log { display:none; }
-  </style>
-</head>
-<body>
-  <!-- Game over modal (hidden by default). Shown when server emits game:over -->
-  <div id="gameOverModal" style="position:fixed;left:0;top:0;right:0;bottom:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);z-index:9999">
-    <div style="background:#fff;padding:24px;border-radius:10px;min-width:260px;max-width:90%;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,0.25)">
-      <h2 id="gameOverTitle" style="margin-top:0;margin-bottom:8px">Partie terminée</h2>
-      <div id="gameOverMessage" style="margin-bottom:12px">Chargement...</div>
-      <div style="display:flex;gap:8px;justify-content:center">
-        <button id="gameOverClose" style="background:#efefef;border:0;padding:8px 12px;border-radius:6px;cursor:pointer">Rester</button>
-        <button id="gameOverReload" style="background:linear-gradient(90deg,#ff7a59,#ffb199);border:0;color:#fff;padding:8px 12px;border-radius:6px;cursor:pointer">Quitter</button>
+  <head>
+    <meta charset="utf-8" />
+    <title>ChessNut - Partie</title>
+    <link rel="stylesheet" href="/styles/style.css" />
+    <style>
+      /* veil overlay for brouillard effect */
+      .square {
+        position: relative;
+      }
+      .square .veil {
+        position: absolute;
+        left: 0;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.95);
+        pointer-events: auto; /* block interactions so veiled squares are not clickable */
+        z-index: 50;
+        cursor: default;
+      }
+      /* activity feed for user-facing logs (card plays) */
+      #activityFeed {
+        max-height: 140px;
+        overflow: auto;
+        padding: 8px;
+        background: #fff;
+        border: 1px solid #eee;
+        border-radius: 6px;
+        font-size: 14px;
+        color: #222;
+      }
+      #log {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Game over modal (hidden by default). Shown when server emits game:over -->
+    <div
+      id="gameOverModal"
+      style="
+        position: fixed;
+        left: 0;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.45);
+        z-index: 9999;
+      "
+    >
+      <div
+        style="
+          background: #fff;
+          padding: 24px;
+          border-radius: 10px;
+          min-width: 260px;
+          max-width: 90%;
+          text-align: center;
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+        "
+      >
+        <h2 id="gameOverTitle" style="margin-top: 0; margin-bottom: 8px">
+          Partie terminée
+        </h2>
+        <div id="gameOverMessage" style="margin-bottom: 12px">
+          Chargement...
+        </div>
+        <div style="display: flex; gap: 8px; justify-content: center">
+          <button
+            id="gameOverClose"
+            style="
+              background: #efefef;
+              border: 0;
+              padding: 8px 12px;
+              border-radius: 6px;
+              cursor: pointer;
+            "
+          >
+            Rester
+          </button>
+          <button
+            id="gameOverReload"
+            style="
+              background: linear-gradient(90deg, #ff7a59, #ffb199);
+              border: 0;
+              color: #fff;
+              padding: 8px 12px;
+              border-radius: 6px;
+              cursor: pointer;
+            "
+          >
+            Quitter
+          </button>
+        </div>
       </div>
     </div>
-  </div>
-  <h2>ChessNut — Partie</h2>
-  <div id="turnBanner" style="margin-bottom:8px"></div>
-  <div>Room: <strong id="roomId">-</strong> &nbsp;•&nbsp; Vous jouez: <strong id="myColor">-</strong>
-  <div class="layout-row">
+    <h2>ChessNut — Partie</h2>
+    <div id="turnBanner" style="margin-bottom: 8px"></div>
     <div>
-      <div id="board"></div>
-    </div>
-    <aside style="min-width:320px;margin-left:18px">
-
-      <section class="card" style="margin-top:12px">
-        <div><strong>Outils / Logs</strong></div>
-        <div style="margin-top:8px">
+      Room: <strong id="roomId">-</strong> &nbsp;•&nbsp; Vous jouez:
+      <strong id="myColor">-</strong>
+      <div class="layout-row">
+        <div>
+          <div id="board"></div>
         </div>
-        <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
-          <pre id="log" style="margin-top:0px;height:140px;overflow:auto;flex:1">logs...</pre>
-        </div>
-        <div style="margin-top:8px">
-          <div><strong>Activité</strong></div>
-          <div id="activityFeed" style="margin-top:8px">Aucune activité pour l'instant.</div>
-        </div>
-      </section>
-      <div style="margin-top:10px;display:flex;align-items:center;gap:12px">
-        <div id="hands" style="display:flex;flex-direction:column;gap:8px;flex:1;margin-left:6px"></div>
+        <aside style="min-width: 320px; margin-left: 18px">
+          <section class="card" style="margin-top: 12px">
+            <div><strong>Outils / Logs</strong></div>
+            <div style="margin-top: 8px"></div>
+            <div
+              style="
+                margin-top: 8px;
+                display: flex;
+                gap: 8px;
+                align-items: center;
+              "
+            >
+              <pre
+                id="log"
+                style="margin-top: 0px; height: 140px; overflow: auto; flex: 1"
+              >
+logs...</pre
+              >
+            </div>
+            <div style="margin-top: 8px">
+              <div><strong>Activité</strong></div>
+              <div id="activityFeed" style="margin-top: 8px">
+                Aucune activité pour l'instant.
+              </div>
+            </div>
+          </section>
+          <div
+            style="
+              margin-top: 10px;
+              display: flex;
+              align-items: center;
+              gap: 12px;
+            "
+          >
+            <div
+              id="hands"
+              style="
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+                flex: 1;
+                margin-left: 6px;
+              "
+            ></div>
+          </div>
+        </aside>
       </div>
-    </aside>
-  </div>
 
-  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-  <script>
-    function qs(name){ const url = new URL(window.location.href); return url.searchParams.get(name); }
-    const roomId = qs('roomId');
-    const playerId = qs('playerId') || undefined;
-    const roomIdEl = document.getElementById('roomId');
-    const playerIdEl = document.getElementById('playerId');
-    if(roomIdEl) roomIdEl.textContent = roomId || '-';
-    if(playerIdEl) playerIdEl.textContent = playerId || '-';
+      <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+      <script>
+        function qs(name) {
+          const url = new URL(window.location.href);
+          return url.searchParams.get(name);
+        }
+        const roomId = qs("roomId");
+        const playerId = qs("playerId") || undefined;
+        const roomIdEl = document.getElementById("roomId");
+        const playerIdEl = document.getElementById("playerId");
+        if (roomIdEl) roomIdEl.textContent = roomId || "-";
+        if (playerIdEl) playerIdEl.textContent = playerId || "-";
 
-  const logEl = document.getElementById('log');
-  const playersEl = document.getElementById('players');
-  const boardEl = document.getElementById('board');
-  const myColorEl = document.getElementById('myColor');
-  let socket = null;
-  let myColor = null;
-  let playerColors = {};
-  let selectedSquare = null;
-  let selectedSquareEl = null;
-  let myPlayerId = playerId || null;
-  const remoteSelections = {};
-  let isSpectating = false;
-  const remoteMoves = {};
-  let currentBoardState = null;
-  let myMines = [];
-  let currentVeiledSquares = [];
-  let pendingCard = null;
+        const logEl = document.getElementById("log");
+        const playersEl = document.getElementById("players");
+        const boardEl = document.getElementById("board");
+        const myColorEl = document.getElementById("myColor");
+        let socket = null;
+        let myColor = null;
+        let playerColors = {};
+        let selectedSquare = null;
+        let selectedSquareEl = null;
+        let myPlayerId = playerId || null;
+        const remoteSelections = {};
+        let isSpectating = false;
+        const remoteMoves = {};
+        let currentBoardState = null;
+        let myMines = [];
+        let currentVeiledSquares = [];
+        let pendingCard = null;
 
-    function log(...args){
-      if(logEl){
-        try{
-          logEl.textContent += '\n' + args.map(a=>typeof a==='object'?JSON.stringify(a):a).join(' ');
-          logEl.scrollTop = logEl.scrollHeight;
-        }catch(e){ console.log(...args); }
-      } else {
-        console.log(...args);
-      }
-    }
-
-    function appendActivity(message){
-      try{
-        const feed = document.getElementById('activityFeed');
-        if(!feed) return;
-        const line = document.createElement('div');
-        line.textContent = message;
-        if(feed.textContent && feed.textContent.indexOf("Aucune activité") !== -1){ feed.textContent = ''; }
-        feed.insertBefore(line, feed.firstChild);
-        while(feed.children.length > 30) feed.removeChild(feed.lastChild);
-      }catch(_){ }
-    }
-
-    function showToast(message, opts){
-      try{
-        opts = opts || {};
-        const id = 'cn-toast';
-        const wrap = document.createElement('div');
-        wrap.className = 'cn-toast';
-        wrap.textContent = message || '';
-        wrap.style.position = 'fixed';
-        wrap.style.left = '50%';
-        wrap.style.transform = 'translateX(-50%)';
-        wrap.style.top = opts.top || '18px';
-        wrap.style.background = opts.background || 'rgba(0,0,0,0.8)';
-        wrap.style.color = opts.color || '#fff';
-        wrap.style.padding = '8px 12px';
-        wrap.style.borderRadius = '6px';
-        wrap.style.zIndex = 99999;
-        wrap.style.fontSize = '14px';
-        wrap.style.boxShadow = '0 6px 18px rgba(0,0,0,0.25)';
-        document.body.appendChild(wrap);
-        setTimeout(()=>{ try{ wrap.style.transition = 'opacity 300ms ease'; wrap.style.opacity = '0'; setTimeout(()=>{ try{ wrap.remove(); }catch(_){ } }, 320); }catch(_){ } }, opts.duration || 3500);
-      }catch(_){ }
-    }
-
-    function emitCardPlay(payload, cb){
-      try{
-        if(!socket) return cb && cb({ error: 'no_socket' });
-        let acked = false;
-        const timer = setTimeout(()=>{
-          if(!acked){
-            try{ socket.emit('room:refresh', { roomId }, ()=>{}); }catch(_){ }
+        function log(...args) {
+          if (logEl) {
+            try {
+              logEl.textContent +=
+                "\n" +
+                args
+                  .map((a) => (typeof a === "object" ? JSON.stringify(a) : a))
+                  .join(" ");
+              logEl.scrollTop = logEl.scrollHeight;
+            } catch (e) {
+              console.log(...args);
+            }
+          } else {
+            console.log(...args);
           }
-        }, 1500);
-        socket.emit('card:play', payload, (resp)=>{
-          acked = true; try{ clearTimeout(timer); }catch(_){ }
-          try{ socket.emit('room:refresh', { roomId }, ()=>{}); }catch(_){ }
-          if(cb) cb(resp);
-        });
-      }catch(e){ if(cb) cb({ error: 'emit_failed' }); }
-    }
+        }
 
-    function playShuffleAnimation(){
-      if(!boardEl) return;
-      try{
-        boardEl.classList.add('shuffle-play');
-        setTimeout(()=>{ try{ boardEl.classList.remove('shuffle-play'); }catch(_){ } }, 700);
-      }catch(_){ }
-    }
+        function appendActivity(message) {
+          try {
+            const feed = document.getElementById("activityFeed");
+            if (!feed) return;
+            const line = document.createElement("div");
+            line.textContent = message;
+            if (
+              feed.textContent &&
+              feed.textContent.indexOf("Aucune activité") !== -1
+            ) {
+              feed.textContent = "";
+            }
+            feed.insertBefore(line, feed.firstChild);
+            while (feed.children.length > 30) feed.removeChild(feed.lastChild);
+          } catch (_) {}
+        }
 
-    function cardRequiresTarget(cardId){
-      if(!cardId) return null;
-      let id = String(cardId).toLowerCase();
-      try{
-        id = id.normalize('NFD').replace(/\p{Diacritic}/gu, '');
-      }catch(e){
-        id = id.replace(/[^\x00-\x7F]/g, '');
-      }
-      if(id.indexOf('mine') !== -1) return 'empty';
-      if(id.indexOf('revol') !== -1) return null;
-      if(id.indexOf('sniper') !== -1) return 'owned';
-      if(id.indexOf('doppel') !== -1) return 'owned';
-      if(id.indexOf('toucher') !== -1) return 'enemy';
-      if(id.indexOf('parrure') !== -1) return 'enemy_queen';
-      if(id.indexOf('tout') !== -1) return 'piece';
-      if(id.indexOf('kamikaz') !== -1) return 'owned';
-      if(id.indexOf('invisible') !== -1) return 'owned';
-      if(id.indexOf('rebond') !== -1) return 'owned';
-      if(id.indexOf('adoub') !== -1) return 'owned';
-      if(id.indexOf('folie') !== -1) return 'owned';
-      if(id.indexOf('fortification') !== -1) return 'owned';
-  if(id.indexOf('promotion') !== -1) return 'owned_pawn';
-      if(id.indexOf('vol_carte') !== -1) return 'player';
-      if(id.indexOf('vole_piece') !== -1) return 'enemy';
-      if(id.indexOf('coincoin') !== -1) return 'owned';
-      if(id.indexOf('teleportation') !== -1) return 'owned';
-      if(id.indexOf('inversion') !== -1) return 'own_then_enemy';
-      return null;
-    }
+        function showToast(message, opts) {
+          try {
+            opts = opts || {};
+            const id = "cn-toast";
+            const wrap = document.createElement("div");
+            wrap.className = "cn-toast";
+            wrap.textContent = message || "";
+            wrap.style.position = "fixed";
+            wrap.style.left = "50%";
+            wrap.style.transform = "translateX(-50%)";
+            wrap.style.top = opts.top || "18px";
+            wrap.style.background = opts.background || "rgba(0,0,0,0.8)";
+            wrap.style.color = opts.color || "#fff";
+            wrap.style.padding = "8px 12px";
+            wrap.style.borderRadius = "6px";
+            wrap.style.zIndex = 99999;
+            wrap.style.fontSize = "14px";
+            wrap.style.boxShadow = "0 6px 18px rgba(0,0,0,0.25)";
+            document.body.appendChild(wrap);
+            setTimeout(() => {
+              try {
+                wrap.style.transition = "opacity 300ms ease";
+                wrap.style.opacity = "0";
+                setTimeout(() => {
+                  try {
+                    wrap.remove();
+                  } catch (_) {}
+                }, 320);
+              } catch (_) {}
+            }, opts.duration || 3500);
+          } catch (_) {}
+        }
 
-  if(!roomId){ showToast('roomId manquant dans l\'URL', { background: 'rgba(200,60,60,0.95)' }); }
+        function emitCardPlay(payload, cb) {
+          try {
+            if (!socket) return cb && cb({ error: "no_socket" });
+            let acked = false;
+            const timer = setTimeout(() => {
+              if (!acked) {
+                try {
+                  socket.emit("room:refresh", { roomId }, () => {});
+                } catch (_) {}
+              }
+            }, 1500);
+            socket.emit("card:play", payload, (resp) => {
+              acked = true;
+              try {
+                clearTimeout(timer);
+              } catch (_) {}
+              try {
+                socket.emit("room:refresh", { roomId }, () => {});
+              } catch (_) {}
+              if (cb) cb(resp);
+            });
+          } catch (e) {
+            if (cb) cb({ error: "emit_failed" });
+          }
+        }
 
-    function connectAndJoin(){
-      socket = io();
-      socket.on('connect', ()=>{ log('socket connecté', socket.id); });
+        function playShuffleAnimation() {
+          if (!boardEl) return;
+          try {
+            boardEl.classList.add("shuffle-play");
+            setTimeout(() => {
+              try {
+                boardEl.classList.remove("shuffle-play");
+              } catch (_) {}
+            }, 700);
+          } catch (_) {}
+        }
 
-      socket.on('room:update', (data)=>{
-      log('room:update', data);
-        if(playersEl){
-          playersEl.innerHTML = '';
-          (data.players||[]).forEach(p=>{
-            try{ playerColors[p.id] = p.color; }catch(_){ }
-            try{ if(p.id === myPlayerId){ myColor = p.color; if(myColorEl) myColorEl.textContent = myColor; } }catch(_){ }
-            const li = document.createElement('li');
-            li.textContent = (p.color || 'Joueur') + (p.id === myPlayerId ? ' (vous)' : '');
-            playersEl.appendChild(li);
+        function cardRequiresTarget(cardId) {
+          if (!cardId) return null;
+          let id = String(cardId).toLowerCase();
+          try {
+            id = id.normalize("NFD").replace(/\p{Diacritic}/gu, "");
+          } catch (e) {
+            id = id.replace(/[^\x00-\x7F]/g, "");
+          }
+          if (id.indexOf("mine") !== -1) return "empty";
+          if (id.indexOf("revol") !== -1) return null;
+          if (id.indexOf("sniper") !== -1) return "owned";
+          if (id.indexOf("doppel") !== -1) return "owned";
+          if (id.indexOf("toucher") !== -1) return "enemy";
+          if (id.indexOf("parrure") !== -1) return "enemy_queen";
+          if (id.indexOf("tout") !== -1) return "piece";
+          if (id.indexOf("kamikaz") !== -1) return "owned";
+          if (id.indexOf("invisible") !== -1) return "owned";
+          if (id.indexOf("rebond") !== -1) return "owned";
+          if (id.indexOf("adoub") !== -1) return "owned";
+          if (id.indexOf("folie") !== -1) return "owned";
+          if (id.indexOf("fortification") !== -1) return "owned";
+          if (id.indexOf("promotion") !== -1) return "owned_pawn";
+          if (id.indexOf("vol_carte") !== -1) return "player";
+          if (id.indexOf("vole_piece") !== -1) return "enemy";
+          if (id.indexOf("coincoin") !== -1) return "owned";
+          if (id.indexOf("teleportation") !== -1) return "owned";
+          if (id.indexOf("inversion") !== -1) return "own_then_enemy";
+          return null;
+        }
+
+        if (!roomId) {
+          showToast("roomId manquant dans l'URL", {
+            background: "rgba(200,60,60,0.95)",
           });
         }
-        if(data.size){
-            buildGrid(data.size);
-            const side = Math.min(800, Math.max(320, data.size * 80));
-            boardEl.style.width = side + 'px';
-            boardEl.style.height = side + 'px';
-        }
-    try{ currentVeiledSquares = Array.isArray(data.veiledSquares) ? data.veiledSquares : (data.boardState && data.boardState.veiledSquares) || []; }catch(_){ currentVeiledSquares = []; }
-    if(data.boardState) {
-      renderBoardFromState(data.boardState);
-      updateTurnBanner(data.boardState);
-    }
-    try{ if(data && data.status && data.status !== 'finished'){ removeSpectatorQuitButton(); } }catch(_){ }
-    try{ myMines = data.minesOwn || []; }catch(e){ myMines = []; }
-    try{ renderMines(); }catch(e){ }
-    if(data.hands){
-      const own = (data.hands && data.hands[myPlayerId]) ? data.hands[myPlayerId] : [];
-      const counts = {};
-      Object.entries(data.hands || {}).forEach(([pid, arr])=>{ counts[pid] = (arr && arr.length) || 0; });
-      renderHands(own, counts);
-    } else if(data.handsOwn || data.handCounts){
-      renderHands(data.handsOwn || [], data.handCounts || {});
-    }
-    try{
-      const drawBtn = document.getElementById('drawBtn');
-      if(drawBtn){
-        const auto = !!data.autoDraw;
-        const board = data.boardState || null;
-        const myShort = myColor && myColor[0];
-        if(!auto && board && myShort && board.turn === myShort){
-          const myHandLen = (data.handsOwn && data.handsOwn.length) || 0;
-          drawBtn.style.display = 'inline-block';
-          drawBtn.disabled = myHandLen >= 5;
-        } else {
-          drawBtn.style.display = 'none';
-        }
-      }
-    }catch(_){ }
-      });
-  socket.on('game:over', (data)=>{
-    try{
-      log('game:over', data);
-      if(data.boardState){ renderBoardFromState(data.boardState); updateTurnBanner(data.boardState); }
-      try{ showGameOver(data); }catch(_){ }
-    }catch(e){ console.warn('game:over handler error', e); }
-  });
-  socket.on('game:started', (data)=>{ log('game:started', data); if(data.boardState){ renderBoardFromState(data.boardState); updateTurnBanner(data.boardState); } });
-      socket.on('card:drawn', (data) => {
-        try{
-          log('recv card:drawn', data);
-          showCardDrawnNotification(data);
-        }catch(e){ console.warn('card:drawn handler error', e); }
-      });
-          socket.on('player:drew', (data) => {
-            try{
-              const pid = data && data.playerId;
-              if(!pid) return;
-              const actor = (pid === myPlayerId) ? 'Vous' : (playerColors[pid] ? playerColors[pid] : 'Adversaire');
-              appendActivity(`${actor} : a pioché une carte`);
-            }catch(_){ }
+
+        function connectAndJoin() {
+          socket = io();
+          socket.on("connect", () => {
+            log("socket connecté", socket.id);
           });
-      socket.on('card:played', (data) => {
-        try{
-          log('recv card:played', data);
-          const played = data && data.played ? data.played : data;
-          const cardObj = played && (played.card || played.cardObj || null);
-          const owner = played && played.playerId;
-          if(owner === myPlayerId){
-            const row = document.querySelector('.cards-row');
-            if(row){
-              const elems = Array.from(row.querySelectorAll('.pokemon-card'));
-              elems.forEach(el => {
-                const uuid = el.dataset.cardUuid || '';
-                const cid = el.dataset.cardId || '';
-                if((cardObj && cardObj.id && uuid && uuid === cardObj.id) || (cardObj && cardObj.cardId && cid && cid === cardObj.cardId)){
-                  el.remove();
-                }
+
+          socket.on("room:update", (data) => {
+            log("room:update", data);
+            if (playersEl) {
+              playersEl.innerHTML = "";
+              (data.players || []).forEach((p) => {
+                try {
+                  playerColors[p.id] = p.color;
+                } catch (_) {}
+                try {
+                  if (p.id === myPlayerId) {
+                    myColor = p.color;
+                    if (myColorEl) myColorEl.textContent = myColor;
+                  }
+                } catch (_) {}
+                const li = document.createElement("li");
+                li.textContent =
+                  (p.color || "Joueur") +
+                  (p.id === myPlayerId ? " (vous)" : "");
+                playersEl.appendChild(li);
               });
             }
-          }
-          try{
-            const title = (cardObj && (cardObj.title || cardObj.cardId)) || (played && played.card && (played.card.title || played.card.cardId)) || 'Carte';
-            const actor = (owner === myPlayerId) ? 'Vous' : (playerColors[owner] ? playerColors[owner] : 'Adversaire');
-              const isHidden = (cardObj && cardObj.hidden) || (played && played.card && played.card.hidden);
-              if(isHidden && owner !== myPlayerId){
-                appendActivity(`${actor} : a joué une carte`);
-              } else {
-                appendActivity(`${actor} : a joué la carte "${title}"`);
-              }
-          }catch(_){ }
-        }catch(e){ console.warn('card:played handler error', e); }
-      });
-      socket.on('card:effect:applied', (data) => {
-        try{
-          const effect = data && data.effect ? data.effect : data;
-          if(!effect) return;
-          if(effect.type === 'melange' || effect.type === 'melange'){
-            try{ playShuffleAnimation(); }catch(_){ }
-          }
-          if(effect.playerId && effect.playerId === myPlayerId){
-            showEffectNotification(effect);
-          } else if(effect.type && (effect.type === 'promotion' || effect.type === 'steal' || effect.type === 'mine')){
-            // public notable effects
-            showEffectNotification(effect);
-          }
-        }catch(e){ console.warn('card:effect:applied handler error', e); }
-      });
-      // when the server sends the stolen card to the stealer (private)
-      socket.on('card:stolen', (data) => {
-        try{
-          log('recv card:stolen', data);
-          // show notification and a small highlight in hands
-          const handsEl = document.getElementById('hands');
-          if(handsEl){
-            const note = document.createElement('div'); note.className = 'card-draw-note';
-            note.textContent = data && data.card ? `Vous avez volé : ${data.card.title || data.card.cardId || 'une carte'}` : 'Vous avez volé une carte';
-            handsEl.prepend(note); setTimeout(()=> note.remove(), 6000);
-          }
-        }catch(e){ console.warn('card:stolen handler error', e); }
-      });
-      socket.on('card:lost', (data) => {
-        try{ log('recv card:lost', data); showEffectNotification({ type: 'card_lost' }); }catch(e){ }
-      });
-      // private event: your played card was blocked (e.g., by a totem)
-      socket.on('card:play_blocked:private', (data) => {
-        try{
-          log('recv card:play_blocked:private', data);
-          const msg = (data && data.message) || 'Votre carte a été annulée par un effet.';
-          // show a toast and also log in the side log
-          showToast(msg, { background: 'rgba(200,60,60,0.95)' });
-          if(logEl) { log('notification:', msg); }
-        }catch(e){ console.warn('card:play_blocked:private handler error', e); }
-      });
-      // generic notification channel for targeted messages
-      socket.on('notification', (data) => {
-        try{
-          log('recv notification', data);
-          const msg = data && data.message ? data.message : (data && data.text) || 'Notification';
-          showToast(msg, { background: 'rgba(40,40,40,0.95)' });
-        }catch(e){ console.warn('notification handler error', e); }
-      });
-      // selection events (include moves) broadcasted by server
-      socket.on('game:select', (data) => {
-        try{
-          const pid = data && data.playerId;
-          const square = data && data.square;
-          const moves = data && data.moves;
-            log('recv game:select', { pid, square, moves: Array.isArray(moves) ? moves.length : moves });
-          // cleared selection
-          if(!square){
-            if(pid === myPlayerId){
-              // our selection cleared (maybe by reconnection) - clear locally without re-emitting
-              clearSelection(false);
-            } else {
-                if(pid){
-                  clearRemoteSelection(pid);
-                }
+            if (data.size) {
+              buildGrid(data.size);
+              const side = Math.min(800, Math.max(320, data.size * 80));
+              boardEl.style.width = side + "px";
+              boardEl.style.height = side + "px";
             }
+            try {
+              currentVeiledSquares = Array.isArray(data.veiledSquares)
+                ? data.veiledSquares
+                : (data.boardState && data.boardState.veiledSquares) || [];
+            } catch (_) {
+              currentVeiledSquares = [];
+            }
+            if (data.boardState) {
+              renderBoardFromState(data.boardState);
+              updateTurnBanner(data.boardState);
+            }
+            try {
+              if (data && data.status && data.status !== "finished") {
+                removeSpectatorQuitButton();
+              }
+            } catch (_) {}
+            try {
+              myMines = data.minesOwn || [];
+            } catch (e) {
+              myMines = [];
+            }
+            try {
+              renderMines();
+            } catch (e) {}
+            if (data.hands) {
+              const own =
+                data.hands && data.hands[myPlayerId]
+                  ? data.hands[myPlayerId]
+                  : [];
+              const counts = {};
+              Object.entries(data.hands || {}).forEach(([pid, arr]) => {
+                counts[pid] = (arr && arr.length) || 0;
+              });
+              renderHands(own, counts);
+            } else if (data.handsOwn || data.handCounts) {
+              renderHands(data.handsOwn || [], data.handCounts || {});
+            }
+            try {
+              const drawBtn = document.getElementById("drawBtn");
+              if (drawBtn) {
+                const auto = !!data.autoDraw;
+                const board = data.boardState || null;
+                const myShort = myColor && myColor[0];
+                if (!auto && board && myShort && board.turn === myShort) {
+                  const myHandLen =
+                    (data.handsOwn && data.handsOwn.length) || 0;
+                  drawBtn.style.display = "inline-block";
+                  drawBtn.disabled = myHandLen >= 5;
+                } else {
+                  drawBtn.style.display = "none";
+                }
+              }
+            } catch (_) {}
+          });
+          socket.on("game:over", (data) => {
+            try {
+              log("game:over", data);
+              if (data.boardState) {
+                renderBoardFromState(data.boardState);
+                updateTurnBanner(data.boardState);
+              }
+              try {
+                showGameOver(data);
+              } catch (_) {}
+            } catch (e) {
+              console.warn("game:over handler error", e);
+            }
+          });
+          socket.on("game:started", (data) => {
+            log("game:started", data);
+            if (data.boardState) {
+              renderBoardFromState(data.boardState);
+              updateTurnBanner(data.boardState);
+            }
+          });
+          socket.on("card:drawn", (data) => {
+            try {
+              log("recv card:drawn", data);
+              showCardDrawnNotification(data);
+            } catch (e) {
+              console.warn("card:drawn handler error", e);
+            }
+          });
+          socket.on("player:drew", (data) => {
+            try {
+              const pid = data && data.playerId;
+              if (!pid) return;
+              const actor =
+                pid === myPlayerId
+                  ? "Vous"
+                  : playerColors[pid]
+                    ? playerColors[pid]
+                    : "Adversaire";
+              appendActivity(`${actor} : a pioché une carte`);
+            } catch (_) {}
+          });
+          socket.on("card:played", (data) => {
+            try {
+              log("recv card:played", data);
+              const played = data && data.played ? data.played : data;
+              const cardObj = played && (played.card || played.cardObj || null);
+              const owner = played && played.playerId;
+              if (owner === myPlayerId) {
+                const row = document.querySelector(".cards-row");
+                if (row) {
+                  const elems = Array.from(
+                    row.querySelectorAll(".pokemon-card"),
+                  );
+                  elems.forEach((el) => {
+                    const uuid = el.dataset.cardUuid || "";
+                    const cid = el.dataset.cardId || "";
+                    if (
+                      (cardObj && cardObj.id && uuid && uuid === cardObj.id) ||
+                      (cardObj &&
+                        cardObj.cardId &&
+                        cid &&
+                        cid === cardObj.cardId)
+                    ) {
+                      el.remove();
+                    }
+                  });
+                }
+              }
+              try {
+                const title =
+                  (cardObj && (cardObj.title || cardObj.cardId)) ||
+                  (played &&
+                    played.card &&
+                    (played.card.title || played.card.cardId)) ||
+                  "Carte";
+                const actor =
+                  owner === myPlayerId
+                    ? "Vous"
+                    : playerColors[owner]
+                      ? playerColors[owner]
+                      : "Adversaire";
+                const isHidden =
+                  (cardObj && cardObj.hidden) ||
+                  (played && played.card && played.card.hidden);
+                if (isHidden && owner !== myPlayerId) {
+                  appendActivity(`${actor} : a joué une carte`);
+                } else {
+                  appendActivity(`${actor} : a joué la carte "${title}"`);
+                }
+              } catch (_) {}
+            } catch (e) {
+              console.warn("card:played handler error", e);
+            }
+          });
+          socket.on("card:effect:applied", (data) => {
+            try {
+              const effect = data && data.effect ? data.effect : data;
+              if (!effect) return;
+              if (effect.type === "melange" || effect.type === "melange") {
+                try {
+                  playShuffleAnimation();
+                } catch (_) {}
+              }
+              if (effect.playerId && effect.playerId === myPlayerId) {
+                showEffectNotification(effect);
+              } else if (
+                effect.type &&
+                (effect.type === "promotion" ||
+                  effect.type === "steal" ||
+                  effect.type === "mine")
+              ) {
+                // public notable effects
+                showEffectNotification(effect);
+              }
+            } catch (e) {
+              console.warn("card:effect:applied handler error", e);
+            }
+          });
+          // when the server sends the stolen card to the stealer (private)
+          socket.on("card:stolen", (data) => {
+            try {
+              log("recv card:stolen", data);
+              // show notification and a small highlight in hands
+              const handsEl = document.getElementById("hands");
+              if (handsEl) {
+                const note = document.createElement("div");
+                note.className = "card-draw-note";
+                note.textContent =
+                  data && data.card
+                    ? `Vous avez volé : ${data.card.title || data.card.cardId || "une carte"}`
+                    : "Vous avez volé une carte";
+                handsEl.prepend(note);
+                setTimeout(() => note.remove(), 6000);
+              }
+            } catch (e) {
+              console.warn("card:stolen handler error", e);
+            }
+          });
+          socket.on("card:lost", (data) => {
+            try {
+              log("recv card:lost", data);
+              showEffectNotification({ type: "card_lost" });
+            } catch (e) {}
+          });
+          // private event: your played card was blocked (e.g., by a totem)
+          socket.on("card:play_blocked:private", (data) => {
+            try {
+              log("recv card:play_blocked:private", data);
+              const msg =
+                (data && data.message) ||
+                "Votre carte a été annulée par un effet.";
+              // show a toast and also log in the side log
+              showToast(msg, { background: "rgba(200,60,60,0.95)" });
+              if (logEl) {
+                log("notification:", msg);
+              }
+            } catch (e) {
+              console.warn("card:play_blocked:private handler error", e);
+            }
+          });
+          // generic notification channel for targeted messages
+          socket.on("notification", (data) => {
+            try {
+              log("recv notification", data);
+              const msg =
+                data && data.message
+                  ? data.message
+                  : (data && data.text) || "Notification";
+              showToast(msg, { background: "rgba(40,40,40,0.95)" });
+            } catch (e) {
+              console.warn("notification handler error", e);
+            }
+          });
+          // selection events (include moves) broadcasted by server
+          socket.on("game:select", (data) => {
+            try {
+              const pid = data && data.playerId;
+              const square = data && data.square;
+              const moves = data && data.moves;
+              log("recv game:select", {
+                pid,
+                square,
+                moves: Array.isArray(moves) ? moves.length : moves,
+              });
+              // cleared selection
+              if (!square) {
+                if (pid === myPlayerId) {
+                  // our selection cleared (maybe by reconnection) - clear locally without re-emitting
+                  clearSelection(false);
+                } else {
+                  if (pid) {
+                    clearRemoteSelection(pid);
+                  }
+                }
+                return;
+              }
+
+              if (pid === myPlayerId) {
+                // re-apply local selection (don't emit) and show markers
+                setSelection(square, false);
+                if (Array.isArray(moves) && moves.length) showLegalMoves(moves);
+                else clearLegalMarkers();
+              } else {
+                // remote player's selection
+                if (pid) setRemoteSelection(pid, square);
+                if (Array.isArray(moves) && moves.length) {
+                  remoteMoves[pid] = moves;
+                  showRemoteLegalMoves(pid, moves);
+                } else {
+                  remoteMoves[pid] = [];
+                  if (pid) clearRemoteMoveMarkers(pid);
+                }
+              }
+            } catch (e) {
+              console.warn("game:select handler error", e);
+            }
+          });
+
+          socket.on("move:moved", (data) => {
+            try {
+              log("recv move:moved", data && { from: data.from, to: data.to });
+              // clear any local selection (move completed) before re-render
+              clearSelection(false);
+              if (data && data.boardState)
+                renderBoardFromState(data.boardState);
+              if (data && data.boardState) updateTurnBanner(data.boardState);
+            } catch (e) {
+              console.warn("move:moved handler error", e);
+            }
+          });
+
+          // mine detonation: show explosion animation at the square and remove local mine visual immediately
+          socket.on("mine:detonated", (evt) => {
+            try {
+              log("recv mine:detonated", evt);
+              // evt.square is algebraic name like 'e4'
+              if (evt && evt.square) showExplosionAt(evt.square);
+              // remove any mine image/dot at that square (owner will get updated minesOwn via room:update)
+              try {
+                const sqEl =
+                  boardEl &&
+                  boardEl.querySelector &&
+                  boardEl.querySelector(`.square[data-square="${evt.square}"]`);
+                if (sqEl) {
+                  const img = sqEl.querySelector(".mine-img");
+                  if (img) img.remove();
+                  const dot = sqEl.querySelector(".mine-dot");
+                  if (dot) dot.remove();
+                }
+              } catch (_) {}
+            } catch (e) {
+              console.warn("mine:detonated handler error", e);
+            }
+          });
+
+          // private detonation info for the mine owner (optional handling)
+          socket.on("mine:detonated:private", (evt) => {
+            try {
+              log(
+                "recv mine:detonated:private",
+                evt,
+              ); /* could show owner-specific UI later */
+            } catch (e) {}
+          });
+
+          socket.emit("room:join", { roomId, playerId }, (resp) => {
+            if (resp && resp.error) {
+              log("join error", resp);
+              showToast(resp.message || resp.error, {
+                background: "rgba(200,60,60,0.95)",
+              });
+              return;
+            }
+            log("Rejoint room", resp);
+            // remember assigned id/color from server
+            if (resp.playerId) {
+              myPlayerId = resp.playerId;
+              if (playerIdEl) playerIdEl.textContent = resp.playerId;
+            }
+            if (resp.color) {
+              myColor = resp.color;
+              if (myColorEl) myColorEl.textContent = myColor;
+              // orient board for black
+              if (boardEl) {
+                if (myColor === "black") boardEl.classList.add("flipped");
+                else boardEl.classList.remove("flipped");
+              }
+            }
+          });
+        }
+
+        connectAndJoin();
+
+        function updateTurnBanner(boardState) {
+          const banner = document.getElementById("turnBanner");
+          if (!banner) return;
+          if (!boardState || !boardState.turn || !myColor) {
+            banner.classList.remove("show");
             return;
           }
-
-          if(pid === myPlayerId){
-            // re-apply local selection (don't emit) and show markers
-            setSelection(square, false);
-            if(Array.isArray(moves) && moves.length) showLegalMoves(moves);
-            else clearLegalMarkers();
+          // myColor is 'white' or 'black', boardState.turn is 'w' or 'b'
+          const myShort = (myColor && myColor[0]) || "";
+          if (myShort === boardState.turn) {
+            banner.textContent = "C'est à vous de jouer";
+            banner.classList.add("show");
           } else {
-            // remote player's selection
-              if(pid) setRemoteSelection(pid, square);
-            if(Array.isArray(moves) && moves.length){
-              remoteMoves[pid] = moves;
-              showRemoteLegalMoves(pid, moves);
-            } else {
-              remoteMoves[pid] = [];
-              if(pid) clearRemoteMoveMarkers(pid);
-            }
-          }
-        }catch(e){ console.warn('game:select handler error', e); }
-      });
-
-      socket.on('move:moved', (data) => {
-        try{
-          log('recv move:moved', data && { from: data.from, to: data.to });
-          // clear any local selection (move completed) before re-render
-          clearSelection(false);
-          if(data && data.boardState) renderBoardFromState(data.boardState);
-          if(data && data.boardState) updateTurnBanner(data.boardState);
-        }catch(e){ console.warn('move:moved handler error', e); }
-      });
-
-      // mine detonation: show explosion animation at the square and remove local mine visual immediately
-      socket.on('mine:detonated', (evt) => {
-        try{
-          log('recv mine:detonated', evt);
-          // evt.square is algebraic name like 'e4'
-          if(evt && evt.square) showExplosionAt(evt.square);
-          // remove any mine image/dot at that square (owner will get updated minesOwn via room:update)
-          try{
-            const sqEl = boardEl && boardEl.querySelector && boardEl.querySelector(`.square[data-square="${evt.square}"]`);
-            if(sqEl){ const img = sqEl.querySelector('.mine-img'); if(img) img.remove(); const dot = sqEl.querySelector('.mine-dot'); if(dot) dot.remove(); }
-          }catch(_){ }
-        }catch(e){ console.warn('mine:detonated handler error', e); }
-      });
-
-      // private detonation info for the mine owner (optional handling)
-      socket.on('mine:detonated:private', (evt) => {
-        try{ log('recv mine:detonated:private', evt); /* could show owner-specific UI later */ }catch(e){}
-      });
-
-    socket.emit('room:join', { roomId, playerId }, (resp)=>{
-  if(resp && resp.error){ log('join error', resp); showToast(resp.message || resp.error, { background: 'rgba(200,60,60,0.95)' }); return; }
-        log('Rejoint room', resp);
-        // remember assigned id/color from server
-        if(resp.playerId){
-          myPlayerId = resp.playerId;
-          if(playerIdEl) playerIdEl.textContent = resp.playerId;
-        }
-        if(resp.color){
-          myColor = resp.color;
-          if(myColorEl) myColorEl.textContent = myColor;
-          // orient board for black
-          if(boardEl){
-            if(myColor === 'black') boardEl.classList.add('flipped');
-            else boardEl.classList.remove('flipped');
+            banner.textContent = "En attente du coup de l'adversaire";
+            banner.classList.add("show");
           }
         }
-      });
-    }
-
-    connectAndJoin();
-
-      function updateTurnBanner(boardState){
-        const banner = document.getElementById('turnBanner');
-        if(!banner) return;
-        if(!boardState || !boardState.turn || !myColor){
-          banner.classList.remove('show');
-          return;
-        }
-        // myColor is 'white' or 'black', boardState.turn is 'w' or 'b'
-        const myShort = (myColor && myColor[0]) || '';
-        if(myShort === boardState.turn){
-          banner.textContent = "C'est à vous de jouer";
-          banner.classList.add('show');
-        } else {
-          banner.textContent = "En attente du coup de l'adversaire";
-          banner.classList.add('show');
-        }
-      }
 
         // Show the end-of-game modal with a helpful message and actions
-        function showGameOver(data){
-          try{
-            const modal = document.getElementById('gameOverModal');
-            const title = document.getElementById('gameOverTitle');
-            const msg = document.getElementById('gameOverMessage');
-            const close = document.getElementById('gameOverClose');
-            const reload = document.getElementById('gameOverReload');
-            if(!modal || !title || !msg) return;
+        function showGameOver(data) {
+          try {
+            const modal = document.getElementById("gameOverModal");
+            const title = document.getElementById("gameOverTitle");
+            const msg = document.getElementById("gameOverMessage");
+            const close = document.getElementById("gameOverClose");
+            const reload = document.getElementById("gameOverReload");
+            if (!modal || !title || !msg) return;
             // determine outcome
-            if(data && data.draw){
-              title.textContent = 'Égalité';
-              msg.textContent = 'La partie est terminée: aucun roi n\'est en jeu.';
-            } else if(data && data.winnerId){
-              const youAreWinner = (myPlayerId && data.winnerId && myPlayerId === data.winnerId);
-              if(youAreWinner){ title.textContent = 'Victoire 🎉'; msg.textContent = 'Félicitations — vous avez gagné !'; }
-              else { title.textContent = 'Défaite'; msg.textContent = 'Vous avez perdu — l\'adversaire a conservé son roi.'; }
-            } else if(data && data.winnerColor){
+            if (data && data.draw) {
+              title.textContent = "Égalité";
+              msg.textContent =
+                "La partie est terminée: aucun roi n'est en jeu.";
+            } else if (data && data.winnerId) {
+              const youAreWinner =
+                myPlayerId && data.winnerId && myPlayerId === data.winnerId;
+              if (youAreWinner) {
+                title.textContent = "Victoire 🎉";
+                msg.textContent = "Félicitations — vous avez gagné !";
+              } else {
+                title.textContent = "Défaite";
+                msg.textContent =
+                  "Vous avez perdu — l'adversaire a conservé son roi.";
+              }
+            } else if (data && data.winnerColor) {
               // fallback: present color-based message
               const youWin = myColor && myColor[0] === data.winnerColor;
-              if(youWin){ title.textContent = 'Victoire 🎉'; msg.textContent = 'Félicitations — vous avez gagné !'; }
-              else { title.textContent = 'Défaite'; msg.textContent = 'Vous avez perdu — l\'adversaire a gagné.'; }
+              if (youWin) {
+                title.textContent = "Victoire 🎉";
+                msg.textContent = "Félicitations — vous avez gagné !";
+              } else {
+                title.textContent = "Défaite";
+                msg.textContent = "Vous avez perdu — l'adversaire a gagné.";
+              }
             } else {
-              title.textContent = 'Partie terminée';
-              msg.textContent = 'La partie est terminée.';
+              title.textContent = "Partie terminée";
+              msg.textContent = "La partie est terminée.";
             }
-            modal.style.display = 'flex';
+            modal.style.display = "flex";
             // disable interactions with board by adding an overlay class (optionally style via CSS)
-            if(boardEl) boardEl.classList.add('disabled-during-gameover');
+            if (boardEl) boardEl.classList.add("disabled-during-gameover");
             // wire actions: stay (close modal) or quit (leave room and go back to index)
-            close.onclick = ()=>{ 
-              modal.style.display = 'none'; 
-              try{ if(boardEl) boardEl.classList.remove('disabled-during-gameover'); }catch(_){ }
+            close.onclick = () => {
+              modal.style.display = "none";
+              try {
+                if (boardEl)
+                  boardEl.classList.remove("disabled-during-gameover");
+              } catch (_) {}
               // mark that this user stayed to spectate and show a persistent Quit button
-              try{ isSpectating = true; createSpectatorQuitButton(); }catch(_){ }
+              try {
+                isSpectating = true;
+                createSpectatorQuitButton();
+              } catch (_) {}
             };
-            reload.onclick = ()=>{
-              try{
+            reload.onclick = () => {
+              try {
                 // try to inform server that we voluntarily leave the room, then navigate away
-                if(socket && socket.connected){
-                  socket.emit('room:leave', { roomId }, (resp)=>{
-                    try{ window.location.href = '/'; }catch(_){ window.location.reload(); }
+                if (socket && socket.connected) {
+                  socket.emit("room:leave", { roomId }, (resp) => {
+                    try {
+                      window.location.href = "/";
+                    } catch (_) {
+                      window.location.reload();
+                    }
                   });
                 } else {
-                  window.location.href = '/';
+                  window.location.href = "/";
                 }
-              }catch(e){ try{ window.location.href = '/'; }catch(_){ window.location.reload(); } }
+              } catch (e) {
+                try {
+                  window.location.href = "/";
+                } catch (_) {
+                  window.location.reload();
+                }
+              }
             };
-          }catch(e){ console.warn('showGameOver error', e); }
+          } catch (e) {
+            console.warn("showGameOver error", e);
+          }
         }
 
         // create a persistent 'Quitter' button for spectators (appears when user chose to stay)
-        function createSpectatorQuitButton(){
-          try{
+        function createSpectatorQuitButton() {
+          try {
             removeSpectatorQuitButton(); // ensure only one
-            const btn = document.createElement('button');
-            btn.id = 'spectatorQuitBtn';
-            btn.textContent = 'Quitter la partie';
-            btn.style.position = 'fixed';
-            btn.style.right = '18px';
-            btn.style.bottom = '18px';
+            const btn = document.createElement("button");
+            btn.id = "spectatorQuitBtn";
+            btn.textContent = "Quitter la partie";
+            btn.style.position = "fixed";
+            btn.style.right = "18px";
+            btn.style.bottom = "18px";
             btn.style.zIndex = 9999;
-            btn.style.padding = '10px 12px';
-            btn.style.borderRadius = '8px';
-            btn.style.border = '0';
-            btn.style.background = 'linear-gradient(90deg,#ff7a59,#ffb199)';
-            btn.style.color = '#fff';
-            btn.style.cursor = 'pointer';
-            btn.onclick = ()=>{
-              try{
-                if(socket && socket.connected){
-                  socket.emit('room:leave', { roomId }, (resp)=>{ try{ window.location.href = '/'; }catch(_){ window.location.reload(); } });
-                } else { window.location.href = '/'; }
-              }catch(e){ try{ window.location.href = '/'; }catch(_){ window.location.reload(); } }
+            btn.style.padding = "10px 12px";
+            btn.style.borderRadius = "8px";
+            btn.style.border = "0";
+            btn.style.background = "linear-gradient(90deg,#ff7a59,#ffb199)";
+            btn.style.color = "#fff";
+            btn.style.cursor = "pointer";
+            btn.onclick = () => {
+              try {
+                if (socket && socket.connected) {
+                  socket.emit("room:leave", { roomId }, (resp) => {
+                    try {
+                      window.location.href = "/";
+                    } catch (_) {
+                      window.location.reload();
+                    }
+                  });
+                } else {
+                  window.location.href = "/";
+                }
+              } catch (e) {
+                try {
+                  window.location.href = "/";
+                } catch (_) {
+                  window.location.reload();
+                }
+              }
             };
             document.body.appendChild(btn);
-          }catch(e){ console.warn('createSpectatorQuitButton error', e); }
-        }
-
-        function removeSpectatorQuitButton(){
-          try{ const existing = document.getElementById('spectatorQuitBtn'); if(existing) existing.remove(); isSpectating = false; }catch(_){ }
-        }
-
-    // movement UI removed: legalMoves and move markers are disabled
-
-    // selection helpers (client-side)
-    function clearSelection(emit = true){
-      if(selectedSquareEl){
-        selectedSquareEl.classList.remove('selected');
-        selectedSquareEl.classList.remove('hide-selection');
-      }
-      selectedSquare = null;
-      selectedSquareEl = null;
-      const fromEl = document.getElementById('from');
-      if(fromEl) fromEl.value = '';
-      // notify others that we cleared selection
-      if(emit && socket && myPlayerId){
-        socket.emit('game:select', { roomId, square: null }, ()=>{});
-      }
-      // clear any shown legal-move markers
-      if(boardEl) clearLegalMarkers();
-    }
-
-    function setSelection(squareName, emit = true){
-      if(!squareName) return clearSelection(emit);
-      if(selectedSquareEl) selectedSquareEl.classList.remove('selected');
-      // clear any existing markers immediately (so selecting a piece with no moves removes old markers)
-      clearLegalMarkers();
-      const sqEl = boardEl.querySelector(`.square[data-square="${squareName}"]`);
-      if(!sqEl){ selectedSquare = null; selectedSquareEl = null; return; }
-      selectedSquare = squareName;
-      selectedSquareEl = sqEl;
-  sqEl.classList.add('selected');
-  // hide the square selection outline while keeping the piece
-  sqEl.classList.add('hide-selection');
-      const fromEl = document.getElementById('from');
-      if(fromEl) fromEl.value = squareName;
-      // notify others of our selection
-      if(emit && socket && myPlayerId){
-        socket.emit('game:select', { roomId, square: squareName }, ()=>{});
-      }
-      // legal moves will be provided by server via the 'game:select' event
-    }
-
-    // show markers for legal moves when clicking any square (any piece color)
-    function clearLegalMarkers(){
-      if(!boardEl) return;
-      const prev = boardEl.querySelectorAll('.move-marker');
-      prev.forEach(p=>p.remove());
-    }
-
-    function showLegalMoves(moves){
-      clearLegalMarkers();
-      (moves||[]).forEach(m => {
-        const to = m.to || (m.move && m.move.to);
-        if(!to) return;
-        const target = boardEl.querySelector(`.square[data-square="${to}"]`);
-        if(!target) return;
-        // do not show legal-move markers on squares that are veiled/hidden
-        try{
-          if(Array.isArray(currentVeiledSquares) && currentVeiledSquares.indexOf(to) !== -1) return;
-          if(target.classList && target.classList.contains('veiled')) return;
-        }catch(_){ }
-        const marker = document.createElement('div');
-        marker.className = 'move-marker';
-        // store metadata if needed later
-        marker.dataset.from = m.from || '';
-        marker.dataset.to = to;
-        target.appendChild(marker);
-      });
-    }
-
-    // remote move markers: attach remoteBy and allow clearing per player
-    function showRemoteLegalMoves(playerId, moves){
-      clearRemoteMoveMarkers(playerId);
-      (moves||[]).forEach(m => {
-        const to = m.to || (m.move && m.move.to);
-        if(!to) return;
-        const target = boardEl.querySelector(`.square[data-square="${to}"]`);
-        if(!target) return;
-        // do not show remote move markers on veiled/hidden squares
-        try{
-          if(Array.isArray(currentVeiledSquares) && currentVeiledSquares.indexOf(to) !== -1) return;
-          if(target.classList && target.classList.contains('veiled')) return;
-        }catch(_){ }
-        const marker = document.createElement('div');
-        marker.className = 'move-marker';
-        marker.dataset.from = m.from || '';
-        marker.dataset.to = to;
-        marker.dataset.remoteBy = playerId;
-        target.appendChild(marker);
-      });
-    }
-
-    function clearRemoteMoveMarkers(playerId){
-      if(!boardEl) return;
-      const prev = boardEl.querySelectorAll(`.move-marker[data-remote-by="${playerId}"]`);
-      prev.forEach(p=>p.remove());
-    }
-
-    // remote selection helpers: mark a square as selected by another player
-    function setRemoteSelection(playerId, squareName){
-      // clear previous for that player
-      clearRemoteSelection(playerId);
-      const sqEl = boardEl.querySelector(`.square[data-square="${squareName}"]`);
-      if(!sqEl) return;
-      remoteSelections[playerId] = squareName;
-      sqEl.classList.add('selected-remote');
-      // hide the square selection outline for remote selection as well
-      sqEl.classList.add('hide-selection');
-      sqEl.dataset.selectedBy = playerId;
-    }
-
-    function clearRemoteSelection(playerId){
-      const prev = remoteSelections[playerId];
-      if(!prev) return;
-      const prevEl = boardEl.querySelector(`.square[data-square="${prev}"]`);
-      if(prevEl){
-        prevEl.classList.remove('selected-remote');
-        delete prevEl.dataset.selectedBy;
-        prevEl.classList.remove('hide-selection');
-      }
-      delete remoteSelections[playerId];
-      // also clear remote move markers
-      clearRemoteMoveMarkers(playerId);
-      delete remoteMoves[playerId];
-    }
-
-    if(boardEl){
-      boardEl.addEventListener('click', (ev)=>{
-          const sqEl = ev.target.closest && ev.target.closest('.square');
-          if(!sqEl) return;
-          const square = sqEl.getAttribute('data-square');
-          if(!square) return;
-
-          // Do not allow interacting with veiled/hidden squares.
-          // `currentVeiledSquares` is populated from server `room:update` and
-          // we also add a `.veiled` class during rendering as a fallback.
-          try{
-            if(Array.isArray(currentVeiledSquares) && currentVeiledSquares.indexOf(square) !== -1){
-              log('clicked veiled square, ignoring');
-              return;
-            }
-            if(sqEl.classList && sqEl.classList.contains('veiled')){ log('clicked veiled square (DOM class), ignoring'); return; }
-          }catch(_){ }
-
-        // If we're in a pending card-targeting mode, handle target selection and do NOT attempt moves
-        if(pendingCard){
-          const req = pendingCard.requireType; // 'empty' | 'owned' | 'owned_pawn' | 'enemy' | 'own_then_enemy' | 'enemy_queen'
-          const myShort = (myColor && myColor[0]) || '';
-          // handle two-step selection for cards like 'inversion'
-          if(req === 'own_then_enemy'){
-            // first select one of your own pieces
-            if(!pendingCard.firstTarget){
-              const piece = currentBoardState && Array.isArray(currentBoardState.pieces) && currentBoardState.pieces.find(p => p.square === square);
-              if(!piece || piece.color !== myShort){ log('select one of your pieces (first)'); return; }
-              if(piece.type && piece.type.toLowerCase() === 'k'){ log('cannot select king'); return; }
-              // store first selection and highlight enemy pieces
-              pendingCard.firstTarget = square;
-              highlightTargets('enemy');
-              // mark visually the chosen source (temporary)
-              try{ const el = boardEl.querySelector(`.square[data-square="${square}"]`); if(el) el.classList.add('target-chosen'); }catch(_){ }
-              log('First piece selected for inversion:', square);
-              return;
-            }
-            // second selection: enemy piece to swap with
-            const occ = currentBoardState && Array.isArray(currentBoardState.pieces) && currentBoardState.pieces.find(p => p.square === square);
-            if(!occ || occ.color === myShort){ log('select an enemy piece (second)'); return; }
-            // emit swap payload: sourceSquare + targetSquare
-            emitCardPlay({ roomId, playerId: myPlayerId, cardId: pendingCard.cardId, payload: { sourceSquare: pendingCard.firstTarget, targetSquare: square } }, (resp)=>{
-              if(resp && resp.error){ log('card:play error', resp); showToast(resp.message || resp.error, { background: 'rgba(200,60,60,0.95)' }); }
-              else { log('inversion played', resp); }
-            });
-            // cleanup visuals
-            try{ const el = boardEl.querySelector(`.square[data-square="${pendingCard.firstTarget}"]`); if(el) el.classList.remove('target-chosen'); }catch(_){ }
-            pendingCard = null; clearTargetHighlights(); return;
+          } catch (e) {
+            console.warn("createSpectatorQuitButton error", e);
           }
-          if(req === 'empty'){
-            const occupied = currentBoardState && Array.isArray(currentBoardState.pieces) && currentBoardState.pieces.find(p => p.square === square);
-            if(occupied){ log('square not empty for mine placement'); return; }
-            // send mine placement
-            emitCardPlay({ roomId, playerId: myPlayerId, cardId: pendingCard.cardId, payload: { targetSquare: square } }, (resp)=>{
-              if(resp && resp.error){ log('card:play error', resp); showToast(resp.message || resp.error, { background: 'rgba(200,60,60,0.95)' }); }
-              else { log('card played with target', resp); }
-            });
-            pendingCard = null; clearTargetHighlights(); return;
-          } else if(req === 'owned'){
-            const piece = currentBoardState && Array.isArray(currentBoardState.pieces) && currentBoardState.pieces.find(p => p.square === square);
-            if(!piece || piece.color !== myShort){ log('select one of your pieces'); return; }
-            if(piece.type && piece.type.toLowerCase() === 'k'){ log('cannot select king'); return; }
-      emitCardPlay({ roomId, playerId: myPlayerId, cardId: pendingCard.cardId, payload: { targetSquare: square } }, (resp)=>{
-        if(resp && resp.error){ log('card:play error', resp); showToast(resp.message || resp.error, { background: 'rgba(200,60,60,0.95)' }); }
-        else { log('card played with target', resp); }
-      });
-            pendingCard = null; clearTargetHighlights(); return;
-          } else if(req === 'owned_pawn'){
-            // must be one of your pawns — show promotion choice modal before sending
-            const piece = currentBoardState && Array.isArray(currentBoardState.pieces) && currentBoardState.pieces.find(p => p.square === square);
-            if(!piece || piece.color !== myShort || !piece.type || piece.type.toLowerCase() !== 'p'){
-              log('select one of your pawns for promotion'); return;
-            }
-            // show promotion UI; when the player picks a piece type, emit the card:play with payload.promotion
-            showPromotionModal(square, (promotionChoice)=>{
-              if(!promotionChoice) {
-                // canceled
-                pendingCard = null; clearTargetHighlights(); return;
-              }
-              emitCardPlay({ roomId, playerId: myPlayerId, cardId: pendingCard.cardId, payload: { targetSquare: square, promotion: promotionChoice } }, (resp)=>{
-                if(resp && resp.error){ log('card:play error', resp); showToast(resp.message || resp.error, { background: 'rgba(200,60,60,0.95)' }); }
-                else { log('card played with promotion', resp); }
-              });
-              pendingCard = null; clearTargetHighlights();
-            });
+        }
+
+        function removeSpectatorQuitButton() {
+          try {
+            const existing = document.getElementById("spectatorQuitBtn");
+            if (existing) existing.remove();
+            isSpectating = false;
+          } catch (_) {}
+        }
+
+        // movement UI removed: legalMoves and move markers are disabled
+
+        // selection helpers (client-side)
+        function clearSelection(emit = true) {
+          if (selectedSquareEl) {
+            selectedSquareEl.classList.remove("selected");
+            selectedSquareEl.classList.remove("hide-selection");
+          }
+          selectedSquare = null;
+          selectedSquareEl = null;
+          const fromEl = document.getElementById("from");
+          if (fromEl) fromEl.value = "";
+          // notify others that we cleared selection
+          if (emit && socket && myPlayerId) {
+            socket.emit("game:select", { roomId, square: null }, () => {});
+          }
+          // clear any shown legal-move markers
+          if (boardEl) clearLegalMarkers();
+        }
+
+        function setSelection(squareName, emit = true) {
+          if (!squareName) return clearSelection(emit);
+          if (selectedSquareEl) selectedSquareEl.classList.remove("selected");
+          // clear any existing markers immediately (so selecting a piece with no moves removes old markers)
+          clearLegalMarkers();
+          const sqEl = boardEl.querySelector(
+            `.square[data-square="${squareName}"]`,
+          );
+          if (!sqEl) {
+            selectedSquare = null;
+            selectedSquareEl = null;
             return;
-          } else if(req === 'enemy'){
-            const occ = currentBoardState && Array.isArray(currentBoardState.pieces) && currentBoardState.pieces.find(p => p.square === square);
-            if(!occ || occ.color === myShort){ log('select an enemy piece'); return; }
-            if(occ.type && occ.type.toLowerCase() === 'k'){ log('cannot select king'); return; }
-            emitCardPlay({ roomId, playerId: myPlayerId, cardId: pendingCard.cardId, payload: { targetSquare: square } }, (resp)=>{
-              if(resp && resp.error){ log('card:play error', resp); showToast(resp.message || resp.error, { background: 'rgba(200,60,60,0.95)' }); }
-              else { log('card played with target', resp);
-                // after server applied the card effect, request legal moves for the selected piece so the client
-                // will receive the updated legal moves (including teleport to empty squares)
-                try{ setSelection(square); }catch(_){ }
-              }
-            });
-            // keep pendingCard until server response processed (client will call setSelection on success)
-            pendingCard = null; clearTargetHighlights(); return;
           }
-          else if(req === 'enemy_queen'){
-            const occ = currentBoardState && Array.isArray(currentBoardState.pieces) && currentBoardState.pieces.find(p => p.square === square);
-            if(!occ || occ.color === myShort || !occ.type || occ.type.toLowerCase() !== 'q'){ log('select an enemy queen'); return; }
-            emitCardPlay({ roomId, playerId: myPlayerId, cardId: pendingCard.cardId, payload: { targetSquare: square } }, (resp)=>{
-              if(resp && resp.error){ log('card:play error', resp); showToast(resp.message || resp.error, { background: 'rgba(200,60,60,0.95)' }); }
-              else { log('card played with target', resp);
-                try{ setSelection(square); }catch(_){ }
-              }
-            });
-            pendingCard = null; clearTargetHighlights(); return;
+          selectedSquare = squareName;
+          selectedSquareEl = sqEl;
+          sqEl.classList.add("selected");
+          // hide the square selection outline while keeping the piece
+          sqEl.classList.add("hide-selection");
+          const fromEl = document.getElementById("from");
+          if (fromEl) fromEl.value = squareName;
+          // notify others of our selection
+          if (emit && socket && myPlayerId) {
+            socket.emit(
+              "game:select",
+              { roomId, square: squareName },
+              () => {},
+            );
           }
-          else if(req === 'piece'){
-            const occ = currentBoardState && Array.isArray(currentBoardState.pieces) && currentBoardState.pieces.find(p => p.square === square);
-            if(!occ){ log('select a piece'); return; }
-            if(occ.type && occ.type.toLowerCase() === 'k'){ log('cannot select king'); return; }
-            emitCardPlay({ roomId, playerId: myPlayerId, cardId: pendingCard.cardId, payload: { targetSquare: square } }, (resp)=>{
-              if(resp && resp.error){ log('card:play error', resp); showToast(resp.message || resp.error, { background: 'rgba(200,60,60,0.95)' }); }
-              else { log('card played with target', resp); }
-            });
-            pendingCard = null; clearTargetHighlights(); return;
-          }
+          // legal moves will be provided by server via the 'game:select' event
         }
 
-        // If this square contains a move-marker (either clicked marker or square area), attempt the move.
-        // Prefer the actual clicked marker if present, otherwise look for a marker element inside the square.
-        const clickedMarker = ev.target.closest && ev.target.closest('.move-marker');
-        const marker = clickedMarker || sqEl.querySelector('.move-marker');
-        if(marker){
-          // ignore remote player's markers
-          const remoteBy = marker.dataset && marker.dataset.remoteBy;
-          if(remoteBy && remoteBy !== myPlayerId){ log('marker belongs to remote player, ignoring'); return; }
-          const to = marker.dataset && marker.dataset.to;
-          const from = marker.dataset && marker.dataset.from ? marker.dataset.from : selectedSquare;
-          if(!to || !from){ log('invalid marker metadata', { from, to }); return; }
-          // only allow if it's our turn
-          const myShort = (myColor && myColor[0]) || '';
-          if(!currentBoardState || currentBoardState.turn !== myShort){ log('not your turn'); return; }
-          socket.emit('game:move', { roomId, from, to }, (resp)=>{
-            if(resp && resp.error){ log('move error', resp); showToast(resp.message || resp.error, { background: 'rgba(200,60,60,0.95)' }); }
-            else { log('move sent', resp); }
-          });
-          return;
+        // show markers for legal moves when clicking any square (any piece color)
+        function clearLegalMarkers() {
+          if (!boardEl) return;
+          const prev = boardEl.querySelectorAll(".move-marker");
+          prev.forEach((p) => p.remove());
         }
 
-        // clicked a piece -> select it (no legal moves requested)
-        const pieceImg = ev.target.closest && ev.target.closest('img.piece');
-        if(pieceImg){
-          setSelection(square);
-          return;
-        }
-
-        // default: clicked empty square -> select it (toggle)
-        if(selectedSquare === square){
-          clearSelection();
-        } else {
-          setSelection(square);
-        }
-      });
-    }
-
-    // move button removed
-
-    // Board rendering using provided SVG assets and `boardState` JSON.
-    const pieceSetPath = '/assets/chess-pieces/chess_maestro_bw';
-  // board visual defaults are handled by CSS (background, size, border, position)
-
-    function renderBoardFromState(boardState){
-      if(!boardState) return;
-      // cache boardState for client-side checks (turn etc.)
-      currentBoardState = boardState;
-      // clear existing pieces but keep squares if present
-      const squares = boardEl.querySelectorAll('.square');
-      squares.forEach(s=> s.innerHTML = '');
-
-      // place pieces according to boardState.pieces (expects algebraic square names)
-      (boardState.pieces || []).forEach(p => {
-        const squareName = p.square;
-        if(!squareName) return;
-        const sqEl = boardEl.querySelector(`.square[data-square="${squareName}"]`);
-        if(!sqEl) return;
-        const letter = p.type ? p.type.toUpperCase() : '?';
-        const filename = (p.color === 'w' ? 'w' + letter : 'b' + letter) + '.svg';
-        const img = document.createElement('img');
-        img.src = `${pieceSetPath}/${filename}`;
-        img.className = 'piece';
-        sqEl.appendChild(img);
-      });
-
-      // re-apply selection if the previously selected square still exists
-      if(selectedSquare){
-        // re-apply local selection without re-emitting
-        setSelection(selectedSquare, false);
-      }
-      // re-apply remote selections
-      Object.entries(remoteSelections).forEach(([pid, sq]) => {
-        const el = boardEl.querySelector(`.square[data-square="${sq}"]`);
-        if(el){ el.classList.add('selected-remote'); el.classList.add('hide-selection'); }
-      });
-      // re-apply remote move markers
-      Object.entries(remoteMoves).forEach(([pid, moves]) => {
-        if(Array.isArray(moves) && moves.length) showRemoteLegalMoves(pid, moves);
-      });
-      // render any mines owned by this player
-      try{ renderMines(); }catch(e){ }
-      // render veils for brouillard effect (if any)
-      try{
-        // remove existing veils
-        const allSq = boardEl.querySelectorAll('.square');
-        allSq.forEach(sqEl => {
-          const v = sqEl.querySelector('.veil'); if(v) v.remove();
-          // also remove prior veiled marker class
-          try{ sqEl.classList.remove('veiled'); }catch(_){ }
-        });
-        if(Array.isArray(currentVeiledSquares) && currentVeiledSquares.length){
-          currentVeiledSquares.forEach(sq => {
-            const el = boardEl.querySelector(`.square[data-square="${sq}"]`);
-            if(!el) return;
-            const veil = document.createElement('div'); veil.className = 'veil';
-            el.appendChild(veil);
-            // add a class to hide piece images as a fallback in case z-index/stacking causes overlay issues
-            try{ 
-              el.classList.add('veiled'); 
-              // remove any move markers that may have been added previously on this square
-              const prevMarkers = el.querySelectorAll('.move-marker');
-              prevMarkers.forEach(m => m.remove());
-            }catch(_){ }
+        function showLegalMoves(moves) {
+          clearLegalMarkers();
+          (moves || []).forEach((m) => {
+            const to = m.to || (m.move && m.move.to);
+            if (!to) return;
+            const target = boardEl.querySelector(
+              `.square[data-square="${to}"]`,
+            );
+            if (!target) return;
+            // do not show legal-move markers on squares that are veiled/hidden
+            try {
+              if (
+                Array.isArray(currentVeiledSquares) &&
+                currentVeiledSquares.indexOf(to) !== -1
+              )
+                return;
+              if (target.classList && target.classList.contains("veiled"))
+                return;
+            } catch (_) {}
+            const marker = document.createElement("div");
+            marker.className = "move-marker";
+            // store metadata if needed later
+            marker.dataset.from = m.from || "";
+            marker.dataset.to = to;
+            target.appendChild(marker);
           });
         }
-      }catch(_){ }
-    }
 
-    // draw mine icons on squares for mines owned by this client
-    function renderMines(){
-      if(!boardEl) return;
-      // remove old mine markers
-      // remove old mine markers (either image or dot)
-      const prev = boardEl.querySelectorAll('.mine-dot, .mine-img');
-      prev.forEach(p=>p.remove());
-      (myMines || []).forEach(sq => {
-        const el = boardEl.querySelector(`.square[data-square="${sq}"]`);
-        if(!el) return;
-        // create an image element so the mine has a transparent background and crisp edges
-        const img = document.createElement('img');
-        img.className = 'mine-img';
-        // use a project asset (SVG) that has a transparent background
-          img.src = '/assets/img/bomb.jpg';
-          img.alt = 'mine';
-          img.onerror = function(){
-            try{ if(this.src && this.src.indexOf('bomb.jpg') === -1) this.src = '/assets/img/bomb.jpg'; }
-            catch(e){}
-          };
-        img.draggable = false;
-        // ensure container is positioned so absolute centering works
-        if(!el.style.position) el.style.position = 'relative';
-        el.appendChild(img);
-      });
-    }
-
-    // show an explosion animation centered on a square (client-side visual)
-    function showExplosionAt(square){
-      if(!boardEl || !square) return;
-      const sqEl = boardEl.querySelector(`.square[data-square="${square}"]`);
-      if(!sqEl) return;
-      // ensure container is positioned so absolute centering works
-      if(!sqEl.style.position) sqEl.style.position = 'relative';
-
-      // Try to play an authored explosion video if available; fallback to CSS explosion if not.
-      const videoPath = '/assets/media/FireElement01.mov';
-      const vid = document.createElement('video');
-      vid.className = 'explosion-video';
-      vid.src = videoPath;
-      vid.autoplay = true; vid.muted = true; vid.playsInline = true; vid.loop = false; vid.preload = 'auto';
-      vid.style.pointerEvents = 'none';
-
-      let usedVideo = false;
-      // Attach event listeners to handle success or failure
-      const cleanup = ()=>{ try{ if(vid && vid.parentNode) vid.parentNode.removeChild(vid); }catch(_){ } };
-      vid.addEventListener('canplay', ()=>{
-        // video is available and can play — use it
-        try{ sqEl.appendChild(vid); usedVideo = true; vid.play().catch(()=>{}); }
-        catch(_){ usedVideo = false; }
-      }, { once: true });
-      // if video errors (file missing or codec issue), fallback to CSS explosion
-      vid.addEventListener('error', ()=>{
-        try{ cleanup(); }catch(_){ }
-        // fallback animation
-        const ex = document.createElement('div'); ex.className = 'explosion'; sqEl.appendChild(ex);
-        requestAnimationFrame(()=> ex.classList.add('play'));
-        setTimeout(()=>{ try{ ex.remove(); }catch(_){ if(ex && ex.parentNode) ex.parentNode.removeChild(ex); } }, 700);
-      }, { once: true });
-      // If video ends, remove it
-      vid.addEventListener('ended', ()=>{ try{ cleanup(); }catch(_){ } }, { once: true });
-      // start loading — if canplay won't fire within a short time, fallback to CSS
-      vid.load();
-      // fallback timeout: if video hasn't started in 180ms, show CSS explosion instead
-      setTimeout(()=>{
-        if(!usedVideo){
-          try{ vid.pause(); if(vid && vid.parentNode) vid.parentNode.removeChild(vid); }catch(_){ }
-          const ex = document.createElement('div'); ex.className = 'explosion'; sqEl.appendChild(ex);
-          requestAnimationFrame(()=> ex.classList.add('play'));
-          setTimeout(()=>{ try{ ex.remove(); }catch(_){ if(ex && ex.parentNode) ex.parentNode.removeChild(ex); } }, 700);
+        // remote move markers: attach remoteBy and allow clearing per player
+        function showRemoteLegalMoves(playerId, moves) {
+          clearRemoteMoveMarkers(playerId);
+          (moves || []).forEach((m) => {
+            const to = m.to || (m.move && m.move.to);
+            if (!to) return;
+            const target = boardEl.querySelector(
+              `.square[data-square="${to}"]`,
+            );
+            if (!target) return;
+            // do not show remote move markers on veiled/hidden squares
+            try {
+              if (
+                Array.isArray(currentVeiledSquares) &&
+                currentVeiledSquares.indexOf(to) !== -1
+              )
+                return;
+              if (target.classList && target.classList.contains("veiled"))
+                return;
+            } catch (_) {}
+            const marker = document.createElement("div");
+            marker.className = "move-marker";
+            marker.dataset.from = m.from || "";
+            marker.dataset.to = to;
+            marker.dataset.remoteBy = playerId;
+            target.appendChild(marker);
+          });
         }
-      }, 180);
-    }
 
-    // target highlighting helpers
-    function clearTargetHighlights(){
-      if(!boardEl) return;
-      const prev = boardEl.querySelectorAll('.square.targetable');
-      prev.forEach(p=>p.classList.remove('targetable'));
-      const note = document.getElementById('pendingNote'); if(note) note.remove();
-    }
-    function highlightTargets(type){
-      if(!boardEl || !currentBoardState) return;
-      clearTargetHighlights();
-      const myShort = (myColor && myColor[0]) || '';
-      Array.from(boardEl.querySelectorAll('.square')).forEach(sqEl => {
-        const sq = sqEl.getAttribute('data-square');
-        if(!sq) return;
-        if(type === 'empty'){
-          const occ = (currentBoardState.pieces||[]).find(p=>p.square===sq);
-          if(!occ) sqEl.classList.add('targetable');
-        } else if(type === 'owned'){
-          const occ = (currentBoardState.pieces||[]).find(p=>p.square===sq);
-          if(occ && occ.color === myShort && occ.type && occ.type.toLowerCase() !== 'k') sqEl.classList.add('targetable');
-        } else if(type === 'owned_pawn'){
-          const occ = (currentBoardState.pieces||[]).find(p=>p.square===sq);
-          if(occ && occ.color === myShort && occ.type && occ.type.toLowerCase() === 'p') sqEl.classList.add('targetable');
-        } else if(type === 'own_then_enemy'){
-          // initial phase: highlight only own pieces (client will switch to enemy after first selection)
-          const occ = (currentBoardState.pieces||[]).find(p=>p.square===sq);
-          if(occ && occ.color === myShort && occ.type && occ.type.toLowerCase() !== 'k') sqEl.classList.add('targetable');
-        } else if(type === 'piece'){
-          const occ = (currentBoardState.pieces||[]).find(p=>p.square===sq);
-          if(occ && occ.type && occ.type.toLowerCase() !== 'k') sqEl.classList.add('targetable');
-        } else if(type === 'enemy_queen'){
-          const occ = (currentBoardState.pieces||[]).find(p=>p.square===sq);
-          if(occ && occ.color && occ.color !== myShort && occ.type && occ.type.toLowerCase() === 'q') sqEl.classList.add('targetable');
-        } else if(type === 'enemy'){
-          const occ = (currentBoardState.pieces||[]).find(p=>p.square===sq);
-          if(occ && occ.color && occ.color !== myShort && occ.type && occ.type.toLowerCase() !== 'k') sqEl.classList.add('targetable');
+        function clearRemoteMoveMarkers(playerId) {
+          if (!boardEl) return;
+          const prev = boardEl.querySelectorAll(
+            `.move-marker[data-remote-by="${playerId}"]`,
+          );
+          prev.forEach((p) => p.remove());
         }
-      });
-      // add a small note near hands
-      try{
-        const handsEl = document.getElementById('hands');
-        if(handsEl){
-          const note = document.createElement('div');
-          note.id = 'pendingNote';
-          note.style.marginTop = '8px';
-          note.style.display = 'flex';
-          note.style.alignItems = 'center';
-          note.style.gap = '8px';
-          const txt = document.createElement('span');
-          txt.textContent = 'Sélectionnez la case cible pour la carte...';
-          txt.style.fontWeight = '700';
-          note.appendChild(txt);
-          const cancelBtn = document.createElement('button');
-          cancelBtn.type = 'button';
-          cancelBtn.id = 'pendingCancelBtn';
-          cancelBtn.textContent = 'Annuler';
-          // use a dedicated class to ensure good contrast against the hands background
-          cancelBtn.className = 'btn-cancel';
-          cancelBtn.addEventListener('click', (ev)=>{ ev.stopPropagation(); cancelPendingCard(); });
-          note.appendChild(cancelBtn);
-          handsEl.prepend(note);
+
+        // remote selection helpers: mark a square as selected by another player
+        function setRemoteSelection(playerId, squareName) {
+          // clear previous for that player
+          clearRemoteSelection(playerId);
+          const sqEl = boardEl.querySelector(
+            `.square[data-square="${squareName}"]`,
+          );
+          if (!sqEl) return;
+          remoteSelections[playerId] = squareName;
+          sqEl.classList.add("selected-remote");
+          // hide the square selection outline for remote selection as well
+          sqEl.classList.add("hide-selection");
+          sqEl.dataset.selectedBy = playerId;
         }
-      }catch(e){}
-    }
 
-    // cancel a pending card selection (client-only)
-    function cancelPendingCard(){
-      if(!pendingCard) return;
-      pendingCard = null;
-      clearTargetHighlights();
-      log('Pending card selection annulée');
-      // remove pendingNote if present
-      const note = document.getElementById('pendingNote'); if(note) note.remove();
-    }
-
-    // build grid with independent square elements and data-square attributes
-    function buildGrid(size){
-      if(!size || size < 1) size = 8;
-      boardEl.style.gridTemplateColumns = `repeat(${size}, 1fr)`;
-      boardEl.style.gridTemplateRows = `repeat(${size}, 1fr)`;
-      // if grid already has correct number of squares, keep them
-      const existing = boardEl.querySelectorAll('.square');
-      if(existing.length === size * size) return;
-      boardEl.innerHTML = '';
-      // create rows from rank size..1 (so that a1 is bottom-left if CSS doesn't flip)
-      for(let rank = size; rank >= 1; rank--){
-        for(let file = 0; file < size; file++){
-          const fileLetter = String.fromCharCode('a'.charCodeAt(0) + file);
-          const squareName = `${fileLetter}${rank}`;
-          const sq = document.createElement('div');
-          // color squares in checker pattern
-          const dark = ((file + rank) % 2) === 0;
-          sq.className = 'square ' + (dark ? 'dark' : 'light');
-          sq.setAttribute('data-square', squareName);
-          boardEl.appendChild(sq);
-        }
-      }
-    }
-
-    // render player's own hand and public counts for others
-    // New: render as horizontal 'pokemon-style' cards side-by-side
-    function renderHands(handsOwn, handCounts){
-      const handsEl = document.getElementById('hands');
-      if(!handsEl) return;
-      handsEl.innerHTML = '';
-
-      const wrap = document.createElement('div');
-      wrap.className = 'player-hand pokemon-hand';
-
-      const header = document.createElement('div');
-      header.className = 'pokemon-hand-header';
-      const title = document.createElement('div');
-      title.textContent = 'Vos cartes';
-      title.className = 'pokemon-hand-title';
-      header.appendChild(title);
-      wrap.appendChild(header);
-
-      const row = document.createElement('div');
-      row.className = 'cards-row';
-
-      (handsOwn || []).slice(0,10).forEach(c => {
-        const cardEl = document.createElement('div');
-        cardEl.className = 'pokemon-card';
-        cardEl.dataset.cardId = c.cardId || c.id || '';
-        cardEl.dataset.cardUuid = c.id || '';
-
-        const top = document.createElement('div'); top.className = 'pokemon-card-top';
-        const art = document.createElement('div'); art.className = 'pokemon-card-art';
-        art.textContent = '';
-        try{
-          const cid = (c.cardId || c.id || '').toString().toLowerCase();
-          const title = (c.title || '').toString().toLowerCase();
-          let imgSrc = null;
-          if(cid === 'adoubement') imgSrc = '/assets/img/cards/adoubement.png';
-          if(cid === 'folie') imgSrc = '/assets/img/cards/folie.png';
-          if(cid === 'fortification') imgSrc = '/assets/img/cards/fortification.png';
-          if(cid === 'rebond') imgSrc = '/assets/img/cards/rebond.png';
-          if(cid === 'anneau') imgSrc = '/assets/img/cards/anneau.png';
-          if(cid === 'brouillard') imgSrc = '/assets/img/cards/brouillard.png';
-          if(cid === 'coincoin') imgSrc = '/assets/img/cards/coincoin.png';
-          if(cid === 'inversion') imgSrc = '/assets/img/cards/inversion.png';
-          if(cid === 'invisible') imgSrc = '/assets/img/cards/invisible.png';
-          if(cid === 'kamikaze') imgSrc = '/assets/img/cards/kamikaz.png';
-          if(cid === 'melange') imgSrc = '/assets/img/cards/mélange.png';
-          if(cid === 'mine') imgSrc = '/assets/img/cards/mine.png';
-          if(cid === 'promotion') imgSrc = '/assets/img/cards/promotion.png';
-          if(cid === 'resurection') imgSrc = '/assets/img/cards/resurection.png';
-          if(cid === 'sniper') imgSrc = '/assets/img/cards/sniper.png';
-          if(cid === 'totem') imgSrc = '/assets/img/cards/totem.png';
-          if(cid === 'toucher') imgSrc = '/assets/img/cards/toucher.png';
-          if(cid === 'vole_piece') imgSrc = '/assets/img/cards/vole_piece.png';
-          if(cid === 'double') imgSrc = '/assets/img/cards/double.png';
-          if(cid === 'empathie') imgSrc = '/assets/img/cards/empathie.png';
-          if(cid === 'parrure') imgSrc = '/assets/img/cards/parrure.png';
-          if(cid === 'revolution') imgSrc = '/assets/img/cards/révolution.png';
-          if(cid === 'doppelganger') imgSrc = '/assets/img/cards/doppelganger.png';
-          if(cid === 'pareil') imgSrc = '/assets/img/cards/pareil.png';
-          if(cid === 'sans_effet') imgSrc = '/assets/img/cards/sans_effet.png';
-          if(cid === 'teleportation') imgSrc = '/assets/img/cards/teleportation.png';
-          if(cid === 'tout') imgSrc = '/assets/img/cards/tout.png';
-          if(cid === 'vole_carte') imgSrc = '/assets/img/cards/vole_carte.png';
-
-          if(imgSrc){
-            const img = document.createElement('img');
-            img.src = imgSrc;
-            img.alt = c.title || cid || 'card';
-            img.className = 'card-art-img';
-            img.style.width = '100%'; img.style.height = '100%'; img.style.objectFit = 'cover';
-            art.appendChild(img);
+        function clearRemoteSelection(playerId) {
+          const prev = remoteSelections[playerId];
+          if (!prev) return;
+          const prevEl = boardEl.querySelector(
+            `.square[data-square="${prev}"]`,
+          );
+          if (prevEl) {
+            prevEl.classList.remove("selected-remote");
+            delete prevEl.dataset.selectedBy;
+            prevEl.classList.remove("hide-selection");
           }
-        }catch(e){ /* ignore artwork errors */ }
-        top.appendChild(art);
+          delete remoteSelections[playerId];
+          // also clear remote move markers
+          clearRemoteMoveMarkers(playerId);
+          delete remoteMoves[playerId];
+        }
 
-        const mid = document.createElement('div'); mid.className = 'pokemon-card-mid';
-        const h = document.createElement('div'); h.className = 'pokemon-card-title'; h.textContent = c.title || c.cardId || 'Carte';
-        const p = document.createElement('div'); p.className = 'pokemon-card-desc'; p.textContent = c.description || '';
-        mid.appendChild(h); mid.appendChild(p);
+        if (boardEl) {
+          boardEl.addEventListener("click", (ev) => {
+            const sqEl = ev.target.closest && ev.target.closest(".square");
+            if (!sqEl) return;
+            const square = sqEl.getAttribute("data-square");
+            if (!square) return;
 
-        const footer = document.createElement('div'); footer.className = 'pokemon-card-footer';
-        const playBtn = document.createElement('button'); playBtn.className = 'card-play-btn'; playBtn.textContent = 'Jouer';
-        footer.appendChild(playBtn);
-
-        cardEl.appendChild(top);
-        cardEl.appendChild(mid);
-        cardEl.appendChild(footer);
-
-        // clicking the whole card or the play button emits card:play
-        function emitPlay(){
-          if(!socket) return;
-          const cid = cardEl.dataset.cardId;
-          // try cardId first, then fall back to the human title (helps with accented ids like "Téléportation")
-          const requireType = cardRequiresTarget(cid) || cardRequiresTarget(c.title || '');
-          if(requireType){
-            if(requireType === 'player'){
-              // If there's only one opponent, auto-select them (no modal needed). Otherwise show modal.
-              const opponents = Object.keys(handCounts || {}).filter(pid => pid !== myPlayerId);
-              if(opponents.length === 1){
-                const targetPlayerId = opponents[0];
-                emitCardPlay({ roomId, playerId: myPlayerId, cardId: cid, payload: { targetPlayerId } }, (resp)=>{
-                      if(resp && resp.error){ log('card:play error', resp); showToast(resp.message || resp.error, { background: 'rgba(200,60,60,0.95)' }); }
-                      else { log('card played (steal card)', resp); }
-                    });
+            // Do not allow interacting with veiled/hidden squares.
+            // `currentVeiledSquares` is populated from server `room:update` and
+            // we also add a `.veiled` class during rendering as a fallback.
+            try {
+              if (
+                Array.isArray(currentVeiledSquares) &&
+                currentVeiledSquares.indexOf(square) !== -1
+              ) {
+                log("clicked veiled square, ignoring");
                 return;
               }
-              // show modal to pick which player to steal from
-                showStealModal(handCounts, (targetPlayerId)=>{
-                if(!targetPlayerId) return; // canceled
-                emitCardPlay({ roomId, playerId: myPlayerId, cardId: cid, payload: { targetPlayerId } }, (resp)=>{
-                  if(resp && resp.error){ log('card:play error', resp); showToast(resp.message || resp.error, { background: 'rgba(200,60,60,0.95)' }); }
-                  else { log('card played (steal card)', resp); }
+              if (sqEl.classList && sqEl.classList.contains("veiled")) {
+                log("clicked veiled square (DOM class), ignoring");
+                return;
+              }
+            } catch (_) {}
+
+            // If we're in a pending card-targeting mode, handle target selection and do NOT attempt moves
+            if (pendingCard) {
+              const req = pendingCard.requireType; // 'empty' | 'owned' | 'owned_pawn' | 'enemy' | 'own_then_enemy' | 'enemy_queen'
+              const myShort = (myColor && myColor[0]) || "";
+              // handle two-step selection for cards like 'inversion'
+              if (req === "own_then_enemy") {
+                // first select one of your own pieces
+                if (!pendingCard.firstTarget) {
+                  const piece =
+                    currentBoardState &&
+                    Array.isArray(currentBoardState.pieces) &&
+                    currentBoardState.pieces.find((p) => p.square === square);
+                  if (!piece || piece.color !== myShort) {
+                    log("select one of your pieces (first)");
+                    return;
+                  }
+                  if (piece.type && piece.type.toLowerCase() === "k") {
+                    log("cannot select king");
+                    return;
+                  }
+                  // store first selection and highlight enemy pieces
+                  pendingCard.firstTarget = square;
+                  highlightTargets("enemy");
+                  // mark visually the chosen source (temporary)
+                  try {
+                    const el = boardEl.querySelector(
+                      `.square[data-square="${square}"]`,
+                    );
+                    if (el) el.classList.add("target-chosen");
+                  } catch (_) {}
+                  log("First piece selected for inversion:", square);
+                  return;
+                }
+                // second selection: enemy piece to swap with
+                const occ =
+                  currentBoardState &&
+                  Array.isArray(currentBoardState.pieces) &&
+                  currentBoardState.pieces.find((p) => p.square === square);
+                if (!occ || occ.color === myShort) {
+                  log("select an enemy piece (second)");
+                  return;
+                }
+                // emit swap payload: sourceSquare + targetSquare
+                emitCardPlay(
+                  {
+                    roomId,
+                    playerId: myPlayerId,
+                    cardId: pendingCard.cardId,
+                    payload: {
+                      sourceSquare: pendingCard.firstTarget,
+                      targetSquare: square,
+                    },
+                  },
+                  (resp) => {
+                    if (resp && resp.error) {
+                      log("card:play error", resp);
+                      showToast(resp.message || resp.error, {
+                        background: "rgba(200,60,60,0.95)",
+                      });
+                    } else {
+                      log("inversion played", resp);
+                    }
+                  },
+                );
+                // cleanup visuals
+                try {
+                  const el = boardEl.querySelector(
+                    `.square[data-square="${pendingCard.firstTarget}"]`,
+                  );
+                  if (el) el.classList.remove("target-chosen");
+                } catch (_) {}
+                pendingCard = null;
+                clearTargetHighlights();
+                return;
+              }
+              if (req === "empty") {
+                const occupied =
+                  currentBoardState &&
+                  Array.isArray(currentBoardState.pieces) &&
+                  currentBoardState.pieces.find((p) => p.square === square);
+                if (occupied) {
+                  log("square not empty for mine placement");
+                  return;
+                }
+                // send mine placement
+                emitCardPlay(
+                  {
+                    roomId,
+                    playerId: myPlayerId,
+                    cardId: pendingCard.cardId,
+                    payload: { targetSquare: square },
+                  },
+                  (resp) => {
+                    if (resp && resp.error) {
+                      log("card:play error", resp);
+                      showToast(resp.message || resp.error, {
+                        background: "rgba(200,60,60,0.95)",
+                      });
+                    } else {
+                      log("card played with target", resp);
+                    }
+                  },
+                );
+                pendingCard = null;
+                clearTargetHighlights();
+                return;
+              } else if (req === "owned") {
+                const piece =
+                  currentBoardState &&
+                  Array.isArray(currentBoardState.pieces) &&
+                  currentBoardState.pieces.find((p) => p.square === square);
+                if (!piece || piece.color !== myShort) {
+                  log("select one of your pieces");
+                  return;
+                }
+                if (piece.type && piece.type.toLowerCase() === "k") {
+                  log("cannot select king");
+                  return;
+                }
+                emitCardPlay(
+                  {
+                    roomId,
+                    playerId: myPlayerId,
+                    cardId: pendingCard.cardId,
+                    payload: { targetSquare: square },
+                  },
+                  (resp) => {
+                    if (resp && resp.error) {
+                      log("card:play error", resp);
+                      showToast(resp.message || resp.error, {
+                        background: "rgba(200,60,60,0.95)",
+                      });
+                    } else {
+                      log("card played with target", resp);
+                    }
+                  },
+                );
+                pendingCard = null;
+                clearTargetHighlights();
+                return;
+              } else if (req === "owned_pawn") {
+                // must be one of your pawns — show promotion choice modal before sending
+                const piece =
+                  currentBoardState &&
+                  Array.isArray(currentBoardState.pieces) &&
+                  currentBoardState.pieces.find((p) => p.square === square);
+                if (
+                  !piece ||
+                  piece.color !== myShort ||
+                  !piece.type ||
+                  piece.type.toLowerCase() !== "p"
+                ) {
+                  log("select one of your pawns for promotion");
+                  return;
+                }
+                // show promotion UI; when the player picks a piece type, emit the card:play with payload.promotion
+                showPromotionModal(square, (promotionChoice) => {
+                  if (!promotionChoice) {
+                    // canceled
+                    pendingCard = null;
+                    clearTargetHighlights();
+                    return;
+                  }
+                  emitCardPlay(
+                    {
+                      roomId,
+                      playerId: myPlayerId,
+                      cardId: pendingCard.cardId,
+                      payload: {
+                        targetSquare: square,
+                        promotion: promotionChoice,
+                      },
+                    },
+                    (resp) => {
+                      if (resp && resp.error) {
+                        log("card:play error", resp);
+                        showToast(resp.message || resp.error, {
+                          background: "rgba(200,60,60,0.95)",
+                        });
+                      } else {
+                        log("card played with promotion", resp);
+                      }
+                    },
+                  );
+                  pendingCard = null;
+                  clearTargetHighlights();
                 });
+                return;
+              } else if (req === "enemy") {
+                const occ =
+                  currentBoardState &&
+                  Array.isArray(currentBoardState.pieces) &&
+                  currentBoardState.pieces.find((p) => p.square === square);
+                if (!occ || occ.color === myShort) {
+                  log("select an enemy piece");
+                  return;
+                }
+                if (occ.type && occ.type.toLowerCase() === "k") {
+                  log("cannot select king");
+                  return;
+                }
+                emitCardPlay(
+                  {
+                    roomId,
+                    playerId: myPlayerId,
+                    cardId: pendingCard.cardId,
+                    payload: { targetSquare: square },
+                  },
+                  (resp) => {
+                    if (resp && resp.error) {
+                      log("card:play error", resp);
+                      showToast(resp.message || resp.error, {
+                        background: "rgba(200,60,60,0.95)",
+                      });
+                    } else {
+                      log("card played with target", resp);
+                      // after server applied the card effect, request legal moves for the selected piece so the client
+                      // will receive the updated legal moves (including teleport to empty squares)
+                      try {
+                        setSelection(square);
+                      } catch (_) {}
+                    }
+                  },
+                );
+                // keep pendingCard until server response processed (client will call setSelection on success)
+                pendingCard = null;
+                clearTargetHighlights();
+                return;
+              } else if (req === "enemy_queen") {
+                const occ =
+                  currentBoardState &&
+                  Array.isArray(currentBoardState.pieces) &&
+                  currentBoardState.pieces.find((p) => p.square === square);
+                if (
+                  !occ ||
+                  occ.color === myShort ||
+                  !occ.type ||
+                  occ.type.toLowerCase() !== "q"
+                ) {
+                  log("select an enemy queen");
+                  return;
+                }
+                emitCardPlay(
+                  {
+                    roomId,
+                    playerId: myPlayerId,
+                    cardId: pendingCard.cardId,
+                    payload: { targetSquare: square },
+                  },
+                  (resp) => {
+                    if (resp && resp.error) {
+                      log("card:play error", resp);
+                      showToast(resp.message || resp.error, {
+                        background: "rgba(200,60,60,0.95)",
+                      });
+                    } else {
+                      log("card played with target", resp);
+                      try {
+                        setSelection(square);
+                      } catch (_) {}
+                    }
+                  },
+                );
+                pendingCard = null;
+                clearTargetHighlights();
+                return;
+              } else if (req === "piece") {
+                const occ =
+                  currentBoardState &&
+                  Array.isArray(currentBoardState.pieces) &&
+                  currentBoardState.pieces.find((p) => p.square === square);
+                if (!occ) {
+                  log("select a piece");
+                  return;
+                }
+                if (occ.type && occ.type.toLowerCase() === "k") {
+                  log("cannot select king");
+                  return;
+                }
+                emitCardPlay(
+                  {
+                    roomId,
+                    playerId: myPlayerId,
+                    cardId: pendingCard.cardId,
+                    payload: { targetSquare: square },
+                  },
+                  (resp) => {
+                    if (resp && resp.error) {
+                      log("card:play error", resp);
+                      showToast(resp.message || resp.error, {
+                        background: "rgba(200,60,60,0.95)",
+                      });
+                    } else {
+                      log("card played with target", resp);
+                    }
+                  },
+                );
+                pendingCard = null;
+                clearTargetHighlights();
+                return;
+              }
+            }
+
+            // If this square contains a move-marker (either clicked marker or square area), attempt the move.
+            // Prefer the actual clicked marker if present, otherwise look for a marker element inside the square.
+            const clickedMarker =
+              ev.target.closest && ev.target.closest(".move-marker");
+            const marker = clickedMarker || sqEl.querySelector(".move-marker");
+            if (marker) {
+              // ignore remote player's markers
+              const remoteBy = marker.dataset && marker.dataset.remoteBy;
+              if (remoteBy && remoteBy !== myPlayerId) {
+                log("marker belongs to remote player, ignoring");
+                return;
+              }
+              const to = marker.dataset && marker.dataset.to;
+              const from =
+                marker.dataset && marker.dataset.from
+                  ? marker.dataset.from
+                  : selectedSquare;
+              if (!to || !from) {
+                log("invalid marker metadata", { from, to });
+                return;
+              }
+              // only allow if it's our turn
+              const myShort = (myColor && myColor[0]) || "";
+              if (!currentBoardState || currentBoardState.turn !== myShort) {
+                log("not your turn");
+                return;
+              }
+              socket.emit("game:move", { roomId, from, to }, (resp) => {
+                if (resp && resp.error) {
+                  log("move error", resp);
+                  showToast(resp.message || resp.error, {
+                    background: "rgba(200,60,60,0.95)",
+                  });
+                } else {
+                  log("move sent", resp);
+                }
               });
               return;
             }
-            // enter pending target mode: next square click will send the card with payload.targetSquare
-            pendingCard = { cardId: cid, cardUuid: cardEl.dataset.cardUuid || '', requireType };
-            highlightTargets(requireType);
-            log('Pending card selection for', cid, '-> select target');
-            return;
-          }
-          // immediate-play card (no target required)
-          const payload = {};
-            emitCardPlay({ roomId, playerId: myPlayerId, cardId: cid, payload }, (resp)=>{
-            if(resp && resp.error){ log('card:play error', resp); showToast(resp.message || resp.error, { background: 'rgba(200,60,60,0.95)' }); }
-            else { log('card played', resp); }
+
+            // clicked a piece -> select it (no legal moves requested)
+            const pieceImg =
+              ev.target.closest && ev.target.closest("img.piece");
+            if (pieceImg) {
+              setSelection(square);
+              return;
+            }
+
+            // default: clicked empty square -> select it (toggle)
+            if (selectedSquare === square) {
+              clearSelection();
+            } else {
+              setSelection(square);
+            }
           });
         }
-        cardEl.addEventListener('click', (ev)=>{ if(ev.target === playBtn) return; emitPlay(); });
-        playBtn.addEventListener('click', (ev)=>{ ev.stopPropagation(); emitPlay(); });
 
-        row.appendChild(cardEl);
-      });
+        // move button removed
 
-      // draw button inside the 'Vos cartes' header (visible only when autoDraw is off and it's your turn)
-      try{
-        const drawBtn = document.createElement('button');
-        drawBtn.id = 'drawBtn';
-        drawBtn.type = 'button';
-        drawBtn.className = 'btn-draw';
-        drawBtn.style.display = 'none';
-        drawBtn.textContent = 'Piocher';
-        // attach handler that emits player:draw and temporarily disables the button
-        drawBtn.addEventListener('click', (ev)=>{
-          ev.stopPropagation();
-          if(!socket) return;
-          drawBtn.disabled = true;
-          socket.emit('player:draw', { roomId }, (resp)=>{
-            if(resp && resp.error){ log('player:draw error', resp); showToast(resp.message || resp.error, { background: 'rgba(200,60,60,0.95)' }); drawBtn.disabled = false; return; }
-            log('player:draw ok', resp);
-            // server will send room:update which will hide/disable the button as needed
+        // Board rendering using provided SVG assets and `boardState` JSON.
+        const pieceSetPath = "/assets/chess-pieces/chess_maestro_bw";
+        // board visual defaults are handled by CSS (background, size, border, position)
+
+        function renderBoardFromState(boardState) {
+          if (!boardState) return;
+          // cache boardState for client-side checks (turn etc.)
+          currentBoardState = boardState;
+          // clear existing pieces but keep squares if present
+          const squares = boardEl.querySelectorAll(".square");
+          squares.forEach((s) => (s.innerHTML = ""));
+
+          // place pieces according to boardState.pieces (expects algebraic square names)
+          (boardState.pieces || []).forEach((p) => {
+            const squareName = p.square;
+            if (!squareName) return;
+            const sqEl = boardEl.querySelector(
+              `.square[data-square="${squareName}"]`,
+            );
+            if (!sqEl) return;
+            const letter = p.type ? p.type.toUpperCase() : "?";
+            const filename =
+              (p.color === "w" ? "w" + letter : "b" + letter) + ".svg";
+            const img = document.createElement("img");
+            img.src = `${pieceSetPath}/${filename}`;
+            img.className = "piece";
+            sqEl.appendChild(img);
           });
-        });
-        header.appendChild(drawBtn);
-      }catch(_){ }
 
-      wrap.appendChild(row);
-      handsEl.appendChild(wrap);
-    }
+          // re-apply selection if the previously selected square still exists
+          if (selectedSquare) {
+            // re-apply local selection without re-emitting
+            setSelection(selectedSquare, false);
+          }
+          // re-apply remote selections
+          Object.entries(remoteSelections).forEach(([pid, sq]) => {
+            const el = boardEl.querySelector(`.square[data-square="${sq}"]`);
+            if (el) {
+              el.classList.add("selected-remote");
+              el.classList.add("hide-selection");
+            }
+          });
+          // re-apply remote move markers
+          Object.entries(remoteMoves).forEach(([pid, moves]) => {
+            if (Array.isArray(moves) && moves.length)
+              showRemoteLegalMoves(pid, moves);
+          });
+          // render any mines owned by this player
+          try {
+            renderMines();
+          } catch (e) {}
+          // render veils for brouillard effect (if any)
+          try {
+            // remove existing veils
+            const allSq = boardEl.querySelectorAll(".square");
+            allSq.forEach((sqEl) => {
+              const v = sqEl.querySelector(".veil");
+              if (v) v.remove();
+              // also remove prior veiled marker class
+              try {
+                sqEl.classList.remove("veiled");
+              } catch (_) {}
+            });
+            if (
+              Array.isArray(currentVeiledSquares) &&
+              currentVeiledSquares.length
+            ) {
+              currentVeiledSquares.forEach((sq) => {
+                const el = boardEl.querySelector(
+                  `.square[data-square="${sq}"]`,
+                );
+                if (!el) return;
+                const veil = document.createElement("div");
+                veil.className = "veil";
+                el.appendChild(veil);
+                // add a class to hide piece images as a fallback in case z-index/stacking causes overlay issues
+                try {
+                  el.classList.add("veiled");
+                  // remove any move markers that may have been added previously on this square
+                  const prevMarkers = el.querySelectorAll(".move-marker");
+                  prevMarkers.forEach((m) => m.remove());
+                } catch (_) {}
+              });
+            }
+          } catch (_) {}
+        }
 
-    function showCardDrawnNotification(evt){
-      try{
-        const handsEl = document.getElementById('hands');
-        if(!handsEl) return;
-        const note = document.createElement('div');
-        note.className = 'card-draw-note';
-        note.textContent = evt && evt.card ? `Pioché: ${evt.card.title || evt.card.cardId}` : 'Carte piochée';
-        note.style.padding = '6px 8px';
-        note.style.border = '1px solid #ccc';
-        note.style.background = '#fff8e1';
-        note.style.marginTop = '8px';
-        handsEl.prepend(note);
-        setTimeout(()=> note.remove(), 5000);
-      }catch(e){ console.warn('showCardDrawnNotification error', e); }
-    }
+        // draw mine icons on squares for mines owned by this client
+        function renderMines() {
+          if (!boardEl) return;
+          // remove old mine markers
+          // remove old mine markers (either image or dot)
+          const prev = boardEl.querySelectorAll(".mine-dot, .mine-img");
+          prev.forEach((p) => p.remove());
+          (myMines || []).forEach((sq) => {
+            const el = boardEl.querySelector(`.square[data-square="${sq}"]`);
+            if (!el) return;
+            // create an image element so the mine has a transparent background and crisp edges
+            const img = document.createElement("img");
+            img.className = "mine-img";
+            // use a project asset (SVG) that has a transparent background
+            img.src = "/assets/img/bomb.jpg";
+            img.alt = "mine";
+            img.onerror = function () {
+              try {
+                if (this.src && this.src.indexOf("bomb.jpg") === -1)
+                  this.src = "/assets/img/bomb.jpg";
+              } catch (e) {}
+            };
+            img.draggable = false;
+            // ensure container is positioned so absolute centering works
+            if (!el.style.position) el.style.position = "relative";
+            el.appendChild(img);
+          });
+        }
 
-    function showEffectNotification(effect){
-      try{
-        const handsEl = document.getElementById('hands');
-        if(!handsEl) return;
-        const note = document.createElement('div');
-        note.className = 'card-draw-note';
-        if(effect.type === 'promotion_failed') note.textContent = 'Promotion échouée — la carte est consommée';
-        else if(effect.type === 'promotion') note.textContent = 'Promotion réussie !';
-        else if(effect.type === 'mine_failed') note.textContent = 'Placement de mine échoué — carte consommée';
-        else if(effect.type === 'steal_failed') note.textContent = 'Vol échoué — carte consommée';
-        else if(effect.type === 'card_lost') note.textContent = 'Une de vos cartes a été volée';
-        else note.textContent = `Effet: ${effect.type}`;
-        note.style.padding = '6px 8px'; note.style.border = '1px solid #ccc'; note.style.background = '#fff8e1'; note.style.marginTop = '8px';
-        handsEl.prepend(note);
-        setTimeout(()=> note.remove(), 6000);
-      }catch(e){ console.warn('showEffectNotification error', e); }
-    }
+        // show an explosion animation centered on a square (client-side visual)
+        function showExplosionAt(square) {
+          if (!boardEl || !square) return;
+          const sqEl = boardEl.querySelector(
+            `.square[data-square="${square}"]`,
+          );
+          if (!sqEl) return;
+          // ensure container is positioned so absolute centering works
+          if (!sqEl.style.position) sqEl.style.position = "relative";
 
-    // show a simple promotion choice modal. callback receives one of 'q','r','b','n' or null if cancelled
-    function showPromotionModal(square, callback){
-      try{
-        if(document.getElementById('promotionModal')) return;
-        const modal = document.createElement('div');
-        modal.id = 'promotionModal';
-        modal.style.position = 'fixed';
-        modal.style.left = '0'; modal.style.top = '0'; modal.style.right = '0'; modal.style.bottom = '0';
-        modal.style.display = 'flex'; modal.style.alignItems = 'center'; modal.style.justifyContent = 'center';
-        modal.style.background = 'rgba(0,0,0,0.45)'; modal.style.zIndex = '9999';
+          // Try to play an authored explosion video if available; fallback to CSS explosion if not.
+          const videoPath = "/assets/media/FireElement01.mov";
+          const vid = document.createElement("video");
+          vid.className = "explosion-video";
+          vid.src = videoPath;
+          vid.autoplay = true;
+          vid.muted = true;
+          vid.playsInline = true;
+          vid.loop = false;
+          vid.preload = "auto";
+          vid.style.pointerEvents = "none";
 
-        const box = document.createElement('div');
-        box.style.background = '#fff'; box.style.padding = '16px'; box.style.borderRadius = '8px'; box.style.minWidth = '320px'; box.style.textAlign = 'center';
-        const title = document.createElement('div'); title.textContent = 'Choisir la promotion'; title.style.fontWeight = '700'; title.style.marginBottom = '8px';
-        box.appendChild(title);
+          let usedVideo = false;
+          // Attach event listeners to handle success or failure
+          const cleanup = () => {
+            try {
+              if (vid && vid.parentNode) vid.parentNode.removeChild(vid);
+            } catch (_) {}
+          };
+          vid.addEventListener(
+            "canplay",
+            () => {
+              // video is available and can play — use it
+              try {
+                sqEl.appendChild(vid);
+                usedVideo = true;
+                vid.play().catch(() => {});
+              } catch (_) {
+                usedVideo = false;
+              }
+            },
+            { once: true },
+          );
+          // if video errors (file missing or codec issue), fallback to CSS explosion
+          vid.addEventListener(
+            "error",
+            () => {
+              try {
+                cleanup();
+              } catch (_) {}
+              // fallback animation
+              const ex = document.createElement("div");
+              ex.className = "explosion";
+              sqEl.appendChild(ex);
+              requestAnimationFrame(() => ex.classList.add("play"));
+              setTimeout(() => {
+                try {
+                  ex.remove();
+                } catch (_) {
+                  if (ex && ex.parentNode) ex.parentNode.removeChild(ex);
+                }
+              }, 700);
+            },
+            { once: true },
+          );
+          // If video ends, remove it
+          vid.addEventListener(
+            "ended",
+            () => {
+              try {
+                cleanup();
+              } catch (_) {}
+            },
+            { once: true },
+          );
+          // start loading — if canplay won't fire within a short time, fallback to CSS
+          vid.load();
+          // fallback timeout: if video hasn't started in 180ms, show CSS explosion instead
+          setTimeout(() => {
+            if (!usedVideo) {
+              try {
+                vid.pause();
+                if (vid && vid.parentNode) vid.parentNode.removeChild(vid);
+              } catch (_) {}
+              const ex = document.createElement("div");
+              ex.className = "explosion";
+              sqEl.appendChild(ex);
+              requestAnimationFrame(() => ex.classList.add("play"));
+              setTimeout(() => {
+                try {
+                  ex.remove();
+                } catch (_) {
+                  if (ex && ex.parentNode) ex.parentNode.removeChild(ex);
+                }
+              }, 700);
+            }
+          }, 180);
+        }
 
-        const desc = document.createElement('div'); desc.textContent = `Promouvoir le pion en:`; desc.style.marginBottom = '12px'; box.appendChild(desc);
+        // target highlighting helpers
+        function clearTargetHighlights() {
+          if (!boardEl) return;
+          const prev = boardEl.querySelectorAll(".square.targetable");
+          prev.forEach((p) => p.classList.remove("targetable"));
+          const note = document.getElementById("pendingNote");
+          if (note) note.remove();
+        }
+        function highlightTargets(type) {
+          if (!boardEl || !currentBoardState) return;
+          clearTargetHighlights();
+          const myShort = (myColor && myColor[0]) || "";
+          Array.from(boardEl.querySelectorAll(".square")).forEach((sqEl) => {
+            const sq = sqEl.getAttribute("data-square");
+            if (!sq) return;
+            if (type === "empty") {
+              const occ = (currentBoardState.pieces || []).find(
+                (p) => p.square === sq,
+              );
+              if (!occ) sqEl.classList.add("targetable");
+            } else if (type === "owned") {
+              const occ = (currentBoardState.pieces || []).find(
+                (p) => p.square === sq,
+              );
+              if (
+                occ &&
+                occ.color === myShort &&
+                occ.type &&
+                occ.type.toLowerCase() !== "k"
+              )
+                sqEl.classList.add("targetable");
+            } else if (type === "owned_pawn") {
+              const occ = (currentBoardState.pieces || []).find(
+                (p) => p.square === sq,
+              );
+              if (
+                occ &&
+                occ.color === myShort &&
+                occ.type &&
+                occ.type.toLowerCase() === "p"
+              )
+                sqEl.classList.add("targetable");
+            } else if (type === "own_then_enemy") {
+              // initial phase: highlight only own pieces (client will switch to enemy after first selection)
+              const occ = (currentBoardState.pieces || []).find(
+                (p) => p.square === sq,
+              );
+              if (
+                occ &&
+                occ.color === myShort &&
+                occ.type &&
+                occ.type.toLowerCase() !== "k"
+              )
+                sqEl.classList.add("targetable");
+            } else if (type === "piece") {
+              const occ = (currentBoardState.pieces || []).find(
+                (p) => p.square === sq,
+              );
+              if (occ && occ.type && occ.type.toLowerCase() !== "k")
+                sqEl.classList.add("targetable");
+            } else if (type === "enemy_queen") {
+              const occ = (currentBoardState.pieces || []).find(
+                (p) => p.square === sq,
+              );
+              if (
+                occ &&
+                occ.color &&
+                occ.color !== myShort &&
+                occ.type &&
+                occ.type.toLowerCase() === "q"
+              )
+                sqEl.classList.add("targetable");
+            } else if (type === "enemy") {
+              const occ = (currentBoardState.pieces || []).find(
+                (p) => p.square === sq,
+              );
+              if (
+                occ &&
+                occ.color &&
+                occ.color !== myShort &&
+                occ.type &&
+                occ.type.toLowerCase() !== "k"
+              )
+                sqEl.classList.add("targetable");
+            }
+          });
+          // add a small note near hands
+          try {
+            const handsEl = document.getElementById("hands");
+            if (handsEl) {
+              const note = document.createElement("div");
+              note.id = "pendingNote";
+              note.style.marginTop = "8px";
+              note.style.display = "flex";
+              note.style.alignItems = "center";
+              note.style.gap = "8px";
+              const txt = document.createElement("span");
+              txt.textContent = "Sélectionnez la case cible pour la carte...";
+              txt.style.fontWeight = "700";
+              note.appendChild(txt);
+              const cancelBtn = document.createElement("button");
+              cancelBtn.type = "button";
+              cancelBtn.id = "pendingCancelBtn";
+              cancelBtn.textContent = "Annuler";
+              // use a dedicated class to ensure good contrast against the hands background
+              cancelBtn.className = "btn-cancel";
+              cancelBtn.addEventListener("click", (ev) => {
+                ev.stopPropagation();
+                cancelPendingCard();
+              });
+              note.appendChild(cancelBtn);
+              handsEl.prepend(note);
+            }
+          } catch (e) {}
+        }
 
-        const btnRow = document.createElement('div'); btnRow.style.display = 'flex'; btnRow.style.gap = '12px'; btnRow.style.justifyContent = 'center'; btnRow.style.marginBottom = '8px';
+        // cancel a pending card selection (client-only)
+        function cancelPendingCard() {
+          if (!pendingCard) return;
+          pendingCard = null;
+          clearTargetHighlights();
+          log("Pending card selection annulée");
+          // remove pendingNote if present
+          const note = document.getElementById("pendingNote");
+          if (note) note.remove();
+        }
 
-        // determine the piece color at the square (should be a pawn)
-        const piece = currentBoardState && Array.isArray(currentBoardState.pieces) && currentBoardState.pieces.find(p=>p.square===square);
-        const colorPrefix = (piece && piece.color) ? (piece.color === 'w' ? 'w' : 'b') : ((myColor && myColor[0]) || 'w');
-        const promoTypes = [ ['q','Dame'], ['r','Tour'], ['b','Fou'], ['n','Cavalier'] ];
-        promoTypes.forEach(([code,label]) => {
-          const btn = document.createElement('button'); btn.type = 'button';
-          btn.style.padding = '6px'; btn.style.border = '1px solid #ccc'; btn.style.background = '#fff'; btn.style.cursor = 'pointer'; btn.style.display = 'flex'; btn.style.flexDirection = 'column'; btn.style.alignItems = 'center'; btn.style.gap = '6px';
-          // image
-          const letter = code.toUpperCase();
-          const img = document.createElement('img');
-          img.src = `${pieceSetPath}/${colorPrefix}${letter}.svg`;
-          img.alt = label; img.style.width = '48px'; img.style.height = '48px'; img.style.display = 'block';
-          // if image fails, show text label
-          img.addEventListener('error', ()=>{ img.style.display = 'none'; });
-          const lbl = document.createElement('div'); lbl.textContent = label; lbl.style.fontSize = '12px';
-          btn.appendChild(img); btn.appendChild(lbl);
-          btn.addEventListener('click', (ev)=>{ ev.stopPropagation(); try{ modal.remove(); }catch(_){ } callback(code); });
-          btnRow.appendChild(btn);
-        });
-        box.appendChild(btnRow);
+        // build grid with independent square elements and data-square attributes
+        function buildGrid(size) {
+          if (!size || size < 1) size = 8;
+          boardEl.style.gridTemplateColumns = `repeat(${size}, 1fr)`;
+          boardEl.style.gridTemplateRows = `repeat(${size}, 1fr)`;
+          // if grid already has correct number of squares, keep them
+          const existing = boardEl.querySelectorAll(".square");
+          if (existing.length === size * size) return;
+          boardEl.innerHTML = "";
+          // create rows from rank size..1 (so that a1 is bottom-left if CSS doesn't flip)
+          for (let rank = size; rank >= 1; rank--) {
+            for (let file = 0; file < size; file++) {
+              const fileLetter = String.fromCharCode("a".charCodeAt(0) + file);
+              const squareName = `${fileLetter}${rank}`;
+              const sq = document.createElement("div");
+              // color squares in checker pattern
+              const dark = (file + rank) % 2 === 0;
+              sq.className = "square " + (dark ? "dark" : "light");
+              sq.setAttribute("data-square", squareName);
+              boardEl.appendChild(sq);
+            }
+          }
+        }
 
-        const cancel = document.createElement('button'); cancel.type = 'button'; cancel.textContent = 'Annuler'; cancel.style.marginTop = '6px'; cancel.style.padding = '8px 12px';
-        cancel.addEventListener('click', (ev)=>{ ev.stopPropagation(); try{ modal.remove(); }catch(_){ } callback(null); });
-        box.appendChild(cancel);
+        // render player's own hand and public counts for others
+        // New: render as horizontal 'pokemon-style' cards side-by-side
+        function renderHands(handsOwn, handCounts) {
+          const handsEl = document.getElementById("hands");
+          if (!handsEl) return;
+          handsEl.innerHTML = "";
 
-        modal.appendChild(box);
-        document.body.appendChild(modal);
-      }catch(e){ console.warn('showPromotionModal error', e); callback(null); }
-    }
+          const wrap = document.createElement("div");
+          wrap.className = "player-hand pokemon-hand";
 
-    // show a modal to pick a player to steal from. handCounts is an object mapping playerId -> count
-    function showStealModal(handCounts, callback){
-      try{
-        if(document.getElementById('stealModal')) return;
-        const modal = document.createElement('div'); modal.id = 'stealModal';
-        modal.style.position = 'fixed'; modal.style.left='0'; modal.style.top='0'; modal.style.right='0'; modal.style.bottom='0';
-        modal.style.display='flex'; modal.style.alignItems='center'; modal.style.justifyContent='center'; modal.style.background='rgba(0,0,0,0.45)'; modal.style.zIndex='9999';
-        const box = document.createElement('div'); box.style.background='#fff'; box.style.padding='12px'; box.style.borderRadius='8px'; box.style.minWidth='320px';
-        const title = document.createElement('div'); title.textContent = 'Choisir le joueur à voler'; title.style.fontWeight='700'; title.style.marginBottom='8px'; box.appendChild(title);
-        const list = document.createElement('div'); list.style.display='flex'; list.style.flexDirection='column'; list.style.gap='8px'; list.style.marginBottom='8px';
-        Object.entries(handCounts || {}).forEach(([pid, count])=>{
-          if(pid === myPlayerId) return; // skip self
-          const row = document.createElement('div'); row.style.display='flex'; row.style.justifyContent='space-between'; row.style.alignItems='center';
-          const label = document.createElement('div'); label.textContent = `${pid} — ${count} carte(s)`; label.style.fontWeight='600';
-          const btn = document.createElement('button'); btn.type='button'; btn.textContent = 'Voler'; btn.style.padding='6px 10px';
-          btn.addEventListener('click', (ev)=>{ ev.stopPropagation(); try{ modal.remove(); }catch(_){ } callback(pid); });
-          row.appendChild(label); row.appendChild(btn); list.appendChild(row);
-        });
-        box.appendChild(list);
-        const cancel = document.createElement('button'); cancel.type='button'; cancel.textContent='Annuler'; cancel.style.padding='8px 10px'; cancel.addEventListener('click',(ev)=>{ ev.stopPropagation(); try{ modal.remove(); }catch(_){ } callback(null); });
-        box.appendChild(cancel);
-        modal.appendChild(box); document.body.appendChild(modal);
-      }catch(e){ console.warn('showStealModal error', e); callback(null); }
-    }
-  </script>
-</body>
+          const header = document.createElement("div");
+          header.className = "pokemon-hand-header";
+          const title = document.createElement("div");
+          title.textContent = "Vos cartes";
+          title.className = "pokemon-hand-title";
+          header.appendChild(title);
+          wrap.appendChild(header);
+
+          const row = document.createElement("div");
+          row.className = "cards-row";
+
+          (handsOwn || []).slice(0, 10).forEach((c) => {
+            const cardEl = document.createElement("div");
+            cardEl.className = "pokemon-card";
+            cardEl.dataset.cardId = c.cardId || c.id || "";
+            cardEl.dataset.cardUuid = c.id || "";
+
+            const top = document.createElement("div");
+            top.className = "pokemon-card-top";
+            const art = document.createElement("div");
+            art.className = "pokemon-card-art";
+            art.textContent = "";
+            try {
+              const cid = (c.cardId || c.id || "").toString().toLowerCase();
+              const title = (c.title || "").toString().toLowerCase();
+              let imgSrc = null;
+              if (cid === "adoubement")
+                imgSrc = "/assets/img/cards/adoubement.png";
+              if (cid === "folie") imgSrc = "/assets/img/cards/folie.png";
+              if (cid === "fortification")
+                imgSrc = "/assets/img/cards/fortification.png";
+              if (cid === "rebond") imgSrc = "/assets/img/cards/rebond.png";
+              if (cid === "anneau") imgSrc = "/assets/img/cards/anneau.png";
+              if (cid === "brouillard")
+                imgSrc = "/assets/img/cards/brouillard.png";
+              if (cid === "coincoin") imgSrc = "/assets/img/cards/coincoin.png";
+              if (cid === "inversion")
+                imgSrc = "/assets/img/cards/inversion.png";
+              if (cid === "invisible")
+                imgSrc = "/assets/img/cards/invisible.png";
+              if (cid === "kamikaze") imgSrc = "/assets/img/cards/kamikaz.png";
+              if (cid === "melange") imgSrc = "/assets/img/cards/mélange.png";
+              if (cid === "mine") imgSrc = "/assets/img/cards/mine.png";
+              if (cid === "promotion")
+                imgSrc = "/assets/img/cards/promotion.png";
+              if (cid === "resurection")
+                imgSrc = "/assets/img/cards/resurection.png";
+              if (cid === "sniper") imgSrc = "/assets/img/cards/sniper.png";
+              if (cid === "totem") imgSrc = "/assets/img/cards/totem.png";
+              if (cid === "toucher") imgSrc = "/assets/img/cards/toucher.png";
+              if (cid === "vole_piece")
+                imgSrc = "/assets/img/cards/vole_piece.png";
+              if (cid === "double") imgSrc = "/assets/img/cards/double.png";
+              if (cid === "empathie") imgSrc = "/assets/img/cards/empathie.png";
+              if (cid === "parrure") imgSrc = "/assets/img/cards/parrure.png";
+              if (cid === "revolution")
+                imgSrc = "/assets/img/cards/révolution.png";
+              if (cid === "doppelganger")
+                imgSrc = "/assets/img/cards/doppelganger.png";
+              if (cid === "pareil") imgSrc = "/assets/img/cards/pareil.png";
+              if (cid === "sans_effet")
+                imgSrc = "/assets/img/cards/sans_effet.png";
+              if (cid === "teleportation")
+                imgSrc = "/assets/img/cards/teleportation.png";
+              if (cid === "tout") imgSrc = "/assets/img/cards/tout.png";
+              if (cid === "vole_carte")
+                imgSrc = "/assets/img/cards/vole_carte.png";
+
+              if (imgSrc) {
+                const img = document.createElement("img");
+                img.src = imgSrc;
+                img.alt = c.title || cid || "card";
+                img.className = "card-art-img";
+                img.style.width = "100%";
+                img.style.height = "100%";
+                img.style.objectFit = "cover";
+                art.appendChild(img);
+              }
+            } catch (e) {
+              /* ignore artwork errors */
+            }
+            top.appendChild(art);
+
+            const mid = document.createElement("div");
+            mid.className = "pokemon-card-mid";
+            const h = document.createElement("div");
+            h.className = "pokemon-card-title";
+            h.textContent = c.title || c.cardId || "Carte";
+            const p = document.createElement("div");
+            p.className = "pokemon-card-desc";
+            p.textContent = c.description || "";
+            mid.appendChild(h);
+            mid.appendChild(p);
+
+            const footer = document.createElement("div");
+            footer.className = "pokemon-card-footer";
+            const playBtn = document.createElement("button");
+            playBtn.className = "card-play-btn";
+            playBtn.textContent = "Jouer";
+            footer.appendChild(playBtn);
+
+            cardEl.appendChild(top);
+            cardEl.appendChild(mid);
+            cardEl.appendChild(footer);
+
+            // clicking the whole card or the play button emits card:play
+            function emitPlay() {
+              if (!socket) return;
+              const cid = cardEl.dataset.cardId;
+              // try cardId first, then fall back to the human title (helps with accented ids like "Téléportation")
+              const requireType =
+                cardRequiresTarget(cid) || cardRequiresTarget(c.title || "");
+              if (requireType) {
+                if (requireType === "player") {
+                  // If there's only one opponent, auto-select them (no modal needed). Otherwise show modal.
+                  const opponents = Object.keys(handCounts || {}).filter(
+                    (pid) => pid !== myPlayerId,
+                  );
+                  if (opponents.length === 1) {
+                    const targetPlayerId = opponents[0];
+                    emitCardPlay(
+                      {
+                        roomId,
+                        playerId: myPlayerId,
+                        cardId: cid,
+                        payload: { targetPlayerId },
+                      },
+                      (resp) => {
+                        if (resp && resp.error) {
+                          log("card:play error", resp);
+                          showToast(resp.message || resp.error, {
+                            background: "rgba(200,60,60,0.95)",
+                          });
+                        } else {
+                          log("card played (steal card)", resp);
+                        }
+                      },
+                    );
+                    return;
+                  }
+                  // show modal to pick which player to steal from
+                  showStealModal(handCounts, (targetPlayerId) => {
+                    if (!targetPlayerId) return; // canceled
+                    emitCardPlay(
+                      {
+                        roomId,
+                        playerId: myPlayerId,
+                        cardId: cid,
+                        payload: { targetPlayerId },
+                      },
+                      (resp) => {
+                        if (resp && resp.error) {
+                          log("card:play error", resp);
+                          showToast(resp.message || resp.error, {
+                            background: "rgba(200,60,60,0.95)",
+                          });
+                        } else {
+                          log("card played (steal card)", resp);
+                        }
+                      },
+                    );
+                  });
+                  return;
+                }
+                // enter pending target mode: next square click will send the card with payload.targetSquare
+                pendingCard = {
+                  cardId: cid,
+                  cardUuid: cardEl.dataset.cardUuid || "",
+                  requireType,
+                };
+                highlightTargets(requireType);
+                log("Pending card selection for", cid, "-> select target");
+                return;
+              }
+              // immediate-play card (no target required)
+              const payload = {};
+              emitCardPlay(
+                { roomId, playerId: myPlayerId, cardId: cid, payload },
+                (resp) => {
+                  if (resp && resp.error) {
+                    log("card:play error", resp);
+                    showToast(resp.message || resp.error, {
+                      background: "rgba(200,60,60,0.95)",
+                    });
+                  } else {
+                    log("card played", resp);
+                  }
+                },
+              );
+            }
+            cardEl.addEventListener("click", (ev) => {
+              if (ev.target === playBtn) return;
+              emitPlay();
+            });
+            playBtn.addEventListener("click", (ev) => {
+              ev.stopPropagation();
+              emitPlay();
+            });
+
+            row.appendChild(cardEl);
+          });
+
+          // draw button inside the 'Vos cartes' header (visible only when autoDraw is off and it's your turn)
+          try {
+            const drawBtn = document.createElement("button");
+            drawBtn.id = "drawBtn";
+            drawBtn.type = "button";
+            drawBtn.className = "btn-draw";
+            drawBtn.style.display = "none";
+            drawBtn.textContent = "Piocher";
+            // attach handler that emits player:draw and temporarily disables the button
+            drawBtn.addEventListener("click", (ev) => {
+              ev.stopPropagation();
+              if (!socket) return;
+              drawBtn.disabled = true;
+              socket.emit("player:draw", { roomId }, (resp) => {
+                if (resp && resp.error) {
+                  log("player:draw error", resp);
+                  showToast(resp.message || resp.error, {
+                    background: "rgba(200,60,60,0.95)",
+                  });
+                  drawBtn.disabled = false;
+                  return;
+                }
+                log("player:draw ok", resp);
+                // server will send room:update which will hide/disable the button as needed
+              });
+            });
+            header.appendChild(drawBtn);
+          } catch (_) {}
+
+          wrap.appendChild(row);
+          handsEl.appendChild(wrap);
+        }
+
+        function showCardDrawnNotification(evt) {
+          try {
+            const handsEl = document.getElementById("hands");
+            if (!handsEl) return;
+            const note = document.createElement("div");
+            note.className = "card-draw-note";
+            note.textContent =
+              evt && evt.card
+                ? `Pioché: ${evt.card.title || evt.card.cardId}`
+                : "Carte piochée";
+            note.style.padding = "6px 8px";
+            note.style.border = "1px solid #ccc";
+            note.style.background = "#fff8e1";
+            note.style.marginTop = "8px";
+            handsEl.prepend(note);
+            setTimeout(() => note.remove(), 5000);
+          } catch (e) {
+            console.warn("showCardDrawnNotification error", e);
+          }
+        }
+
+        function showEffectNotification(effect) {
+          try {
+            const handsEl = document.getElementById("hands");
+            if (!handsEl) return;
+            const note = document.createElement("div");
+            note.className = "card-draw-note";
+            if (effect.type === "promotion_failed")
+              note.textContent = "Promotion échouée — la carte est consommée";
+            else if (effect.type === "promotion")
+              note.textContent = "Promotion réussie !";
+            else if (effect.type === "mine_failed")
+              note.textContent = "Placement de mine échoué — carte consommée";
+            else if (effect.type === "steal_failed")
+              note.textContent = "Vol échoué — carte consommée";
+            else if (effect.type === "card_lost")
+              note.textContent = "Une de vos cartes a été volée";
+            else note.textContent = `Effet: ${effect.type}`;
+            note.style.padding = "6px 8px";
+            note.style.border = "1px solid #ccc";
+            note.style.background = "#fff8e1";
+            note.style.marginTop = "8px";
+            handsEl.prepend(note);
+            setTimeout(() => note.remove(), 6000);
+          } catch (e) {
+            console.warn("showEffectNotification error", e);
+          }
+        }
+
+        // show a simple promotion choice modal. callback receives one of 'q','r','b','n' or null if cancelled
+        function showPromotionModal(square, callback) {
+          try {
+            if (document.getElementById("promotionModal")) return;
+            const modal = document.createElement("div");
+            modal.id = "promotionModal";
+            modal.style.position = "fixed";
+            modal.style.left = "0";
+            modal.style.top = "0";
+            modal.style.right = "0";
+            modal.style.bottom = "0";
+            modal.style.display = "flex";
+            modal.style.alignItems = "center";
+            modal.style.justifyContent = "center";
+            modal.style.background = "rgba(0,0,0,0.45)";
+            modal.style.zIndex = "9999";
+
+            const box = document.createElement("div");
+            box.style.background = "#fff";
+            box.style.padding = "16px";
+            box.style.borderRadius = "8px";
+            box.style.minWidth = "320px";
+            box.style.textAlign = "center";
+            const title = document.createElement("div");
+            title.textContent = "Choisir la promotion";
+            title.style.fontWeight = "700";
+            title.style.marginBottom = "8px";
+            box.appendChild(title);
+
+            const desc = document.createElement("div");
+            desc.textContent = `Promouvoir le pion en:`;
+            desc.style.marginBottom = "12px";
+            box.appendChild(desc);
+
+            const btnRow = document.createElement("div");
+            btnRow.style.display = "flex";
+            btnRow.style.gap = "12px";
+            btnRow.style.justifyContent = "center";
+            btnRow.style.marginBottom = "8px";
+
+            // determine the piece color at the square (should be a pawn)
+            const piece =
+              currentBoardState &&
+              Array.isArray(currentBoardState.pieces) &&
+              currentBoardState.pieces.find((p) => p.square === square);
+            const colorPrefix =
+              piece && piece.color
+                ? piece.color === "w"
+                  ? "w"
+                  : "b"
+                : (myColor && myColor[0]) || "w";
+            const promoTypes = [
+              ["q", "Dame"],
+              ["r", "Tour"],
+              ["b", "Fou"],
+              ["n", "Cavalier"],
+            ];
+            promoTypes.forEach(([code, label]) => {
+              const btn = document.createElement("button");
+              btn.type = "button";
+              btn.style.padding = "6px";
+              btn.style.border = "1px solid #ccc";
+              btn.style.background = "#fff";
+              btn.style.cursor = "pointer";
+              btn.style.display = "flex";
+              btn.style.flexDirection = "column";
+              btn.style.alignItems = "center";
+              btn.style.gap = "6px";
+              // image
+              const letter = code.toUpperCase();
+              const img = document.createElement("img");
+              img.src = `${pieceSetPath}/${colorPrefix}${letter}.svg`;
+              img.alt = label;
+              img.style.width = "48px";
+              img.style.height = "48px";
+              img.style.display = "block";
+              // if image fails, show text label
+              img.addEventListener("error", () => {
+                img.style.display = "none";
+              });
+              const lbl = document.createElement("div");
+              lbl.textContent = label;
+              lbl.style.fontSize = "12px";
+              btn.appendChild(img);
+              btn.appendChild(lbl);
+              btn.addEventListener("click", (ev) => {
+                ev.stopPropagation();
+                try {
+                  modal.remove();
+                } catch (_) {}
+                callback(code);
+              });
+              btnRow.appendChild(btn);
+            });
+            box.appendChild(btnRow);
+
+            const cancel = document.createElement("button");
+            cancel.type = "button";
+            cancel.textContent = "Annuler";
+            cancel.style.marginTop = "6px";
+            cancel.style.padding = "8px 12px";
+            cancel.addEventListener("click", (ev) => {
+              ev.stopPropagation();
+              try {
+                modal.remove();
+              } catch (_) {}
+              callback(null);
+            });
+            box.appendChild(cancel);
+
+            modal.appendChild(box);
+            document.body.appendChild(modal);
+          } catch (e) {
+            console.warn("showPromotionModal error", e);
+            callback(null);
+          }
+        }
+
+        // show a modal to pick a player to steal from. handCounts is an object mapping playerId -> count
+        function showStealModal(handCounts, callback) {
+          try {
+            if (document.getElementById("stealModal")) return;
+            const modal = document.createElement("div");
+            modal.id = "stealModal";
+            modal.style.position = "fixed";
+            modal.style.left = "0";
+            modal.style.top = "0";
+            modal.style.right = "0";
+            modal.style.bottom = "0";
+            modal.style.display = "flex";
+            modal.style.alignItems = "center";
+            modal.style.justifyContent = "center";
+            modal.style.background = "rgba(0,0,0,0.45)";
+            modal.style.zIndex = "9999";
+            const box = document.createElement("div");
+            box.style.background = "#fff";
+            box.style.padding = "12px";
+            box.style.borderRadius = "8px";
+            box.style.minWidth = "320px";
+            const title = document.createElement("div");
+            title.textContent = "Choisir le joueur à voler";
+            title.style.fontWeight = "700";
+            title.style.marginBottom = "8px";
+            box.appendChild(title);
+            const list = document.createElement("div");
+            list.style.display = "flex";
+            list.style.flexDirection = "column";
+            list.style.gap = "8px";
+            list.style.marginBottom = "8px";
+            Object.entries(handCounts || {}).forEach(([pid, count]) => {
+              if (pid === myPlayerId) return; // skip self
+              const row = document.createElement("div");
+              row.style.display = "flex";
+              row.style.justifyContent = "space-between";
+              row.style.alignItems = "center";
+              const label = document.createElement("div");
+              label.textContent = `${pid} — ${count} carte(s)`;
+              label.style.fontWeight = "600";
+              const btn = document.createElement("button");
+              btn.type = "button";
+              btn.textContent = "Voler";
+              btn.style.padding = "6px 10px";
+              btn.addEventListener("click", (ev) => {
+                ev.stopPropagation();
+                try {
+                  modal.remove();
+                } catch (_) {}
+                callback(pid);
+              });
+              row.appendChild(label);
+              row.appendChild(btn);
+              list.appendChild(row);
+            });
+            box.appendChild(list);
+            const cancel = document.createElement("button");
+            cancel.type = "button";
+            cancel.textContent = "Annuler";
+            cancel.style.padding = "8px 10px";
+            cancel.addEventListener("click", (ev) => {
+              ev.stopPropagation();
+              try {
+                modal.remove();
+              } catch (_) {}
+              callback(null);
+            });
+            box.appendChild(cancel);
+            modal.appendChild(box);
+            document.body.appendChild(modal);
+          } catch (e) {
+            console.warn("showStealModal error", e);
+            callback(null);
+          }
+        }
+      </script>
+    </div>
+  </body>
 </html>

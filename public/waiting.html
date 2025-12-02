@@ -1,505 +1,835 @@
 <!doctype html>
 <html>
-<head>
-  <meta charset="utf-8" />
-  <title>ChessNut - Salle d'attente</title>
-  <link rel="stylesheet" href="/styles/style.css">
-  <style>
-    /* small waiting-room styles for selectable cards */
-    .pokemon-card { position: relative; cursor: pointer; transition: transform .08s ease, box-shadow .08s ease; }
-    .pokemon-card.selected { border-color: #28a745; box-shadow: 0 6px 14px rgba(40,167,69,0.08); transform: translateY(-3px); }
-    .pokemon-card .select-mark { position: absolute; right:8px; top:8px; background:#28a745; color:#fff; border-radius:50%; width:20px;height:20px; display:flex;align-items:center;justify-content:center;font-size:12px; }
-  </style>
-</head>
-<body>
-  <div class="page">
-    <header class="hero card">
-      <div>
-        <div class="title">ChessNut — Salle d'attente</div>
-      </div>
-    </header>
+  <head>
+    <meta charset="utf-8" />
+    <title>ChessNut - Salle d'attente</title>
+    <link rel="stylesheet" href="/styles/style.css" />
+    <style>
+      /* small waiting-room styles for selectable cards */
+      .pokemon-card {
+        position: relative;
+        cursor: pointer;
+        transition:
+          transform 0.08s ease,
+          box-shadow 0.08s ease;
+      }
+      .pokemon-card.selected {
+        border-color: #28a745;
+        box-shadow: 0 6px 14px rgba(40, 167, 69, 0.08);
+        transform: translateY(-3px);
+      }
+      .pokemon-card .select-mark {
+        position: absolute;
+        right: 8px;
+        top: 8px;
+        background: #28a745;
+        color: #fff;
+        border-radius: 50%;
+        width: 20px;
+        height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header class="hero card">
+        <div>
+          <div class="title">ChessNut — Salle d'attente</div>
+        </div>
+      </header>
 
-    <section class="card">
-      <div>Partie: <strong id="roomId">-</strong></div>
-      <div>Joueurs: <strong id="playerCount">0/2</strong></div>
-      <div id="youAreHost" style="display:none;color:green;font-weight:bold;">(Vous êtes l'hôte)</div>
+      <section class="card">
+        <div>Partie: <strong id="roomId">-</strong></div>
+        <div>Joueurs: <strong id="playerCount">0/2</strong></div>
+        <div
+          id="youAreHost"
+          style="display: none; color: green; font-weight: bold"
+        >
+          (Vous êtes l'hôte)
+        </div>
 
-      <div style="margin-top:8px">
-        <label id="autoDrawLabel" style="display:none;align-items:center;gap:8px;">
-          <input type="checkbox" id="autoDrawToggle" />
-          Pioche automatique
-        </label>
-      </div>
+        <div style="margin-top: 8px">
+          <label
+            id="autoDrawLabel"
+            style="display: none; align-items: center; gap: 8px"
+          >
+            <input type="checkbox" id="autoDrawToggle" />
+            Pioche automatique
+          </label>
+        </div>
 
-      <div style="margin-top:8px">
-        <label id="no-remise" style="display:none;align-items:center;gap:8px;">
-          <input type="checkbox" id="no-remiseToggle" />
-          Sans remise
-        </label>
-      </div>
+        <div style="margin-top: 8px">
+          <label
+            id="no-remise"
+            style="display: none; align-items: center; gap: 8px"
+          >
+            <input type="checkbox" id="no-remiseToggle" />
+            Sans remise
+          </label>
+        </div>
 
-      <div style="margin-top:8px">
-        <label id="customDrawLabel" style="display:none;align-items:center;gap:8px;">
-          <input type="checkbox" id="customDrawToggle" />
-          Pioche personnalisée
-        </label>
-      </div>
+        <div style="margin-top: 8px">
+          <label
+            id="customDrawLabel"
+            style="display: none; align-items: center; gap: 8px"
+          >
+            <input type="checkbox" id="customDrawToggle" />
+            Pioche personnalisée
+          </label>
+        </div>
 
-      <!-- Minimal card list: shown only if Pioche personnalisée is checked -->
-      <div id="customCardsSection" style="display:none;margin-top:8px;border:1px solid #eee;padding:8px;border-radius:6px;background:#fff;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-          <div style="font-weight:600">Cartes disponibles</div>
-          <div style="display:flex;gap:8px">
-            <button id="customSelectAll" class="btn-ghost">Tout sélectionner</button>
-            <button id="customDeselectAll" class="btn-ghost">Tout déselectionner</button>
+        <!-- Minimal card list: shown only if Pioche personnalisée is checked -->
+        <div
+          id="customCardsSection"
+          style="
+            display: none;
+            margin-top: 8px;
+            border: 1px solid #eee;
+            padding: 8px;
+            border-radius: 6px;
+            background: #fff;
+          "
+        >
+          <div
+            style="
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              margin-bottom: 6px;
+            "
+          >
+            <div style="font-weight: 600">Cartes disponibles</div>
+            <div style="display: flex; gap: 8px">
+              <button id="customSelectAll" class="btn-ghost">
+                Tout sélectionner
+              </button>
+              <button id="customDeselectAll" class="btn-ghost">
+                Tout déselectionner
+              </button>
+            </div>
+          </div>
+          <div
+            id="customCardsContainer"
+            style="color: #333; padding-right: 6px"
+          >
+            (Cochez "Pioche personnalisée" pour charger la liste)
           </div>
         </div>
-        <div id="customCardsContainer" style="color:#333;padding-right:6px">(Cochez "Pioche personnalisée" pour charger la liste)</div>
+
+        <div style="margin-top: 8px">
+          <button id="startBtn" style="display: none" class="btn-cta">
+            Commencer la partie
+          </button>
+          <button id="copyInviteBtn" style="margin-left: 8px" class="btn-ghost">
+            Copier le lien d'invitation
+          </button>
+        </div>
+      </section>
+
+      <div style="margin-top: 10px">
+        <a href="/">Retour à la page principale</a>
       </div>
+    </div>
 
-      <div style="margin-top:8px">
-        <button id="startBtn" style="display:none" class="btn-cta">Commencer la partie</button>
-        <button id="copyInviteBtn" style="margin-left:8px" class="btn-ghost">Copier le lien d'invitation</button>
-      </div>
-    </section>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="/toast.js"></script>
+    <script>
+      function qs(name) {
+        const url = new URL(window.location.href);
+        return url.searchParams.get(name);
+      }
+      const roomId = qs("roomId");
+      const playerId = qs("playerId") || undefined;
+      document.getElementById("roomId").textContent = roomId || "-";
 
-    <div style="margin-top:10px"><a href="/">Retour à la page principale</a></div>
-  </div>
+      const statusEl = document.getElementById("status");
+      const playerCountEl = document.getElementById("playerCount");
+      let socket = null;
+      let myPlayerId = null;
+      let myColor = null;
+      let roomHostId = null;
+      const hostLabelEl = document.getElementById("hostLabel");
+      const youAreHostEl = document.getElementById("youAreHost");
+      const autoDrawLabelEl = document.getElementById("autoDrawLabel");
+      const autoDrawToggleEl = document.getElementById("autoDrawToggle");
+      const noRemiseLabelEl = document.getElementById("no-remise");
+      const noRemiseToggleEl = document.getElementById("no-remiseToggle");
+      const customDrawLabelEl = document.getElementById("customDrawLabel");
+      const customDrawToggleEl = document.getElementById("customDrawToggle");
 
-  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-  <script src="/toast.js"></script>
-  <script>
-    function qs(name){ const url = new URL(window.location.href); return url.searchParams.get(name); }
-    const roomId = qs('roomId');
-    const playerId = qs('playerId') || undefined;
-    document.getElementById('roomId').textContent = roomId || '-';
+      // Selection state for custom draw (persisted per room)
+      let selectedCards = new Set();
+      function storageKey() {
+        return `customDrawSelection:${roomId}`;
+      }
+      function saveSelection() {
+        try {
+          localStorage.setItem(
+            storageKey(),
+            JSON.stringify(Array.from(selectedCards)),
+          );
+        } catch (_) {}
+      }
+      function loadSelection() {
+        try {
+          const v = localStorage.getItem(storageKey());
+          if (v) {
+            const arr = JSON.parse(v);
+            selectedCards = new Set(arr || []);
+          }
+        } catch (_) {}
+      }
 
-  const statusEl = document.getElementById('status');
-  const playerCountEl = document.getElementById('playerCount');
-  let socket = null;
-  let myPlayerId = null;
-  let myColor = null;
-  let roomHostId = null;
-  const hostLabelEl = document.getElementById('hostLabel');
-  const youAreHostEl = document.getElementById('youAreHost');
-  const autoDrawLabelEl = document.getElementById('autoDrawLabel');
-  const autoDrawToggleEl = document.getElementById('autoDrawToggle');
-  const noRemiseLabelEl = document.getElementById('no-remise');
-  const noRemiseToggleEl = document.getElementById('no-remiseToggle');
-  const customDrawLabelEl = document.getElementById('customDrawLabel');
-  const customDrawToggleEl = document.getElementById('customDrawToggle');
+      function log(...args) {
+        console.log(...args);
+      }
 
-  // Selection state for custom draw (persisted per room)
-  let selectedCards = new Set();
-  function storageKey(){ return `customDrawSelection:${roomId}`; }
-  function saveSelection(){ try{ localStorage.setItem(storageKey(), JSON.stringify(Array.from(selectedCards))); }catch(_){} }
-  function loadSelection(){ try{ const v = localStorage.getItem(storageKey()); if(v){ const arr = JSON.parse(v); selectedCards = new Set(arr || []); } }catch(_){} }
+      if (!roomId) {
+        showToast("roomId manquant dans l'URL", {
+          background: "rgba(200,60,60,0.95)",
+        });
+      }
 
-    function log(...args){ console.log(...args); }
+      function connectAndJoin() {
+        socket = io();
+        socket.on("connect", () => {
+          log("socket connecté", socket.id);
+        });
 
-  if(!roomId){ showToast('roomId manquant dans l\'URL', { background: 'rgba(200,60,60,0.95)' }); }
-
-    function connectAndJoin(){
-      socket = io();
-      socket.on('connect', ()=>{ log('socket connecté', socket.id); });
-
-  socket.on('room:update', (data)=>{
-    console.log('room:update', data);
-    if(statusEl) statusEl.textContent = data.status || '-';
-        const count = (data.players||[]).length;
-        playerCountEl.textContent = `${count}/2`;
-        // remember hostId from server updates; if missing, fall back to first player
-        if(data.hostId !== undefined && data.hostId !== null) {
-          roomHostId = data.hostId;
-        } else if ((data.players || []).length > 0) {
-          // fallback: first player is host
-          roomHostId = data.players[0].id;
-        } else {
-          roomHostId = null;
-        }
-
-        // update host label UI
-        if(hostLabelEl){
-          hostLabelEl.textContent = roomHostId || '-';
-          if(myPlayerId && roomHostId && myPlayerId === roomHostId){
-            youAreHostEl.style.display = 'inline';
+        socket.on("room:update", (data) => {
+          console.log("room:update", data);
+          if (statusEl) statusEl.textContent = data.status || "-";
+          const count = (data.players || []).length;
+          playerCountEl.textContent = `${count}/2`;
+          // remember hostId from server updates; if missing, fall back to first player
+          if (data.hostId !== undefined && data.hostId !== null) {
+            roomHostId = data.hostId;
+          } else if ((data.players || []).length > 0) {
+            // fallback: first player is host
+            roomHostId = data.players[0].id;
           } else {
-            youAreHostEl.style.display = 'none';
+            roomHostId = null;
           }
-        }
 
-        // enable start button only when there are 2 players and current user is host
-        const startBtn = document.getElementById('startBtn');
-        if(startBtn){
-          // host determined by explicit hostId sent by server (or fallback)
-          if(myPlayerId && roomHostId && myPlayerId === roomHostId){
-            startBtn.style.display = 'inline-block';
-            startBtn.disabled = count !== 2;
-          } else {
-            // hide for non-hosts
-            startBtn.style.display = 'none';
-          }
-        }
-        // update auto-draw UI if server provides it
-        try{
-          if(typeof data.autoDraw !== 'undefined' && autoDrawLabelEl && autoDrawToggleEl){
-            // show the control only to the host
-            if(myPlayerId && roomHostId && myPlayerId === roomHostId){
-              autoDrawLabelEl.style.display = 'inline-flex';
-              autoDrawToggleEl.checked = !!data.autoDraw;
-              autoDrawToggleEl.disabled = false;
+          // update host label UI
+          if (hostLabelEl) {
+            hostLabelEl.textContent = roomHostId || "-";
+            if (myPlayerId && roomHostId && myPlayerId === roomHostId) {
+              youAreHostEl.style.display = "inline";
             } else {
-              // hide control for non-hosts
-              autoDrawLabelEl.style.display = 'none';
+              youAreHostEl.style.display = "none";
             }
           }
-        }catch(_){ }
-        // update no-remise UI if server provides it
-        try{
-          if(typeof data.noRemise !== 'undefined' && noRemiseLabelEl && noRemiseToggleEl){
-            // show the control only to the host
-            if(myPlayerId && roomHostId && myPlayerId === roomHostId){
-              noRemiseLabelEl.style.display = 'inline-flex';
-              noRemiseToggleEl.checked = !!data.noRemise;
-              noRemiseToggleEl.disabled = false;
+
+          // enable start button only when there are 2 players and current user is host
+          const startBtn = document.getElementById("startBtn");
+          if (startBtn) {
+            // host determined by explicit hostId sent by server (or fallback)
+            if (myPlayerId && roomHostId && myPlayerId === roomHostId) {
+              startBtn.style.display = "inline-block";
+              startBtn.disabled = count !== 2;
             } else {
-              // hide control for non-hosts
-              noRemiseLabelEl.style.display = 'none';
+              // hide for non-hosts
+              startBtn.style.display = "none";
             }
           }
-        }catch(_){ }
-        // show custom draw checkbox to host (UI-only for now)
-        try{
-          if(customDrawLabelEl && customDrawToggleEl){
-            if(myPlayerId && roomHostId && myPlayerId === roomHostId){
-              customDrawLabelEl.style.display = 'inline-flex';
-              // do not override the user's local choice; leave checked as-is
-              customDrawToggleEl.disabled = false;
-            } else {
-              customDrawLabelEl.style.display = 'none';
-            }
-          }
-        }catch(_){ }
-      });
-
-      // register game started handler early so we don't miss the broadcast
-      socket.on('game:started', (data)=>{
-        log('game:started', data);
-        if(myPlayerId){
-          window.location.href = `/game.html?roomId=${encodeURIComponent(roomId)}&playerId=${encodeURIComponent(myPlayerId)}`;
-        } else {
-          window.location.href = `/game.html?roomId=${encodeURIComponent(roomId)}`;
-        }
-      });
-
-      socket.emit('room:join', { roomId, playerId }, (resp)=>{
-        if(resp && resp.error){
-          console.warn('join error', resp);
-          // do not alert or force-redirect; show error in status and keep page for debugging/retry
-          try{ document.getElementById('status').textContent = resp.error || 'Impossible de rejoindre la room'; }catch(e){}
-          return;
-        }
-        myPlayerId = resp.playerId;
-        myColor = resp.color;
-        // server may or may not include hostId in the response; fall back to color
-        if(resp.hostId !== undefined && resp.hostId !== null){
-          roomHostId = resp.hostId;
-        } else if(resp.color === 'white'){
-          roomHostId = resp.playerId; // assume creator (first join) is white
-        }
-        log('Rejoint room', resp);
-        // update host UI immediately
-        if(hostLabelEl){ hostLabelEl.textContent = roomHostId || '-'; }
-        if(youAreHostEl){ youAreHostEl.style.display = (myPlayerId && roomHostId && myPlayerId === roomHostId) ? 'inline' : 'none'; }
-        if(myPlayerId && roomHostId && myPlayerId === roomHostId){
-          const btn = document.getElementById('startBtn');
-          btn.style.display = 'inline-block';
-          btn.disabled = true;
-        }
-        // after join, fetch room state to avoid missing a recent 'playing' state
-        fetch(`/rooms/${encodeURIComponent(roomId)}`).then(r => r.json()).then(roomInfo => {
-          try{
-            if(roomInfo && typeof roomInfo.autoDraw !== 'undefined'){
-              if(myPlayerId && roomHostId && myPlayerId === roomHostId){
-                // host: show control and set state
-                if(autoDrawLabelEl && autoDrawToggleEl){ autoDrawLabelEl.style.display = 'inline-flex'; autoDrawToggleEl.checked = !!roomInfo.autoDraw; autoDrawToggleEl.disabled = false; }
+          // update auto-draw UI if server provides it
+          try {
+            if (
+              typeof data.autoDraw !== "undefined" &&
+              autoDrawLabelEl &&
+              autoDrawToggleEl
+            ) {
+              // show the control only to the host
+              if (myPlayerId && roomHostId && myPlayerId === roomHostId) {
+                autoDrawLabelEl.style.display = "inline-flex";
+                autoDrawToggleEl.checked = !!data.autoDraw;
+                autoDrawToggleEl.disabled = false;
               } else {
-                // non-host: hide control
-                if(autoDrawLabelEl) autoDrawLabelEl.style.display = 'none';
+                // hide control for non-hosts
+                autoDrawLabelEl.style.display = "none";
               }
             }
-            // set no-remise independently so host sees it even if autoDraw is undefined
-            try{
-              if(roomInfo && typeof roomInfo.noRemise !== 'undefined'){
-                if(myPlayerId && roomHostId && myPlayerId === roomHostId){
-                  if(noRemiseLabelEl && noRemiseToggleEl){ noRemiseLabelEl.style.display = 'inline-flex'; noRemiseToggleEl.checked = !!roomInfo.noRemise; noRemiseToggleEl.disabled = false; }
-                } else {
-                  if(noRemiseLabelEl) noRemiseLabelEl.style.display = 'none';
-                }
+          } catch (_) {}
+          // update no-remise UI if server provides it
+          try {
+            if (
+              typeof data.noRemise !== "undefined" &&
+              noRemiseLabelEl &&
+              noRemiseToggleEl
+            ) {
+              // show the control only to the host
+              if (myPlayerId && roomHostId && myPlayerId === roomHostId) {
+                noRemiseLabelEl.style.display = "inline-flex";
+                noRemiseToggleEl.checked = !!data.noRemise;
+                noRemiseToggleEl.disabled = false;
+              } else {
+                // hide control for non-hosts
+                noRemiseLabelEl.style.display = "none";
               }
-            }catch(_){ }
-            // show custom draw checkbox to host on initial fetch as well
-            try{
-              if(customDrawLabelEl && customDrawToggleEl){
-                if(myPlayerId && roomHostId && myPlayerId === roomHostId){
-                  customDrawLabelEl.style.display = 'inline-flex';
-                  // preserve local UI state for this control; do not force-assign checked
-                  customDrawToggleEl.disabled = false;
-                } else {
-                  customDrawLabelEl.style.display = 'none';
-                }
-              }
-            }catch(_){ }
-          }catch(_){ }
-          if(roomInfo && roomInfo.status === 'playing'){
-            // server already marked room as playing; redirect immediately
-            if(myPlayerId){
-              window.location.href = `/game.html?roomId=${encodeURIComponent(roomId)}&playerId=${encodeURIComponent(myPlayerId)}`;
-            } else {
-              window.location.href = `/game.html?roomId=${encodeURIComponent(roomId)}`;
             }
-          }
-        }).catch(e => { /* ignore */ });
-      });
-    }
-
-    connectAndJoin();
-
-    // Start button handler (host) — ensure custom deck is applied before starting
-    document.getElementById('startBtn').addEventListener('click', ()=>{
-      if(!socket) return;
-      // If custom draw is enabled and host selected cards, send the deck first
-      try{
-        if(customDrawToggleEl && customDrawToggleEl.checked && selectedCards.size && myPlayerId && roomHostId && myPlayerId === roomHostId){
-          socket.emit('room:deck:set', { roomId, selected: Array.from(selectedCards) }, (deckResp)=>{
-            if(deckResp && deckResp.error){ showToast(deckResp.message || deckResp.error, { background: 'rgba(200,60,60,0.95)' }); return; }
-            // now start the game
-            socket.emit('game:start', { roomId }, (resp)=>{
-              if(resp && resp.error){ log('start error', resp); showToast(resp.error || resp.message || 'Erreur', { background: 'rgba(200,60,60,0.95)' }); return; }
-              log('game:start acknowledged');
-            });
-          });
-          return;
-        }
-      }catch(_){ }
-      // fallback: start immediately
-      socket.emit('game:start', { roomId }, (resp)=>{
-        if(resp && resp.error){ log('start error', resp); showToast(resp.error || resp.message || 'Erreur', { background: 'rgba(200,60,60,0.95)' }); return; }
-        log('game:start acknowledged');
-      });
-    });
-
-    // Auto-draw toggle (host only)
-    if(autoDrawToggleEl){
-      autoDrawToggleEl.addEventListener('change', (ev)=>{
-        if(!socket) return;
-        const enabled = !!autoDrawToggleEl.checked;
-        socket.emit('room:auto_draw:set', { roomId, enabled }, (resp)=>{
-          if(resp && resp.error){ log('auto-draw error', resp); showToast(resp.error || resp.message || 'Erreur', { background: 'rgba(200,60,60,0.95)' }); return; }
-          log('auto-draw updated', resp);
+          } catch (_) {}
+          // show custom draw checkbox to host (UI-only for now)
+          try {
+            if (customDrawLabelEl && customDrawToggleEl) {
+              if (myPlayerId && roomHostId && myPlayerId === roomHostId) {
+                customDrawLabelEl.style.display = "inline-flex";
+                // do not override the user's local choice; leave checked as-is
+                customDrawToggleEl.disabled = false;
+              } else {
+                customDrawLabelEl.style.display = "none";
+              }
+            }
+          } catch (_) {}
         });
-      });
-    }
 
-    // No-remise toggle (host only) - independent from auto-draw
-    if(noRemiseToggleEl){
-      noRemiseToggleEl.addEventListener('change', (ev)=>{
-        if(!socket) return;
-        const enabled = !!noRemiseToggleEl.checked;
-        socket.emit('room:no_remise:set', { roomId, enabled }, (resp)=>{
-          if(resp && resp.error){ log('no-remise error', resp); showToast(resp.error || resp.message || 'Erreur', { background: 'rgba(200,60,60,0.95)' }); return; }
-          log('no-remise updated', resp);
-        });
-      });
-    }
-
-    // Custom draw toggle (minimal behavior)
-    // When checked, show a new section and fetch /cards to display a simple list.
-    if(customDrawToggleEl){
-      const customCardsSection = document.getElementById('customCardsSection');
-      const customCardsContainer = document.getElementById('customCardsContainer');
-      const customSelectAllBtn = document.getElementById('customSelectAll');
-      const customDeselectAllBtn = document.getElementById('customDeselectAll');
-      customDrawToggleEl.addEventListener('change', async (ev)=>{
-        const checked = !!customDrawToggleEl.checked;
-        log('custom-draw toggled (minimal)', { checked });
-        if(customCardsSection) customCardsSection.style.display = checked ? 'block' : 'none';
-        // When toggling the checkbox, inform server: if unchecked, clear custom deck on server so default deck is used.
-        try{
-          if(socket && socket.connected && myPlayerId && roomHostId && myPlayerId === roomHostId){
-            if(!checked){
-              // inform server to revert to default deck
-              socket.emit('room:deck:set', { roomId, selected: [] }, (resp)=>{
-                if(resp && resp.error) showToast(resp.message || resp.error, { background: 'rgba(200,60,60,0.95)' });
-                else showToast('Pioche personnalisée désactivée — pioche par défaut restaurée', { background: 'rgba(40,160,40,0.95)' });
-              });
-            } else {
-              // if checked and we already have a selection, push it to server
-              if(selectedCards.size){
-                socket.emit('room:deck:set', { roomId, selected: Array.from(selectedCards) }, (resp)=>{
-                  if(resp && resp.error) showToast(resp.message || resp.error, { background: 'rgba(200,60,60,0.95)' });
-                  else showToast('Pioche personnalisée activée', { background: 'rgba(40,160,40,0.95)' });
-                });
-              }
-            }
+        // register game started handler early so we don't miss the broadcast
+        socket.on("game:started", (data) => {
+          log("game:started", data);
+          if (myPlayerId) {
+            window.location.href = `/game.html?roomId=${encodeURIComponent(roomId)}&playerId=${encodeURIComponent(myPlayerId)}`;
+          } else {
+            window.location.href = `/game.html?roomId=${encodeURIComponent(roomId)}`;
           }
-        }catch(_){ }
-        if(checked){
-          // fetch card list and render simple names
-          if(customCardsContainer){
-            customCardsContainer.textContent = 'Chargement...';
-            try{
-              const r = await fetch('/cards');
-              const data = await r.json();
-              const cards = Array.isArray(data) ? data : (data && Array.isArray(data.cards) ? data.cards : []);
-              if(cards.length === 0){ customCardsContainer.textContent = 'Aucune carte trouvée.'; return; }
-              // restore previous selection for this room
-              try{ loadSelection(); }catch(_){}
-              const grid = document.createElement('div');
-              grid.style.display = 'grid';
-              grid.style.gridTemplateColumns = 'repeat(auto-fill,minmax(220px,1fr))';
-              grid.style.gap = '10px';
+        });
 
-              cards.forEach(c => {
-                // create the same visual structure as in game.renderHands -> .pokemon-card
-                const cardEl = document.createElement('div');
-                cardEl.className = 'pokemon-card';
-                const cardId = (c.id || c.cardId || c.name || c.title || JSON.stringify(c)).toString();
-                cardEl.dataset.cardId = cardId;
-
-                const top = document.createElement('div'); top.className = 'pokemon-card-top';
-                const art = document.createElement('div'); art.className = 'pokemon-card-art'; art.textContent = '';
-                try{
-                  const cid = (c.cardId || c.id || '').toString().toLowerCase();
-                  const titleRaw = (c.title || '').toString().toLowerCase();
-                  let imgSrc = null;
-                  if(cid === 'adoubement') imgSrc = '/assets/img/cards/adoubement.png';
-                  if(cid === 'folie') imgSrc = '/assets/img/cards/folie.png';
-                  if(cid === 'fortification') imgSrc = '/assets/img/cards/fortification.png';
-                  if(cid === 'rebond') imgSrc = '/assets/img/cards/rebond.png';
-                  if(cid === 'anneau') imgSrc = '/assets/img/cards/anneau.png';
-                  if(cid === 'brouillard') imgSrc = '/assets/img/cards/brouillard.png';
-                  if(cid === 'coincoin') imgSrc = '/assets/img/cards/coincoin.png';
-                  if(cid === 'inversion') imgSrc = '/assets/img/cards/inversion.png';
-                  if(cid === 'invisible') imgSrc = '/assets/img/cards/invisible.png';
-                  if(cid === 'kamikaze') imgSrc = '/assets/img/cards/kamikaz.png';
-                  if(cid === 'melange') imgSrc = '/assets/img/cards/mélange.png';
-                  if(cid === 'mine') imgSrc = '/assets/img/cards/mine.png';
-                  if(cid === 'promotion') imgSrc = '/assets/img/cards/promotion.png';
-                  if(cid === 'resurection') imgSrc = '/assets/img/cards/resurection.png';
-                  if(cid === 'sniper') imgSrc = '/assets/img/cards/sniper.png';
-                  if(cid === 'totem') imgSrc = '/assets/img/cards/totem.png';
-                  if(cid === 'toucher') imgSrc = '/assets/img/cards/toucher.png';
-                  if(cid === 'vole_piece') imgSrc = '/assets/img/cards/vole_piece.png';
-                  if(cid === 'double') imgSrc = '/assets/img/cards/double.png';
-                  if(cid === 'empathie') imgSrc = '/assets/img/cards/empathie.png';
-                  if(cid === 'parrure') imgSrc = '/assets/img/cards/parrure.png';
-                  if(cid === 'revolution') imgSrc = '/assets/img/cards/révolution.png';
-                  if(cid === 'doppelganger') imgSrc = '/assets/img/cards/doppelganger.png';
-                  if(cid === 'pareil') imgSrc = '/assets/img/cards/pareil.png';
-                  if(cid === 'sans_effet') imgSrc = '/assets/img/cards/sans_effet.png';
-                  if(cid === 'teleportation') imgSrc = '/assets/img/cards/teleportation.png';
-                  if(cid === 'tout') imgSrc = '/assets/img/cards/tout.png';
-                  if(cid === 'vole_carte') imgSrc = '/assets/img/cards/vole_carte.png';
-
-                  if(imgSrc){ const img = document.createElement('img'); img.src = imgSrc; img.alt = c.title || cid || 'card'; img.className = 'card-art-img'; img.style.width='100%'; img.style.height='100%'; img.style.objectFit='cover'; art.appendChild(img); }
-                }catch(e){}
-                top.appendChild(art);
-
-                const mid = document.createElement('div'); mid.className = 'pokemon-card-mid';
-                const h = document.createElement('div'); h.className = 'pokemon-card-title'; h.textContent = c.name || c.title || c.cardId || c.id || 'Carte';
-                const p = document.createElement('div'); p.className = 'pokemon-card-desc'; p.textContent = c.short || c.description || '';
-                mid.appendChild(h); mid.appendChild(p);
-
-                const footer = document.createElement('div'); footer.className = 'pokemon-card-footer';
-
-                // add a small select mark (hidden unless selected)
-                const selectMark = document.createElement('div'); selectMark.className = 'select-mark'; selectMark.textContent = '✓'; selectMark.style.display = 'none';
-                cardEl.appendChild(selectMark);
-
-                cardEl.appendChild(top); cardEl.appendChild(mid); cardEl.appendChild(footer);
-
-                // apply selection state if previously selected
-                if(selectedCards.has(cardId)){
-                  cardEl.classList.add('selected');
-                  selectMark.style.display = 'flex';
-                }
-
-                // click toggles selection (no other action in waiting room)
-                cardEl.addEventListener('click', (ev)=>{
-                  ev.stopPropagation();
-                  if(selectedCards.has(cardId)){
-                    selectedCards.delete(cardId);
-                    cardEl.classList.remove('selected');
-                    selectMark.style.display = 'none';
-                  } else {
-                    selectedCards.add(cardId);
-                    cardEl.classList.add('selected');
-                    selectMark.style.display = 'flex';
-                  }
-                  saveSelection();
-                  // if we're the host and connected AND custom-draw is enabled, update the server's custom deck selection
-                  try{
-                    if(socket && socket.connected && myPlayerId && roomHostId && myPlayerId === roomHostId && customDrawToggleEl && customDrawToggleEl.checked){
-                      socket.emit('room:deck:set', { roomId, selected: Array.from(selectedCards) }, (resp)=>{
-                        if(resp && resp.error){ showToast(resp.message || resp.error, { background: 'rgba(200,60,60,0.95)' }); }
-                        else { showToast('Pioche personnalisée mise à jour', { background: 'rgba(40,160,40,0.95)' }); }
-                      });
+        socket.emit("room:join", { roomId, playerId }, (resp) => {
+          if (resp && resp.error) {
+            console.warn("join error", resp);
+            // do not alert or force-redirect; show error in status and keep page for debugging/retry
+            try {
+              document.getElementById("status").textContent =
+                resp.error || "Impossible de rejoindre la room";
+            } catch (e) {}
+            return;
+          }
+          myPlayerId = resp.playerId;
+          myColor = resp.color;
+          // server may or may not include hostId in the response; fall back to color
+          if (resp.hostId !== undefined && resp.hostId !== null) {
+            roomHostId = resp.hostId;
+          } else if (resp.color === "white") {
+            roomHostId = resp.playerId; // assume creator (first join) is white
+          }
+          log("Rejoint room", resp);
+          // update host UI immediately
+          if (hostLabelEl) {
+            hostLabelEl.textContent = roomHostId || "-";
+          }
+          if (youAreHostEl) {
+            youAreHostEl.style.display =
+              myPlayerId && roomHostId && myPlayerId === roomHostId
+                ? "inline"
+                : "none";
+          }
+          if (myPlayerId && roomHostId && myPlayerId === roomHostId) {
+            const btn = document.getElementById("startBtn");
+            btn.style.display = "inline-block";
+            btn.disabled = true;
+          }
+          // after join, fetch room state to avoid missing a recent 'playing' state
+          fetch(`/rooms/${encodeURIComponent(roomId)}`)
+            .then((r) => r.json())
+            .then((roomInfo) => {
+              try {
+                if (roomInfo && typeof roomInfo.autoDraw !== "undefined") {
+                  if (myPlayerId && roomHostId && myPlayerId === roomHostId) {
+                    // host: show control and set state
+                    if (autoDrawLabelEl && autoDrawToggleEl) {
+                      autoDrawLabelEl.style.display = "inline-flex";
+                      autoDrawToggleEl.checked = !!roomInfo.autoDraw;
+                      autoDrawToggleEl.disabled = false;
                     }
-                  }catch(_){ }
-                });
-
-                grid.appendChild(cardEl);
-              });
-              customCardsContainer.innerHTML = '';
-              customCardsContainer.appendChild(grid);
-            }catch(e){ customCardsContainer.textContent = 'Erreur lors du chargement des cartes.'; }
-          }
-        }
-      });
-      // wire up select all / deselect all
-      function setAllVisible(yes){
-        // find card elements in the container grid
-        const els = customCardsContainer ? customCardsContainer.querySelectorAll('.pokemon-card') : [];
-        els.forEach(el => {
-          const id = el.dataset.cardId;
-          const mark = el.querySelector('.select-mark');
-          if(yes){ selectedCards.add(id); el.classList.add('selected'); if(mark) mark.style.display = 'flex'; }
-          else { selectedCards.delete(id); el.classList.remove('selected'); if(mark) mark.style.display = 'none'; }
-        });
-        saveSelection();
-        // send selection to server if host AND custom-draw enabled
-        try{
-          if(socket && socket.connected && myPlayerId && roomHostId && myPlayerId === roomHostId && customDrawToggleEl && customDrawToggleEl.checked){
-            socket.emit('room:deck:set', { roomId, selected: Array.from(selectedCards) }, (resp)=>{
-              if(resp && resp.error) showToast(resp.message || resp.error, { background: 'rgba(200,60,60,0.95)' });
-              else showToast('Pioche personnalisée mise à jour', { background: 'rgba(40,160,40,0.95)' });
+                  } else {
+                    // non-host: hide control
+                    if (autoDrawLabelEl) autoDrawLabelEl.style.display = "none";
+                  }
+                }
+                // set no-remise independently so host sees it even if autoDraw is undefined
+                try {
+                  if (roomInfo && typeof roomInfo.noRemise !== "undefined") {
+                    if (myPlayerId && roomHostId && myPlayerId === roomHostId) {
+                      if (noRemiseLabelEl && noRemiseToggleEl) {
+                        noRemiseLabelEl.style.display = "inline-flex";
+                        noRemiseToggleEl.checked = !!roomInfo.noRemise;
+                        noRemiseToggleEl.disabled = false;
+                      }
+                    } else {
+                      if (noRemiseLabelEl)
+                        noRemiseLabelEl.style.display = "none";
+                    }
+                  }
+                } catch (_) {}
+                // show custom draw checkbox to host on initial fetch as well
+                try {
+                  if (customDrawLabelEl && customDrawToggleEl) {
+                    if (myPlayerId && roomHostId && myPlayerId === roomHostId) {
+                      customDrawLabelEl.style.display = "inline-flex";
+                      // preserve local UI state for this control; do not force-assign checked
+                      customDrawToggleEl.disabled = false;
+                    } else {
+                      customDrawLabelEl.style.display = "none";
+                    }
+                  }
+                } catch (_) {}
+              } catch (_) {}
+              if (roomInfo && roomInfo.status === "playing") {
+                // server already marked room as playing; redirect immediately
+                if (myPlayerId) {
+                  window.location.href = `/game.html?roomId=${encodeURIComponent(roomId)}&playerId=${encodeURIComponent(myPlayerId)}`;
+                } else {
+                  window.location.href = `/game.html?roomId=${encodeURIComponent(roomId)}`;
+                }
+              }
+            })
+            .catch((e) => {
+              /* ignore */
             });
+        });
+      }
+
+      connectAndJoin();
+
+      // Start button handler (host) — ensure custom deck is applied before starting
+      document.getElementById("startBtn").addEventListener("click", () => {
+        if (!socket) return;
+        // If custom draw is enabled and host selected cards, send the deck first
+        try {
+          if (
+            customDrawToggleEl &&
+            customDrawToggleEl.checked &&
+            selectedCards.size &&
+            myPlayerId &&
+            roomHostId &&
+            myPlayerId === roomHostId
+          ) {
+            socket.emit(
+              "room:deck:set",
+              { roomId, selected: Array.from(selectedCards) },
+              (deckResp) => {
+                if (deckResp && deckResp.error) {
+                  showToast(deckResp.message || deckResp.error, {
+                    background: "rgba(200,60,60,0.95)",
+                  });
+                  return;
+                }
+                // now start the game
+                socket.emit("game:start", { roomId }, (resp) => {
+                  if (resp && resp.error) {
+                    log("start error", resp);
+                    showToast(resp.error || resp.message || "Erreur", {
+                      background: "rgba(200,60,60,0.95)",
+                    });
+                    return;
+                  }
+                  log("game:start acknowledged");
+                });
+              },
+            );
+            return;
           }
-        }catch(_){ }
+        } catch (_) {}
+        // fallback: start immediately
+        socket.emit("game:start", { roomId }, (resp) => {
+          if (resp && resp.error) {
+            log("start error", resp);
+            showToast(resp.error || resp.message || "Erreur", {
+              background: "rgba(200,60,60,0.95)",
+            });
+            return;
+          }
+          log("game:start acknowledged");
+        });
+      });
+
+      // Auto-draw toggle (host only)
+      if (autoDrawToggleEl) {
+        autoDrawToggleEl.addEventListener("change", (ev) => {
+          if (!socket) return;
+          const enabled = !!autoDrawToggleEl.checked;
+          socket.emit("room:auto_draw:set", { roomId, enabled }, (resp) => {
+            if (resp && resp.error) {
+              log("auto-draw error", resp);
+              showToast(resp.error || resp.message || "Erreur", {
+                background: "rgba(200,60,60,0.95)",
+              });
+              return;
+            }
+            log("auto-draw updated", resp);
+          });
+        });
       }
-      if(customSelectAllBtn) customSelectAllBtn.addEventListener('click', (e)=>{ e.preventDefault(); setAllVisible(true); });
-      if(customDeselectAllBtn) customDeselectAllBtn.addEventListener('click', (e)=>{ e.preventDefault(); setAllVisible(false); });
-      // ensure initial state: hide unless checkbox is already checked
-      if(customDrawToggleEl.checked && customCardsSection){ customCardsSection.style.display = 'block'; customDrawToggleEl.dispatchEvent(new Event('change')); }
-    }
 
-    // Copy invite link (hidden link, no display)
-    document.getElementById('copyInviteBtn').addEventListener('click', async ()=>{
-      const link = `${window.location.origin}/waiting.html?roomId=${encodeURIComponent(roomId)}`;
-      try{
-        await navigator.clipboard.writeText(link);
-  showToast('Lien d\'invitation copié dans le presse-papier', { background: 'rgba(40,160,40,0.95)' });
-      }catch(e){
-        // fallback
-        window.prompt('Copie le lien ci-dessous', link);
+      // No-remise toggle (host only) - independent from auto-draw
+      if (noRemiseToggleEl) {
+        noRemiseToggleEl.addEventListener("change", (ev) => {
+          if (!socket) return;
+          const enabled = !!noRemiseToggleEl.checked;
+          socket.emit("room:no_remise:set", { roomId, enabled }, (resp) => {
+            if (resp && resp.error) {
+              log("no-remise error", resp);
+              showToast(resp.error || resp.message || "Erreur", {
+                background: "rgba(200,60,60,0.95)",
+              });
+              return;
+            }
+            log("no-remise updated", resp);
+          });
+        });
       }
-    });
 
-    // fallback: if socket already existed and server emits game:started earlier, ensure handler exists
-    // (handled after join)
+      // Custom draw toggle (minimal behavior)
+      // When checked, show a new section and fetch /cards to display a simple list.
+      if (customDrawToggleEl) {
+        const customCardsSection =
+          document.getElementById("customCardsSection");
+        const customCardsContainer = document.getElementById(
+          "customCardsContainer",
+        );
+        const customSelectAllBtn = document.getElementById("customSelectAll");
+        const customDeselectAllBtn =
+          document.getElementById("customDeselectAll");
+        customDrawToggleEl.addEventListener("change", async (ev) => {
+          const checked = !!customDrawToggleEl.checked;
+          log("custom-draw toggled (minimal)", { checked });
+          if (customCardsSection)
+            customCardsSection.style.display = checked ? "block" : "none";
+          // When toggling the checkbox, inform server: if unchecked, clear custom deck on server so default deck is used.
+          try {
+            if (
+              socket &&
+              socket.connected &&
+              myPlayerId &&
+              roomHostId &&
+              myPlayerId === roomHostId
+            ) {
+              if (!checked) {
+                // inform server to revert to default deck
+                socket.emit(
+                  "room:deck:set",
+                  { roomId, selected: [] },
+                  (resp) => {
+                    if (resp && resp.error)
+                      showToast(resp.message || resp.error, {
+                        background: "rgba(200,60,60,0.95)",
+                      });
+                    else
+                      showToast(
+                        "Pioche personnalisée désactivée — pioche par défaut restaurée",
+                        { background: "rgba(40,160,40,0.95)" },
+                      );
+                  },
+                );
+              } else {
+                // if checked and we already have a selection, push it to server
+                if (selectedCards.size) {
+                  socket.emit(
+                    "room:deck:set",
+                    { roomId, selected: Array.from(selectedCards) },
+                    (resp) => {
+                      if (resp && resp.error)
+                        showToast(resp.message || resp.error, {
+                          background: "rgba(200,60,60,0.95)",
+                        });
+                      else
+                        showToast("Pioche personnalisée activée", {
+                          background: "rgba(40,160,40,0.95)",
+                        });
+                    },
+                  );
+                }
+              }
+            }
+          } catch (_) {}
+          if (checked) {
+            // fetch card list and render simple names
+            if (customCardsContainer) {
+              customCardsContainer.textContent = "Chargement...";
+              try {
+                const r = await fetch("/cards");
+                const data = await r.json();
+                const cards = Array.isArray(data)
+                  ? data
+                  : data && Array.isArray(data.cards)
+                    ? data.cards
+                    : [];
+                if (cards.length === 0) {
+                  customCardsContainer.textContent = "Aucune carte trouvée.";
+                  return;
+                }
+                // restore previous selection for this room
+                try {
+                  loadSelection();
+                } catch (_) {}
+                const grid = document.createElement("div");
+                grid.style.display = "grid";
+                grid.style.gridTemplateColumns =
+                  "repeat(auto-fill,minmax(220px,1fr))";
+                grid.style.gap = "10px";
 
-    
-  </script>
-</body>
+                cards.forEach((c) => {
+                  // create the same visual structure as in game.renderHands -> .pokemon-card
+                  const cardEl = document.createElement("div");
+                  cardEl.className = "pokemon-card";
+                  const cardId = (
+                    c.id ||
+                    c.cardId ||
+                    c.name ||
+                    c.title ||
+                    JSON.stringify(c)
+                  ).toString();
+                  cardEl.dataset.cardId = cardId;
+
+                  const top = document.createElement("div");
+                  top.className = "pokemon-card-top";
+                  const art = document.createElement("div");
+                  art.className = "pokemon-card-art";
+                  art.textContent = "";
+                  try {
+                    const cid = (c.cardId || c.id || "")
+                      .toString()
+                      .toLowerCase();
+                    const titleRaw = (c.title || "").toString().toLowerCase();
+                    let imgSrc = null;
+                    if (cid === "adoubement")
+                      imgSrc = "/assets/img/cards/adoubement.png";
+                    if (cid === "folie") imgSrc = "/assets/img/cards/folie.png";
+                    if (cid === "fortification")
+                      imgSrc = "/assets/img/cards/fortification.png";
+                    if (cid === "rebond")
+                      imgSrc = "/assets/img/cards/rebond.png";
+                    if (cid === "anneau")
+                      imgSrc = "/assets/img/cards/anneau.png";
+                    if (cid === "brouillard")
+                      imgSrc = "/assets/img/cards/brouillard.png";
+                    if (cid === "coincoin")
+                      imgSrc = "/assets/img/cards/coincoin.png";
+                    if (cid === "inversion")
+                      imgSrc = "/assets/img/cards/inversion.png";
+                    if (cid === "invisible")
+                      imgSrc = "/assets/img/cards/invisible.png";
+                    if (cid === "kamikaze")
+                      imgSrc = "/assets/img/cards/kamikaz.png";
+                    if (cid === "melange")
+                      imgSrc = "/assets/img/cards/mélange.png";
+                    if (cid === "mine") imgSrc = "/assets/img/cards/mine.png";
+                    if (cid === "promotion")
+                      imgSrc = "/assets/img/cards/promotion.png";
+                    if (cid === "resurection")
+                      imgSrc = "/assets/img/cards/resurection.png";
+                    if (cid === "sniper")
+                      imgSrc = "/assets/img/cards/sniper.png";
+                    if (cid === "totem") imgSrc = "/assets/img/cards/totem.png";
+                    if (cid === "toucher")
+                      imgSrc = "/assets/img/cards/toucher.png";
+                    if (cid === "vole_piece")
+                      imgSrc = "/assets/img/cards/vole_piece.png";
+                    if (cid === "double")
+                      imgSrc = "/assets/img/cards/double.png";
+                    if (cid === "empathie")
+                      imgSrc = "/assets/img/cards/empathie.png";
+                    if (cid === "parrure")
+                      imgSrc = "/assets/img/cards/parrure.png";
+                    if (cid === "revolution")
+                      imgSrc = "/assets/img/cards/révolution.png";
+                    if (cid === "doppelganger")
+                      imgSrc = "/assets/img/cards/doppelganger.png";
+                    if (cid === "pareil")
+                      imgSrc = "/assets/img/cards/pareil.png";
+                    if (cid === "sans_effet")
+                      imgSrc = "/assets/img/cards/sans_effet.png";
+                    if (cid === "teleportation")
+                      imgSrc = "/assets/img/cards/teleportation.png";
+                    if (cid === "tout") imgSrc = "/assets/img/cards/tout.png";
+                    if (cid === "vole_carte")
+                      imgSrc = "/assets/img/cards/vole_carte.png";
+
+                    if (imgSrc) {
+                      const img = document.createElement("img");
+                      img.src = imgSrc;
+                      img.alt = c.title || cid || "card";
+                      img.className = "card-art-img";
+                      img.style.width = "100%";
+                      img.style.height = "100%";
+                      img.style.objectFit = "cover";
+                      art.appendChild(img);
+                    }
+                  } catch (e) {}
+                  top.appendChild(art);
+
+                  const mid = document.createElement("div");
+                  mid.className = "pokemon-card-mid";
+                  const h = document.createElement("div");
+                  h.className = "pokemon-card-title";
+                  h.textContent =
+                    c.name || c.title || c.cardId || c.id || "Carte";
+                  const p = document.createElement("div");
+                  p.className = "pokemon-card-desc";
+                  p.textContent = c.short || c.description || "";
+                  mid.appendChild(h);
+                  mid.appendChild(p);
+
+                  const footer = document.createElement("div");
+                  footer.className = "pokemon-card-footer";
+
+                  // add a small select mark (hidden unless selected)
+                  const selectMark = document.createElement("div");
+                  selectMark.className = "select-mark";
+                  selectMark.textContent = "✓";
+                  selectMark.style.display = "none";
+                  cardEl.appendChild(selectMark);
+
+                  cardEl.appendChild(top);
+                  cardEl.appendChild(mid);
+                  cardEl.appendChild(footer);
+
+                  // apply selection state if previously selected
+                  if (selectedCards.has(cardId)) {
+                    cardEl.classList.add("selected");
+                    selectMark.style.display = "flex";
+                  }
+
+                  // click toggles selection (no other action in waiting room)
+                  cardEl.addEventListener("click", (ev) => {
+                    ev.stopPropagation();
+                    if (selectedCards.has(cardId)) {
+                      selectedCards.delete(cardId);
+                      cardEl.classList.remove("selected");
+                      selectMark.style.display = "none";
+                    } else {
+                      selectedCards.add(cardId);
+                      cardEl.classList.add("selected");
+                      selectMark.style.display = "flex";
+                    }
+                    saveSelection();
+                    // if we're the host and connected AND custom-draw is enabled, update the server's custom deck selection
+                    try {
+                      if (
+                        socket &&
+                        socket.connected &&
+                        myPlayerId &&
+                        roomHostId &&
+                        myPlayerId === roomHostId &&
+                        customDrawToggleEl &&
+                        customDrawToggleEl.checked
+                      ) {
+                        socket.emit(
+                          "room:deck:set",
+                          { roomId, selected: Array.from(selectedCards) },
+                          (resp) => {
+                            if (resp && resp.error) {
+                              showToast(resp.message || resp.error, {
+                                background: "rgba(200,60,60,0.95)",
+                              });
+                            } else {
+                              showToast("Pioche personnalisée mise à jour", {
+                                background: "rgba(40,160,40,0.95)",
+                              });
+                            }
+                          },
+                        );
+                      }
+                    } catch (_) {}
+                  });
+
+                  grid.appendChild(cardEl);
+                });
+                customCardsContainer.innerHTML = "";
+                customCardsContainer.appendChild(grid);
+              } catch (e) {
+                customCardsContainer.textContent =
+                  "Erreur lors du chargement des cartes.";
+              }
+            }
+          }
+        });
+        // wire up select all / deselect all
+        function setAllVisible(yes) {
+          // find card elements in the container grid
+          const els = customCardsContainer
+            ? customCardsContainer.querySelectorAll(".pokemon-card")
+            : [];
+          els.forEach((el) => {
+            const id = el.dataset.cardId;
+            const mark = el.querySelector(".select-mark");
+            if (yes) {
+              selectedCards.add(id);
+              el.classList.add("selected");
+              if (mark) mark.style.display = "flex";
+            } else {
+              selectedCards.delete(id);
+              el.classList.remove("selected");
+              if (mark) mark.style.display = "none";
+            }
+          });
+          saveSelection();
+          // send selection to server if host AND custom-draw enabled
+          try {
+            if (
+              socket &&
+              socket.connected &&
+              myPlayerId &&
+              roomHostId &&
+              myPlayerId === roomHostId &&
+              customDrawToggleEl &&
+              customDrawToggleEl.checked
+            ) {
+              socket.emit(
+                "room:deck:set",
+                { roomId, selected: Array.from(selectedCards) },
+                (resp) => {
+                  if (resp && resp.error)
+                    showToast(resp.message || resp.error, {
+                      background: "rgba(200,60,60,0.95)",
+                    });
+                  else
+                    showToast("Pioche personnalisée mise à jour", {
+                      background: "rgba(40,160,40,0.95)",
+                    });
+                },
+              );
+            }
+          } catch (_) {}
+        }
+        if (customSelectAllBtn)
+          customSelectAllBtn.addEventListener("click", (e) => {
+            e.preventDefault();
+            setAllVisible(true);
+          });
+        if (customDeselectAllBtn)
+          customDeselectAllBtn.addEventListener("click", (e) => {
+            e.preventDefault();
+            setAllVisible(false);
+          });
+        // ensure initial state: hide unless checkbox is already checked
+        if (customDrawToggleEl.checked && customCardsSection) {
+          customCardsSection.style.display = "block";
+          customDrawToggleEl.dispatchEvent(new Event("change"));
+        }
+      }
+
+      // Copy invite link (hidden link, no display)
+      document
+        .getElementById("copyInviteBtn")
+        .addEventListener("click", async () => {
+          const link = `${window.location.origin}/waiting.html?roomId=${encodeURIComponent(roomId)}`;
+          try {
+            await navigator.clipboard.writeText(link);
+            showToast("Lien d'invitation copié dans le presse-papier", {
+              background: "rgba(40,160,40,0.95)",
+            });
+          } catch (e) {
+            // fallback
+            window.prompt("Copie le lien ci-dessous", link);
+          }
+        });
+
+      // fallback: if socket already existed and server emits game:started earlier, ensure handler exists
+      // (handled after join)
+    </script>
+  </body>
 </html>

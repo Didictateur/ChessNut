@@ -1,174 +1,289 @@
 <!doctype html>
 <html>
-<head>
-  <meta charset="utf-8" />
-  <title>ChessNut</title>
-  <link rel="stylesheet" href="/styles/style.css">
-</head>
-<body>
-  <div class="page">
-    <header class="hero card">
-      <div>
-        <div class="title">ChessNut</div>
-        <div style="margin-top:8px">
-          <a href="https://github.com/Didictateur/ChessNut" target="_blank" rel="noopener noreferrer" class="btn-ghost" style="text-decoration:none;padding:6px 10px;font-size:0.95em;">Voir sur GitHub</a>
+  <head>
+    <meta charset="utf-8" />
+    <title>ChessNut</title>
+    <link rel="stylesheet" href="/styles/style.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="hero card">
+        <div>
+          <div class="title">ChessNut</div>
+          <div style="margin-top: 8px">
+            <a
+              href="https://github.com/Didictateur/ChessNut"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="btn-ghost"
+              style="
+                text-decoration: none;
+                padding: 6px 10px;
+                font-size: 0.95em;
+              "
+              >Voir sur GitHub</a
+            >
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
 
-    <section class="card lobby">
-      <div>
-        <button id="create" class="btn-cta">Créer une partie</button>
-      </div>
+      <section class="card lobby">
+        <div>
+          <button id="create" class="btn-cta">Créer une partie</button>
+        </div>
 
-      <div class="controls">
-        <input id="roomId" class="input" placeholder="ex: ab12cd34" />
-        <button id="join" class="btn-ghost">Rejoindre</button>
-      </div>
-    </section>
-    
-    <section class="card rules" id="cardRules" style="margin-top:16px">
-      <h3>Règles du jeu</h3>
-      <p>Les cartes ajoutent des effets spéciaux au-dessus des règles d'échecs classiques. Voici l'essentiel pour jouer :</p>
-      <ul>
-        <li><strong>Jouer une carte :</strong> cliquez sur une carte dans votre main puis suivez l'invite (sélection d'une pièce, d'une case). Certaines cartes n'exigent pas de cible.</li>
-        <li><strong>Carte mouvement :</strong> certaines cartes comptent déjà comme un mouvement à part entière. Il faut donc en tenir compte lors de votre tour.</li>
-        <li><strong>Durée des effets :</strong> certaines cartes sont temporaires (durée mesurée en tours), d'autres restent actives. Un tour correspond aux actions d'un seul joueur. Un cycle vaut donc pour deux tours.</li>
-        <li><strong>Fin de partie :</strong> si un roi est capturé, la partie s'arrête sur une victoire, une défaite ou peut-être même une égalité. Les joueurs peuvent choisir de rester en spectateur ou de quitter la partie.</li>
-      </ul>
-      <p style="margin-top:8px;font-size:0.95em;color:#444">Remarque : ces règles couvrent uniquement les mécaniques des cartes — pour le jeu d'échecs standard, les mouvements habituels s'appliquent (pions, tours, cavaliers, fous, dames, rois).</p>
-      <h3>Modes de jeux</h3>
-      <p>Il existe plusieurs modes de jeux pour s'adapter à différents styles de jeu :</p>
-      <ul>
-        <li><strong>Pioche automatique :</strong> Si activé, les cartes sont piochées automatiquement à chaque tour. Sinon, les joueurs doivent décider s'ils piochent ou s'ils jouent. Attention ! Il n'est pas possible de piocher deux fois de suite !</li>
-        <li><strong>Sans remise :</strong> Les cartes jouées ne sont pas remises dans la pioche, ce qui les rend uniques.</li>
-        <li><strong>Pioche personnalisée :</strong> Choisissez les cartes disponibles dans la pioche.</li>
-      </ul>
-    </section>
+        <div class="controls">
+          <input id="roomId" class="input" placeholder="ex: ab12cd34" />
+          <button id="join" class="btn-ghost">Rejoindre</button>
+        </div>
+      </section>
 
-    <section class="card" id="availableCards" style="margin-top:16px">
-      <h3>Cartes disponibles</h3>
-      <div id="cardsGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:12px">
-        <!-- Affichage des cartes disponibles -->
-      </div>
-    </section>
-  </div>
+      <section class="card rules" id="cardRules" style="margin-top: 16px">
+        <h3>Règles du jeu</h3>
+        <p>
+          Les cartes ajoutent des effets spéciaux au-dessus des règles d'échecs
+          classiques. Voici l'essentiel pour jouer :
+        </p>
+        <ul>
+          <li>
+            <strong>Jouer une carte :</strong> cliquez sur une carte dans votre
+            main puis suivez l'invite (sélection d'une pièce, d'une case).
+            Certaines cartes n'exigent pas de cible.
+          </li>
+          <li>
+            <strong>Carte mouvement :</strong> certaines cartes comptent déjà
+            comme un mouvement à part entière. Il faut donc en tenir compte lors
+            de votre tour.
+          </li>
+          <li>
+            <strong>Durée des effets :</strong> certaines cartes sont
+            temporaires (durée mesurée en tours), d'autres restent actives. Un
+            tour correspond aux actions d'un seul joueur. Un cycle vaut donc
+            pour deux tours.
+          </li>
+          <li>
+            <strong>Fin de partie :</strong> si un roi est capturé, la partie
+            s'arrête sur une victoire, une défaite ou peut-être même une
+            égalité. Les joueurs peuvent choisir de rester en spectateur ou de
+            quitter la partie.
+          </li>
+        </ul>
+        <p style="margin-top: 8px; font-size: 0.95em; color: #444">
+          Remarque : ces règles couvrent uniquement les mécaniques des cartes —
+          pour le jeu d'échecs standard, les mouvements habituels s'appliquent
+          (pions, tours, cavaliers, fous, dames, rois).
+        </p>
+        <h3>Modes de jeux</h3>
+        <p>
+          Il existe plusieurs modes de jeux pour s'adapter à différents styles
+          de jeu :
+        </p>
+        <ul>
+          <li>
+            <strong>Pioche automatique :</strong> Si activé, les cartes sont
+            piochées automatiquement à chaque tour. Sinon, les joueurs doivent
+            décider s'ils piochent ou s'ils jouent. Attention ! Il n'est pas
+            possible de piocher deux fois de suite !
+          </li>
+          <li>
+            <strong>Sans remise :</strong> Les cartes jouées ne sont pas remises
+            dans la pioche, ce qui les rend uniques.
+          </li>
+          <li>
+            <strong>Pioche personnalisée :</strong> Choisissez les cartes
+            disponibles dans la pioche.
+          </li>
+        </ul>
+      </section>
 
-  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-  <script src="/toast.js"></script>
-  <script>
-    function log(...args){ console.log(...args); }
+      <section class="card" id="availableCards" style="margin-top: 16px">
+        <h3>Cartes disponibles</h3>
+        <div
+          id="cardsGrid"
+          style="
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 12px;
+            margin-top: 12px;
+          "
+        >
+          <!-- Affichage des cartes disponibles -->
+        </div>
+      </section>
+    </div>
 
-    document.getElementById('create').addEventListener('click', async ()=>{
-      const r = await fetch('/rooms', { method:'POST' });
-      const j = await r.json();
-      document.getElementById('roomId').value = j.roomId;
-      log('Room créée', j.roomId);
-      // redirect creator to waiting page
-      window.location.href = `/waiting.html?roomId=${encodeURIComponent(j.roomId)}`;
-    });
-
-    document.getElementById('join').addEventListener('click', async ()=>{
-      const roomId = document.getElementById('roomId').value.trim();
-  if(!roomId){ showToast('Entrez roomId', { background: 'rgba(200,60,60,0.95)' }); return; }
-      // verify room exists before redirecting
-      try{
-        const resp = await fetch(`/rooms/${encodeURIComponent(roomId)}`);
-        if(!resp.ok){
-          const j = await resp.json().catch(()=>({ error: 'room not found' }));
-          showToast(j.error || 'room not found', { background: 'rgba(200,60,60,0.95)' });
-          return;
-        }
-      }catch(e){
-        showToast('Erreur de connexion au serveur', { background: 'rgba(200,60,60,0.95)' });
-        return;
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="/toast.js"></script>
+    <script>
+      function log(...args) {
+        console.log(...args);
       }
 
-      const playerIdEl = document.getElementById('playerId');
-      const playerId = (playerIdEl && playerIdEl.value) ? playerIdEl.value.trim() : '';
-      // redirect to waiting page; playerId optional
-      const qs = `?roomId=${encodeURIComponent(roomId)}${playerId?`&playerId=${encodeURIComponent(playerId)}`:''}`;
-      window.location.href = '/waiting.html' + qs;
-    });
+      document.getElementById("create").addEventListener("click", async () => {
+        const r = await fetch("/rooms", { method: "POST" });
+        const j = await r.json();
+        document.getElementById("roomId").value = j.roomId;
+        log("Room créée", j.roomId);
+        // redirect creator to waiting page
+        window.location.href = `/waiting.html?roomId=${encodeURIComponent(j.roomId)}`;
+      });
 
-    // Fetch available cards from server and render as a grid using the same card UI as in-game
-    async function loadCardsGrid(){
-      try{
-        const resp = await fetch('/cards');
-        if(!resp.ok) return;
-        const j = await resp.json();
-        if(!j || !Array.isArray(j.cards)) return;
-        const grid = document.getElementById('cardsGrid');
-        if(!grid) return;
-        grid.innerHTML = '';
-        j.cards.forEach(c => {
-          try{
-            const cardEl = document.createElement('div');
-            cardEl.className = 'pokemon-card';
-            cardEl.dataset.cardId = c.cardId || c.id || '';
-            cardEl.dataset.cardUuid = c.id || '';
+      document.getElementById("join").addEventListener("click", async () => {
+        const roomId = document.getElementById("roomId").value.trim();
+        if (!roomId) {
+          showToast("Entrez roomId", { background: "rgba(200,60,60,0.95)" });
+          return;
+        }
+        // verify room exists before redirecting
+        try {
+          const resp = await fetch(`/rooms/${encodeURIComponent(roomId)}`);
+          if (!resp.ok) {
+            const j = await resp
+              .json()
+              .catch(() => ({ error: "room not found" }));
+            showToast(j.error || "room not found", {
+              background: "rgba(200,60,60,0.95)",
+            });
+            return;
+          }
+        } catch (e) {
+          showToast("Erreur de connexion au serveur", {
+            background: "rgba(200,60,60,0.95)",
+          });
+          return;
+        }
 
-            const top = document.createElement('div'); top.className = 'pokemon-card-top';
-            const art = document.createElement('div'); art.className = 'pokemon-card-art';
-            art.textContent = '';
-            // artwork mapping (reuse same simple heuristics as in game view)
-            try{
-              const cid = (c.cardId || c.id || '').toString().toLowerCase();
-              const title = (c.title || '').toString().toLowerCase();
-              let imgSrc = null;
-              if(cid === 'adoubement') imgSrc = '/assets/img/cards/adoubement.png';
-              if(cid === 'folie') imgSrc = '/assets/img/cards/folie.png';
-              if(cid === 'fortification') imgSrc = '/assets/img/cards/fortification.png';
-              if(cid === 'rebond') imgSrc = '/assets/img/cards/rebond.png';
-              if(cid === 'anneau') imgSrc = '/assets/img/cards/anneau.png';
-              if(cid === 'brouillard') imgSrc = '/assets/img/cards/brouillard.png';
-              if(cid === 'coincoin') imgSrc = '/assets/img/cards/coincoin.png';
-              if(cid === 'inversion') imgSrc = '/assets/img/cards/inversion.png';
-              if(cid === 'invisible') imgSrc = '/assets/img/cards/invisible.png';
-              if(cid === 'kamikaze') imgSrc = '/assets/img/cards/kamikaz.png';
-              if(cid === 'melange') imgSrc = '/assets/img/cards/mélange.png';
-              if(cid === 'mine') imgSrc = '/assets/img/cards/mine.png';
-              if(cid === 'promotion') imgSrc = '/assets/img/cards/promotion.png';
-              if(cid === 'resurection') imgSrc = '/assets/img/cards/resurection.png';
-              if(cid === 'sniper') imgSrc = '/assets/img/cards/sniper.png';
-              if(cid === 'totem') imgSrc = '/assets/img/cards/totem.png';
-              if(cid === 'toucher') imgSrc = '/assets/img/cards/toucher.png';
-              if(cid === 'vole_piece') imgSrc = '/assets/img/cards/vole_piece.png';
-              if(cid === 'double') imgSrc = '/assets/img/cards/double.png';
-              if(cid === 'empathie') imgSrc = '/assets/img/cards/empathie.png';
-              if(cid === 'parrure') imgSrc = '/assets/img/cards/parrure.png';
-              if(cid === 'revolution') imgSrc = '/assets/img/cards/révolution.png';
-              if(cid === 'doppelganger') imgSrc = '/assets/img/cards/doppelganger.png';
-              if(cid === 'pareil') imgSrc = '/assets/img/cards/pareil.png';
-              if(cid === 'sans_effet') imgSrc = '/assets/img/cards/sans_effet.png';
-              if(cid === 'teleportation') imgSrc = '/assets/img/cards/teleportation.png';
-              if(cid === 'tout') imgSrc = '/assets/img/cards/tout.png';
-              if(cid === 'vole_carte') imgSrc = '/assets/img/cards/vole_carte.png';
+        const playerIdEl = document.getElementById("playerId");
+        const playerId =
+          playerIdEl && playerIdEl.value ? playerIdEl.value.trim() : "";
+        // redirect to waiting page; playerId optional
+        const qs = `?roomId=${encodeURIComponent(roomId)}${playerId ? `&playerId=${encodeURIComponent(playerId)}` : ""}`;
+        window.location.href = "/waiting.html" + qs;
+      });
 
-              if(imgSrc){ const img = document.createElement('img'); img.src = imgSrc; img.alt = c.title || cid || 'card'; img.className = 'card-art-img'; img.style.width = '100%'; img.style.height = '100%'; img.style.objectFit = 'cover'; art.appendChild(img); }
-            }catch(_){ }
-            top.appendChild(art);
+      // Fetch available cards from server and render as a grid using the same card UI as in-game
+      async function loadCardsGrid() {
+        try {
+          const resp = await fetch("/cards");
+          if (!resp.ok) return;
+          const j = await resp.json();
+          if (!j || !Array.isArray(j.cards)) return;
+          const grid = document.getElementById("cardsGrid");
+          if (!grid) return;
+          grid.innerHTML = "";
+          j.cards.forEach((c) => {
+            try {
+              const cardEl = document.createElement("div");
+              cardEl.className = "pokemon-card";
+              cardEl.dataset.cardId = c.cardId || c.id || "";
+              cardEl.dataset.cardUuid = c.id || "";
 
-            const mid = document.createElement('div'); mid.className = 'pokemon-card-mid';
-            const h = document.createElement('div'); h.className = 'pokemon-card-title'; h.textContent = c.title || c.cardId || 'Carte';
-            const p = document.createElement('div'); p.className = 'pokemon-card-desc'; p.textContent = c.description || '';
-            mid.appendChild(h); mid.appendChild(p);
+              const top = document.createElement("div");
+              top.className = "pokemon-card-top";
+              const art = document.createElement("div");
+              art.className = "pokemon-card-art";
+              art.textContent = "";
+              // artwork mapping (reuse same simple heuristics as in game view)
+              try {
+                const cid = (c.cardId || c.id || "").toString().toLowerCase();
+                const title = (c.title || "").toString().toLowerCase();
+                let imgSrc = null;
+                if (cid === "adoubement")
+                  imgSrc = "/assets/img/cards/adoubement.png";
+                if (cid === "folie") imgSrc = "/assets/img/cards/folie.png";
+                if (cid === "fortification")
+                  imgSrc = "/assets/img/cards/fortification.png";
+                if (cid === "rebond") imgSrc = "/assets/img/cards/rebond.png";
+                if (cid === "anneau") imgSrc = "/assets/img/cards/anneau.png";
+                if (cid === "brouillard")
+                  imgSrc = "/assets/img/cards/brouillard.png";
+                if (cid === "coincoin")
+                  imgSrc = "/assets/img/cards/coincoin.png";
+                if (cid === "inversion")
+                  imgSrc = "/assets/img/cards/inversion.png";
+                if (cid === "invisible")
+                  imgSrc = "/assets/img/cards/invisible.png";
+                if (cid === "kamikaze")
+                  imgSrc = "/assets/img/cards/kamikaz.png";
+                if (cid === "melange") imgSrc = "/assets/img/cards/mélange.png";
+                if (cid === "mine") imgSrc = "/assets/img/cards/mine.png";
+                if (cid === "promotion")
+                  imgSrc = "/assets/img/cards/promotion.png";
+                if (cid === "resurection")
+                  imgSrc = "/assets/img/cards/resurection.png";
+                if (cid === "sniper") imgSrc = "/assets/img/cards/sniper.png";
+                if (cid === "totem") imgSrc = "/assets/img/cards/totem.png";
+                if (cid === "toucher") imgSrc = "/assets/img/cards/toucher.png";
+                if (cid === "vole_piece")
+                  imgSrc = "/assets/img/cards/vole_piece.png";
+                if (cid === "double") imgSrc = "/assets/img/cards/double.png";
+                if (cid === "empathie")
+                  imgSrc = "/assets/img/cards/empathie.png";
+                if (cid === "parrure") imgSrc = "/assets/img/cards/parrure.png";
+                if (cid === "revolution")
+                  imgSrc = "/assets/img/cards/révolution.png";
+                if (cid === "doppelganger")
+                  imgSrc = "/assets/img/cards/doppelganger.png";
+                if (cid === "pareil") imgSrc = "/assets/img/cards/pareil.png";
+                if (cid === "sans_effet")
+                  imgSrc = "/assets/img/cards/sans_effet.png";
+                if (cid === "teleportation")
+                  imgSrc = "/assets/img/cards/teleportation.png";
+                if (cid === "tout") imgSrc = "/assets/img/cards/tout.png";
+                if (cid === "vole_carte")
+                  imgSrc = "/assets/img/cards/vole_carte.png";
 
-            const footer = document.createElement('div'); footer.className = 'pokemon-card-footer';
+                if (imgSrc) {
+                  const img = document.createElement("img");
+                  img.src = imgSrc;
+                  img.alt = c.title || cid || "card";
+                  img.className = "card-art-img";
+                  img.style.width = "100%";
+                  img.style.height = "100%";
+                  img.style.objectFit = "cover";
+                  art.appendChild(img);
+                }
+              } catch (_) {}
+              top.appendChild(art);
 
-            cardEl.appendChild(top);
-            cardEl.appendChild(mid);
-            cardEl.appendChild(footer);
+              const mid = document.createElement("div");
+              mid.className = "pokemon-card-mid";
+              const h = document.createElement("div");
+              h.className = "pokemon-card-title";
+              h.textContent = c.title || c.cardId || "Carte";
+              const p = document.createElement("div");
+              p.className = "pokemon-card-desc";
+              p.textContent = c.description || "";
+              mid.appendChild(h);
+              mid.appendChild(p);
 
-            grid.appendChild(cardEl);
-          }catch(e){ console.warn('render card error', e); }
-        });
-      }catch(e){ console.warn('loadCardsGrid error', e); }
-    }
+              const footer = document.createElement("div");
+              footer.className = "pokemon-card-footer";
 
-    function escapeHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-    // populate on load
-    try{ loadCardsGrid(); }catch(_){ }
-  </script>
-</body>
+              cardEl.appendChild(top);
+              cardEl.appendChild(mid);
+              cardEl.appendChild(footer);
+
+              grid.appendChild(cardEl);
+            } catch (e) {
+              console.warn("render card error", e);
+            }
+          });
+        } catch (e) {
+          console.warn("loadCardsGrid error", e);
+        }
+      }
+
+      function escapeHtml(s) {
+        return String(s || "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+      }
+      // populate on load
+      try {
+        loadCardsGrid();
+      } catch (_) {}
+    </script>
+  </body>
 </html>

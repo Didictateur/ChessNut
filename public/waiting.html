@@ -104,8 +104,8 @@
       socket.on('connect', ()=>{ log('socket connecté', socket.id); });
 
   socket.on('room:update', (data)=>{
-        console.log('room:update', data);
-        statusEl.textContent = data.status || '-';
+    console.log('room:update', data);
+    if(statusEl) statusEl.textContent = data.status || '-';
         const count = (data.players||[]).length;
         playerCountEl.textContent = `${count}/2`;
         // remember hostId from server updates; if missing, fall back to first player

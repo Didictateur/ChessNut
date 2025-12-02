@@ -292,7 +292,7 @@ function buildDefaultDeck(){
     ],
     [
       'Jouer deux fois',
-      'Le joueur peut déplacer deux pièces',
+      'Le joueur peut déplacer deux pièces. Ne peut pas capturer pendant son deuxième tour',
       'double'
     ],
     [
@@ -361,7 +361,7 @@ function buildDefaultDeck(){
       'sniper'
     ],
     [
-      'Inversion',
+      'Échange',
       "Échange la position d'une pièce avec une pièce adverse.\n\nCompte comme un mouvement",
       'inversion'
     ],
@@ -995,6 +995,18 @@ io.on('connection', (socket) => {
         }
       }catch(_){ }
 
+      // Second move of "double"
+      try{
+        const effects = room.activeCardEffects || [];
+        const dbl = effects.find(e => e && (e.type === 'double') && e.playerId === senderId);
+        if(dbl && typeof dbl.remainingMoves === 'number' && dbl.remainingMoves === 1){
+          const occupant = (pieces || []).find(p => p.square === to);
+          if(occupant){
+            return cb && cb({ error: 'capture_forbidden_double', message: "Vous ne pouvez pas capturer lors du deuxième mouvement de 'Jouer deux fois'." });
+          }
+        }
+      }catch(_){ }
+
       const targetIndex = pieces.findIndex(p => p.square === to);
       let sniperTriggered = false;
       let capturedPieceForReactions = null;
@@ -1163,7 +1175,7 @@ io.on('connection', (socket) => {
         room.activeCardEffects = room.activeCardEffects || [];
         for(let i = room.activeCardEffects.length - 1; i >= 0; i--){
           const e = room.activeCardEffects[i];
-          if(e.type === 'double' && e.playerId === senderId){
+          if((e.type === 'double') && e.playerId === senderId){
             const newRemaining = (typeof e.remainingMoves === 'number') ? (e.remainingMoves - 1) : ((e.remainingMoves || 2) - 1);
             if(newRemaining > 0){
               e.remainingMoves = newRemaining;
@@ -1178,7 +1190,7 @@ io.on('connection', (socket) => {
             break;
           }
         }
-      }catch(err){ console.error('double_move consume error', err); }
+      }catch(err){ console.error('double move consume error', err); }
 
       if(!consumedDoubleMove){
         board.turn = (board.turn === 'w') ? 'b' : 'w';
@@ -2203,11 +2215,11 @@ io.on('connection', (socket) => {
         else if(cardId === 'double'){
           try{
             room.activeCardEffects = room.activeCardEffects || [];
-            const effect = { id: played.id, type: 'double_move', playerId: senderId, ts: Date.now(), remainingMoves: (payload && payload.moves) || 2 };
+            const effect = { id: played.id, type: 'double', playerId: senderId, ts: Date.now(), remainingMoves: (payload && payload.moves) || 2 };
             room.activeCardEffects.push(effect);
             try{ io.to(room.id).emit('card:effect:applied', { roomId: room.id, effect }); }catch(_){ }
-            played.payload = Object.assign({}, payload, { applied: 'double_move', moves: effect.remainingMoves });
-          }catch(e){ console.error('double_move effect error', e); }
+            played.payload = Object.assign({}, payload, { applied: 'double', moves: effect.remainingMoves });
+          }catch(e){ console.error('double effect error', e); }
         }
 
         // tous les même

@@ -1941,6 +1941,13 @@ io.on('connection', (socket) => {
               targetPiece.type = toType;
               targetPiece.promoted = true;
               try{
+                if(board){
+                  board.turn = (board.turn === 'w') ? 'b' : 'w';
+                  try{ recordPlayerDrewPrev(room, senderId); }catch(_){ }
+                  const nextColor = board.turn;
+                  const nextPlayer = (room.players || []).find(p => (p.color && p.color[0]) === nextColor);
+                  if(nextPlayer){ try{ maybeDrawAtTurnStart(room, nextPlayer.id); }catch(_){ } }
+                }
                 const effect = { id: played.id, type: 'promotion', pieceId: targetPiece.id, pieceSquare: target, playerId: senderId, ts: Date.now() };
                 room.activeCardEffects = room.activeCardEffects || [];
                 room.activeCardEffects.push(effect);

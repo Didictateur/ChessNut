@@ -138,6 +138,13 @@
               if(cid === 'empathie') imgSrc = '/assets/img/cards/empathie.png';
               if(cid === 'parrure') imgSrc = '/assets/img/cards/parrure.png';
               if(cid === 'revolution') imgSrc = '/assets/img/cards/révolution.png';
+              if(cid === 'doppelganger') imgSrc = '/assets/img/cards/doppelganger.png';
+              if(cid === 'pareil') imgSrc = '/assets/img/cards/pareil.png';
+              if(cid === 'sans_effet') imgSrc = '/assets/img/cards/sans_effet.png';
+              if(cid === 'teleportation') imgSrc = '/assets/img/cards/teleportation.png';
+              if(cid === 'tout') imgSrc = '/assets/img/cards/tout.png';
+              if(cid === 'vole_carte') imgSrc = '/assets/img/cards/vole_carte.png';
+
               if(imgSrc){ const img = document.createElement('img'); img.src = imgSrc; img.alt = c.title || cid || 'card'; img.className = 'card-art-img'; img.style.width = '100%'; img.style.height = '100%'; img.style.objectFit = 'cover'; art.appendChild(img); }
             }catch(_){ }
             top.appendChild(art);

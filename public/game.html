@@ -371,6 +371,30 @@ logs...</pre
             if (data.boardState) {
               renderBoardFromState(data.boardState);
               updateTurnBanner(data.boardState);
+              // restore last-move highlight from localStorage (persist across refresh)
+              try {
+                if (roomId) {
+                  const key = `cn:lastMove:${roomId}`;
+                  const raw = localStorage.getItem(key);
+                  if (raw) {
+                    const lm = JSON.parse(raw);
+                    if (lm && lm.to && lm.from && lm.to !== lm.from) {
+                      // apply visuals (renderBoardFromState cleared old highlights)
+                      const dest = boardEl.querySelector(`.square[data-square="${lm.to}"]`);
+                      if (dest) {
+                        dest.classList.add("last-move-dest");
+                        const circle = document.createElement("div");
+                        circle.className = "last-move-circle";
+                        dest.appendChild(circle);
+                      }
+                      const fromEl = boardEl.querySelector(`.square[data-square="${lm.from}"]`);
+                      if (fromEl) fromEl.classList.add("last-move-source");
+                    }
+                  }
+                }
+              } catch (e) {
+                /* ignore storage errors */
+              }
             }
             try {
               if (data && data.status && data.status !== "finished") {
@@ -639,9 +663,42 @@ logs...</pre
               log("recv move:moved", data && { from: data.from, to: data.to });
               // clear any local selection (move completed) before re-render
               clearSelection(false);
-              if (data && data.boardState)
-                renderBoardFromState(data.boardState);
+              // remove any previous visual markers (circle or highlight) everywhere
+              try {
+                const prevHighlights = boardEl.querySelectorAll(".last-move-dest, .last-move-source");
+                prevHighlights.forEach((el) => {
+                  el.classList.remove("last-move-dest");
+                  el.classList.remove("last-move-source");
+                });
+              } catch (_) {}
+              try {
+                const prevCircles = boardEl.querySelectorAll(".last-move-circle");
+                prevCircles.forEach((c) => c.remove());
+              } catch (_) {}
+
+              if (data && data.boardState) renderBoardFromState(data.boardState);
               if (data && data.boardState) updateTurnBanner(data.boardState);
+
+              try {
+                // only highlight the destination square (not the source). create a proper .last-move-circle
+                if (data && data.from && data.to && data.from !== data.to) {
+                  const dest = boardEl.querySelector(`.square[data-square="${data.to}"]`);
+                  if (dest) {
+                    dest.classList.add("last-move-dest");
+                  }
+                  const fromEl = boardEl.querySelector(`.square[data-square="${data.from}"]`);
+                  if (fromEl) {
+                    fromEl.classList.add("last-move-source");
+                  }
+                    // persist last move per room so a refresh can restore highlights
+                    try {
+                      if (roomId) {
+                        const key = `cn:lastMove:${roomId}`;
+                        localStorage.setItem(key, JSON.stringify({ from: data.from, to: data.to, ts: Date.now() }));
+                      }
+                    } catch (e) {}
+                }
+              } catch (_) {}
             } catch (e) {
               console.warn("move:moved handler error", e);
             }
@@ -1412,7 +1469,20 @@ logs...</pre
           currentBoardState = boardState;
           // clear existing pieces but keep squares if present
           const squares = boardEl.querySelectorAll(".square");
-          squares.forEach((s) => (s.innerHTML = ""));
+          squares.forEach((s) => {
+            // remove any last-move visual state from previous turns
+            try {
+              s.classList.remove("last-move-dest");
+              s.classList.remove("last-move-source");
+            } catch (_) {}
+            // remove any lingering circle markers
+            try {
+              const prev = s.querySelectorAll('.last-move-circle');
+              prev.forEach((c) => c.remove());
+            } catch (_) {}
+            // clear square contents (pieces/markers)
+            s.innerHTML = "";
+          });
 
           // place pieces according to boardState.pieces (expects algebraic square names)
           (boardState.pieces || []).forEach((p) => {

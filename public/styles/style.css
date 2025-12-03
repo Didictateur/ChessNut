@@ -49,8 +49,8 @@ a:hover{text-decoration:underline}
 #board{border:1px solid rgba(11,18,32,0.06);position:relative;background-image: url('/assets/chess-pieces/boards/8x8_wood.svg');background-size:cover}
 
 /* square cells and piece images (used by renderFen) */
-.square{width:100%;height:100%;display:flex;align-items:center;justify-content:center}
-.square img, .piece{max-width:78%;max-height:78%;user-select:none}
+.square{width:100%;height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.square img, .piece{max-width:78%;max-height:78%;user-select:none;position:relative;z-index:3}
 
 /* marker shown on target squares for legal moves */
 .square{position:relative}
@@ -245,4 +245,23 @@ button:hover{transform:translateY(-3px);transition:all 180ms ease}
 }
 #board.shuffle-play .square img{ transition: transform 700ms cubic-bezier(.2,.9,.2,1); transform: rotate(2deg) scale(0.995); filter: drop-shadow(0 6px 18px rgba(0,0,0,0.06)); }
 
+/* overlay that fills the whole square (subtle green) so the entire cell is highlighted */
+.square.last-move-dest::after{
+  content: '';
+  position: absolute;
+  left: 0; top: 0; right: 0; bottom: 0;
+  background: rgb(164, 229, 208);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* subtle highlight for the source square of the last move (less prominent) */
+.square.last-move-source::after{
+  content: '';
+  position: absolute;
+  left: 0; top: 0; right: 0; bottom: 0;
+  background: rgb(164, 229, 208);
+  pointer-events: none;
+  z-index: 2;
+}
 

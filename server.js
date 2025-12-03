@@ -2538,6 +2538,27 @@ io.on("connection", (socket) => {
       const removed = hand.splice(idx, 1)[0];
       room.hands[senderId] = hand;
       room.discard = room.discard || [];
+      // touhcer
+      try {
+        room.activeCardEffects = room.activeCardEffects || [];
+        for (let ei = room.activeCardEffects.length - 1; ei >= 0; ei--) {
+          const ev = room.activeCardEffects[ei];
+          if (!ev) continue;
+          if (ev.type === "toucher" && ev.playerId === senderId) {
+            try {
+              room.activeCardEffects.splice(ei, 1);
+            } catch (_) {}
+            try {
+              io.to(room.id).emit("card:effect:removed", {
+                roomId: room.id,
+                effectId: ev.id,
+                type: ev.type,
+                playerId: ev.playerId,
+              });
+            } catch (_) {}
+          }
+        }
+      } catch (_) {}
       if (!room.noRemise) {
         room.discard.push(removed);
         played.card = removed;

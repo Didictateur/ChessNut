@@ -371,6 +371,29 @@ logs...</pre
             if (data.boardState) {
               renderBoardFromState(data.boardState);
               updateTurnBanner(data.boardState);
+              // re-apply any active 'toucher' effects sent by the server (useful after refresh/reconnect)
+              try {
+                if (Array.isArray(data.activeCardEffects) && data.activeCardEffects.length) {
+                  data.activeCardEffects.forEach((eff) => {
+                    try {
+                      if (eff && eff.type === 'toucher') {
+                        let targetSquare = eff.pieceSquare || null;
+                        if (!targetSquare && eff.pieceId && data.boardState && Array.isArray(data.boardState.pieces)) {
+                          const p = data.boardState.pieces.find((x) => x.id === eff.pieceId);
+                          if (p && p.square) targetSquare = p.square;
+                        }
+                        if (targetSquare && boardEl) {
+                          const el = boardEl.querySelector(`.square[data-square="${targetSquare}"]`);
+                          if (el) {
+                            el.classList.add('targeted');
+                            try { el.dataset.toucherEffectId = eff.id || ''; } catch(_) {}
+                          }
+                        }
+                      }
+                    } catch(_) {}
+                  });
+                }
+              } catch(_) {}
               // restore last-move highlight from localStorage (persist across refresh)
               try {
                 if (roomId) {
@@ -554,8 +577,60 @@ logs...</pre
                 // public notable effects
                 showEffectNotification(effect);
               }
+              // toucher
+              try {
+                if (effect.type === "toucher") {
+                  const sq = effect.pieceSquare || null;
+                  let targetSquare = sq;
+                  if (!targetSquare && effect.pieceId && currentBoardState && Array.isArray(currentBoardState.pieces)) {
+                    const p = currentBoardState.pieces.find((x) => x.id === effect.pieceId);
+                    if (p && p.square) targetSquare = p.square;
+                  }
+                  if (targetSquare && boardEl) {
+                    const el = boardEl.querySelector(`.square[data-square="${targetSquare}"]`);
+                    if (el) {
+                      el.classList.add("targeted");
+                      try { el.dataset.toucherEffectId = effect.id || ""; } catch(_) {}
+                    }
+                  }
+                }
+              } catch (e) {}
             } catch (e) {
               console.warn("card:effect:applied handler error", e);
+            }
+          });
+
+          // toucher
+          socket.on("card:effect:removed", (data) => {
+            try {
+              const effId = data && (data.effectId || data.id);
+              const type = data && data.type;
+              if (!effId) return;
+              if (type === "toucher") {
+                // find any square with matching dataset.toucherEffectId and remove the visual
+                try {
+                  const sq = boardEl && boardEl.querySelector && boardEl.querySelector(`.square[data-toucher-effect-id][data-toucher-effect-id="${effId}"]`);
+                  if (sq) {
+                    sq.classList.remove("last-move-source");
+                    sq.classList.remove("targeted");
+                    try { delete sq.dataset.toucherEffectId; } catch(_) {}
+                  } else {
+                    // fallback: remove any .last-move-source or .targeted if its dataset matches
+                    const all = boardEl.querySelectorAll('.square.last-move-source, .square.targeted');
+                    all.forEach((s) => {
+                      try {
+                        if (s.dataset && s.dataset.toucherEffectId === String(effId)) {
+                          s.classList.remove('last-move-source');
+                          s.classList.remove('targeted');
+                          delete s.dataset.toucherEffectId;
+                        }
+                      } catch(_) {}
+                    });
+                  }
+                } catch (_) {}
+              }
+            } catch (e) {
+              console.warn('card:effect:removed handler error', e);
             }
           });
           // when the server sends the stolen card to the stealer (private)

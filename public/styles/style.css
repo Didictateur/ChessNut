@@ -245,23 +245,29 @@ button:hover{transform:translateY(-3px);transition:all 180ms ease}
 }
 #board.shuffle-play .square img{ transition: transform 700ms cubic-bezier(.2,.9,.2,1); transform: rotate(2deg) scale(0.995); filter: drop-shadow(0 6px 18px rgba(0,0,0,0.06)); }
 
-/* overlay that fills the whole square (subtle green) so the entire cell is highlighted */
+.square.targeted::after{
+  content: '';
+  position: absolute;
+  left: 0; top: 0; right: 0; bottom: 0;
+  background: rgb(255, 201, 201);
+  pointer-events: none;
+  z-index: 2;
+}
+
 .square.last-move-dest::after{
   content: '';
   position: absolute;
   left: 0; top: 0; right: 0; bottom: 0;
-  background: rgb(164, 229, 208);
+  background: rgb(212, 255, 241);
   pointer-events: none;
   z-index: 2;
 }
 
-/* subtle highlight for the source square of the last move (less prominent) */
 .square.last-move-source::after{
   content: '';
   position: absolute;
   left: 0; top: 0; right: 0; bottom: 0;
-  background: rgb(164, 229, 208);
+  background: rgb(212, 255, 241);
   pointer-events: none;
   z-index: 2;
 }
-

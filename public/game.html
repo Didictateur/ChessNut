@@ -404,14 +404,25 @@ logs...</pre
                     if (lm && lm.to && lm.from && lm.to !== lm.from) {
                       // apply visuals (renderBoardFromState cleared old highlights)
                       const dest = boardEl.querySelector(`.square[data-square="${lm.to}"]`);
-                      if (dest) {
-                        dest.classList.add("last-move-dest");
-                        const circle = document.createElement("div");
-                        circle.className = "last-move-circle";
-                        dest.appendChild(circle);
-                      }
+                      try {
+                        let showDest = false;
+                        if (currentBoardState && Array.isArray(currentBoardState.pieces)) {
+                          showDest = currentBoardState.pieces.some((x) => x && x.square === lm.to);
+                        }
+                        if (showDest && dest) {
+                          dest.classList.add("last-move-dest");
+                        }
+                      } catch (_) {}
                       const fromEl = boardEl.querySelector(`.square[data-square="${lm.from}"]`);
-                      if (fromEl) fromEl.classList.add("last-move-source");
+                      try {
+                        let showSource = false;
+                        if (currentBoardState && Array.isArray(currentBoardState.pieces)) {
+                          showSource = currentBoardState.pieces.some((x) => x && x.square === lm.from);
+                        }
+                        if (showSource && fromEl) {
+                          fromEl.classList.add("last-move-source");
+                        }
+                      } catch (_) {}
                     }
                   }
                 }
@@ -736,9 +747,24 @@ logs...</pre
           socket.on("move:moved", (data) => {
             try {
               log("recv move:moved", data && { from: data.from, to: data.to });
-              // clear any local selection (move completed) before re-render
+              const prevBoardState = currentBoardState;
+              let hasPieceFromBefore = false;
+              let hasPieceToBefore = false;
+              try {
+                const fromBeforeEl =
+                  boardEl && boardEl.querySelector &&
+                  boardEl.querySelector(`.square[data-square="${data && data.from}"]`);
+                if (fromBeforeEl && fromBeforeEl.querySelector && fromBeforeEl.querySelector('img.piece'))
+                  hasPieceFromBefore = true;
+              } catch (_) {}
+              try {
+                const toBeforeEl =
+                  boardEl && boardEl.querySelector &&
+                  boardEl.querySelector(`.square[data-square="${data && data.to}"]`);
+                if (toBeforeEl && toBeforeEl.querySelector && toBeforeEl.querySelector('img.piece'))
+                  hasPieceToBefore = true;
+              } catch (_) {}
               clearSelection(false);
-              // remove any previous visual markers (circle or highlight) everywhere
               try {
                 const prevHighlights = boardEl.querySelectorAll(".last-move-dest, .last-move-source");
                 prevHighlights.forEach((el) => {
@@ -755,23 +781,59 @@ logs...</pre
               if (data && data.boardState) updateTurnBanner(data.boardState);
 
               try {
-                // only highlight the destination square (not the source). create a proper .last-move-circle
                 if (data && data.from && data.to && data.from !== data.to) {
                   const dest = boardEl.querySelector(`.square[data-square="${data.to}"]`);
-                  if (dest) {
-                    dest.classList.add("last-move-dest");
-                  }
                   const fromEl = boardEl.querySelector(`.square[data-square="${data.from}"]`);
-                  if (fromEl) {
-                    fromEl.classList.add("last-move-source");
+                  let showSource = false;
+                  try {
+                    if (currentBoardState && Array.isArray(currentBoardState.pieces)) {
+                      showSource = currentBoardState.pieces.some((x) => x && x.square === data.from);
+                    }
+                  } catch (_) {
+                    showSource = false;
                   }
-                    // persist last move per room so a refresh can restore highlights
-                    try {
-                      if (roomId) {
-                        const key = `cn:lastMove:${roomId}`;
-                        localStorage.setItem(key, JSON.stringify({ from: data.from, to: data.to, ts: Date.now() }));
-                      }
-                    } catch (e) {}
+                  if (!showSource) showSource = !!hasPieceFromBefore;
+
+                  let showDest = false;
+                  try {
+                    if (currentBoardState && Array.isArray(currentBoardState.pieces)) {
+                      showDest = currentBoardState.pieces.some((x) => x && x.square === data.to);
+                    }
+                  } catch (_) {
+                    showDest = false;
+                  }
+                  if (!showDest) showDest = !!hasPieceToBefore;
+
+                  try {
+                    if (!showDest && dest && dest.querySelector && dest.querySelector('img.piece')) showDest = true;
+                  } catch (_) {}
+                  try {
+                    if (!showSource && dest && dest.querySelector && dest.querySelector('img.piece')) showSource = true;
+                  } catch (_) {}
+
+                  try {
+                    if (showDest && dest) {
+                      dest.classList.add("last-move-dest");
+                      const circle = document.createElement("div");
+                      circle.className = "last-move-circle";
+                      dest.appendChild(circle);
+                    }
+                  } catch (_) {}
+                  try {
+                    if (showSource && fromEl) {
+                      fromEl.classList.add("last-move-source");
+                      const circle = document.createElement("div");
+                      circle.className = "last-move-circle";
+                      fromEl.appendChild(circle);
+                    }
+                  } catch (_) {}
+
+                  try {
+                    if (roomId) {
+                      const key = `cn:lastMove:${roomId}`;
+                      localStorage.setItem(key, JSON.stringify({ from: data.from, to: data.to, ts: Date.now() }));
+                    }
+                  } catch (e) {}
                 }
               } catch (_) {}
             } catch (e) {

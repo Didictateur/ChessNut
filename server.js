@@ -285,12 +285,15 @@ function endTurnAfterCard(room, senderId) {
       room.activeCardEffects = room.activeCardEffects || [];
       for (let i = room.activeCardEffects.length - 1; i >= 0; i--) {
         const e = room.activeCardEffects[i];
-        if (typeof e.remainingTurns === "number") {
+          if (typeof e.remainingTurns === "number") {
           let shouldDecrement = false;
           if (e.decrementOn === "opponent") {
             shouldDecrement = e.playerId !== senderId;
           } else if (e.decrementOn === "owner") {
             shouldDecrement = e.playerId === senderId;
+          } else if (e.decrementOn === "both") {
+            // explicit "both" means decrement on every end-of-turn
+            shouldDecrement = true;
           } else {
             shouldDecrement = e.playerId === senderId;
           }
@@ -305,12 +308,32 @@ function endTurnAfterCard(room, senderId) {
             if (e.remainingTurns <= 0) {
               room.activeCardEffects.splice(i, 1);
               try {
+                // If empathie expires, revert the players' swapped colors
+                if (e && e.type === "empathie") {
+                  try {
+                    (room.players || []).forEach((pl) => {
+                      if (!pl || !pl.color) return;
+                      if (pl.color === "white") pl.color = "black";
+                      else if (pl.color === "black") pl.color = "white";
+                    });
+                    // bump board version and notify clients
+                    try {
+                      if (room.boardState) room.boardState.version = (room.boardState.version || 0) + 1;
+                    } catch (_) {}
+                  } catch (_) {}
+                }
+              } catch (_) {}
+              try {
                 io.to(room.id).emit("card:effect:removed", {
                   roomId: room.id,
                   effectId: e.id,
                   type: e.type,
                   playerId: e.playerId,
                 });
+              } catch (_) {}
+              try {
+                // ensure clients receive the updated room state after effect expiry
+                sendRoomUpdate(room);
               } catch (_) {}
             }
           }
@@ -421,115 +444,162 @@ function buildDefaultDeck() {
       "Les déplacements en diagonales de la pièce sélectionnée peuvent rebondir une fois sur les bords",
       "rebond",
     ],
+
     [
       "Adoubement",
       "La pièce sélectionnée peut maintenant faire les déplacements du cavalier en plus",
       "adoubement",
     ],
+
     [
       "Folie",
       "La pièce sélectionnée peut maintenant faire les déplacements du fou en plus",
       "folie",
     ],
+
     [
       "Fortification",
       "La pièce sélectionnée peut maintenant faire les déplacements de la tour en plus",
       "fortification",
     ],
+
     ["L'anneau", "Le plateau devient un anneau pendant un tour", "anneau"],
     [
       "Brouillard de guerre",
-      "Les joueur ne peuvent voir que au alentour de leurs pièces pendant 4 tours",
+      "Les joueur ne peuvent voir que au alentour de leurs pièces pendant 6 tours",
       "brouillard",
     ],
+
     [
       "Jouer deux fois",
       "Le joueur peut déplacer deux pièces. Ne peut pas capturer pendant son deuxième tour",
       "double",
     ],
+
     [
       "Totem d'immunité",
       "Annule l'effet de la prochaine carte jouée par l'adversaire",
       "totem",
     ],
+
     [
       "Placement de mines",
       "Le joueur place une mine sur une case vide sans la révéler au joueur adverse. Une pièce qui se pose dessus explose et est capturée par le joueur ayant placé la mine",
       "mine",
     ],
+
     [
       "Vole d'une pièce",
       "Désigne une pièce non roi qui change de camp.\n\nCompte comme un mouvement",
       "vole_piece",
     ],
-    ["Promotion", "Un pion au choix est promu", "promotion"],
+
+    [
+      "Promotion",
+      "Un pion au choix est promu",
+      "promotion"
+    ],
+
     [
       "Vole d'une carte",
       "Vole une carte aléatoirement au joueur adverse",
       "vole_carte",
     ],
-    ["Resurection", "Ressucite la dernière pièce perdue", "resurection"],
-    ["Carte sans effet", "N'a aucun effet", "sans_effet"],
+
+    [
+      "Resurection",
+      "Ressucite la dernière pièce perdue",
+      "resurection"
+    ],
+
+    [
+      "Carte sans effet",
+      "N'a aucun effet",
+      "sans_effet"
+    ],
+
     [
       "Kamikaze",
       "Détruit une de ses pièces, détruisant toutes les pièces adjacentes.\n\nCompte comme un mouvement",
       "kamikaze",
     ],
+
     [
       "Invisible",
       "Une des pièces devient invisible pour l'adversaire",
       "invisible",
     ],
+
     [
       "Coin-Coin",
       "Possibilité de se téléporter depuis un coin vers n'importe quel autre coin",
       "coincoin",
     ],
+
     [
       "Téléportation",
       "Téléporte n'importe quelle pièce de son camp sur une case vide",
       "teleportation",
     ],
+
     [
       "Toucher c'est jouer",
       "Toucher une pièce adverse qu'il sera obligé de jouer",
       "toucher",
     ],
+
     [
       "Sniper",
       "Capturer une pièce sans avoir à bouger la pièce capturante",
       "sniper",
     ],
+
     [
       "Échange",
       "Échange la position d'une pièce avec une pièce adverse.\n\nCompte comme un mouvement",
       "inversion",
     ],
+
     [
       "Mélange",
       "La position de toutes les pièces sont échangées aléatoirement",
       "melange",
     ],
-    ["La parrure", "Une reine est dégradée en pion", "parrure"],
+
+    [
+      "La parrure",
+      "Une reine est dégradée en pion",
+      "parrure"
+    ],
+
     [
       "Tout ou rien",
       "Une pièce choisie ne peut maintenant se déplacer que si elle capture.",
       "tout",
     ],
+
     [
       "Tous les mêmes",
       "Au yeux de l ennemie, toutes les pièces se ressemblent pendant 2 tours.",
       "pareil",
     ],
+
     [
       "Révolution",
       "Tous les pions sont aléatoirement changés en Cavalier, Fou ou Tour et les Cavaliers, Fous et Tours sont changés en pions.",
       "revolution",
     ],
+
     [
       "Doppelganger",
       "Choisis une pièce. À partir de maintenant, devient chacune des pièces qu'elle capture.",
       "doppelganger",
+    ],
+
+    [
+      "Empathie",
+      "On échange de place pendant 6 tours",
+      "empathie"
     ],
 
     // facile et intéresssant
@@ -566,7 +636,6 @@ function buildDefaultDeck() {
     // ['vacances','Choisie une pièce qui sort du plateau pendant deux tours. Ce après quoi elle tente de revenir: si la case est occupée, alors la pièce vacancière est capturée par la pièce occupant la case.'],
 
     // a reflechir
-      ["Empathie", "Change la couleur associée à chaque joueur.", "empathie"],
     // ['effet domino', "La pièce désigner peut rejouer tant qu'elle capture"]
     // ['reversi','Si deux pions encadrent parfaitement une pièce adverse, cette dernière change de camp'],
     // ['plus on est de fous','Si le joueur possède deux fous dans la même diagonale, alors toutes les pièces adverses encadrées par ces deux fous sont capturés'],
@@ -1876,6 +1945,8 @@ io.on("connection", (socket) => {
                 shouldDecrement = e.playerId !== senderId;
               } else if (e.decrementOn === "owner") {
                 shouldDecrement = e.playerId === senderId;
+              } else if (e.decrementOn === "both") {
+                shouldDecrement = true;
               } else {
                 shouldDecrement = e.playerId === senderId;
               }
@@ -1890,12 +1961,30 @@ io.on("connection", (socket) => {
                 if (e.remainingTurns <= 0) {
                   room.activeCardEffects.splice(i, 1);
                   try {
+                    // If empathie expires, revert the players' swapped colors
+                    if (e && e.type === "empathie") {
+                      try {
+                        (room.players || []).forEach((pl) => {
+                          if (!pl || !pl.color) return;
+                          if (pl.color === "white") pl.color = "black";
+                          else if (pl.color === "black") pl.color = "white";
+                        });
+                        try {
+                          if (room.boardState) room.boardState.version = (room.boardState.version || 0) + 1;
+                        } catch (_) {}
+                      } catch (_) {}
+                    }
+                  } catch (_) {}
+                  try {
                     io.to(room.id).emit("card:effect:removed", {
                       roomId: room.id,
                       effectId: e.id,
                       type: e.type,
                       playerId: e.playerId,
                     });
+                  } catch (_) {}
+                  try {
+                    sendRoomUpdate(room);
                   } catch (_) {}
                 }
               }
@@ -2328,6 +2417,8 @@ io.on("connection", (socket) => {
               shouldDecrement = e.playerId !== senderId;
             } else if (e.decrementOn === "owner") {
               shouldDecrement = e.playerId === senderId;
+            } else if (e.decrementOn === "both") {
+              shouldDecrement = true;
             } else {
               shouldDecrement = e.playerId === senderId;
             }
@@ -2342,12 +2433,29 @@ io.on("connection", (socket) => {
               if (e.remainingTurns <= 0) {
                 room.activeCardEffects.splice(i, 1);
                 try {
+                  if (e && e.type === "empathie") {
+                    try {
+                      (room.players || []).forEach((pl) => {
+                        if (!pl || !pl.color) return;
+                        if (pl.color === "white") pl.color = "black";
+                        else if (pl.color === "black") pl.color = "white";
+                      });
+                      try {
+                        if (room.boardState) room.boardState.version = (room.boardState.version || 0) + 1;
+                      } catch (_) {}
+                    } catch (_) {}
+                  }
+                } catch (_) {}
+                try {
                   io.to(room.id).emit("card:effect:removed", {
                     roomId: room.id,
                     effectId: e.id,
                     type: e.type,
                     playerId: e.playerId,
                   });
+                } catch (_) {}
+                try {
+                  sendRoomUpdate(room);
                 } catch (_) {}
               }
             }
@@ -3435,6 +3543,10 @@ io.on("connection", (socket) => {
             id: played.id,
             type: "empathie",
             playerId: senderId,
+            // lasts 6 turns (decrement on every end-of-turn)
+            remainingTurns: 6,
+            decrementOn: "both",
+            imposedBy: senderId,
             ts: Date.now(),
           };
           room.activeCardEffects = room.activeCardEffects || [];
@@ -4176,7 +4288,7 @@ io.on("connection", (socket) => {
             type: "brouillard",
             playerId: targetPlayer.id,
             ts: Date.now(),
-            remainingTurns: (payload && payload.turns) || 4,
+            remainingTurns: (payload && payload.turns) || 6,
             veiledSquares: all,
             playCounts,
           };
@@ -4821,36 +4933,55 @@ io.on("connection", (socket) => {
               room.activeCardEffects = room.activeCardEffects || [];
               for (let i = room.activeCardEffects.length - 1; i >= 0; i--) {
                 const e = room.activeCardEffects[i];
-                if (typeof e.remainingTurns === "number") {
-                  let shouldDecrement = false;
-                  if (e.decrementOn === "opponent") {
-                    shouldDecrement = e.playerId !== senderId;
-                  } else if (e.decrementOn === "owner") {
-                    shouldDecrement = e.playerId === senderId;
-                  } else {
-                    shouldDecrement = e.playerId === senderId;
-                  }
-                  if (shouldDecrement) {
-                    e.remainingTurns = e.remainingTurns - 1;
-                    try {
-                      io.to(room.id).emit("card:effect:updated", {
-                        roomId: room.id,
-                        effect: e,
-                      });
-                    } catch (_) {}
-                    if (e.remainingTurns <= 0) {
-                      room.activeCardEffects.splice(i, 1);
+                  if (typeof e.remainingTurns === "number") {
+                    let shouldDecrement = false;
+                    if (e.decrementOn === "opponent") {
+                      shouldDecrement = e.playerId !== senderId;
+                    } else if (e.decrementOn === "owner") {
+                      shouldDecrement = e.playerId === senderId;
+                    } else if (e.decrementOn === "both") {
+                      shouldDecrement = true;
+                    } else {
+                      shouldDecrement = e.playerId === senderId;
+                    }
+                    if (shouldDecrement) {
+                      e.remainingTurns = e.remainingTurns - 1;
                       try {
-                        io.to(room.id).emit("card:effect:removed", {
+                        io.to(room.id).emit("card:effect:updated", {
                           roomId: room.id,
-                          effectId: e.id,
-                          type: e.type,
-                          playerId: e.playerId,
+                          effect: e,
                         });
                       } catch (_) {}
+                      if (e.remainingTurns <= 0) {
+                        room.activeCardEffects.splice(i, 1);
+                        try {
+                          if (e && e.type === "empathie") {
+                            try {
+                              (room.players || []).forEach((pl) => {
+                                if (!pl || !pl.color) return;
+                                if (pl.color === "white") pl.color = "black";
+                                else if (pl.color === "black") pl.color = "white";
+                              });
+                              try {
+                                if (room.boardState) room.boardState.version = (room.boardState.version || 0) + 1;
+                              } catch (_) {}
+                            } catch (_) {}
+                          }
+                        } catch (_) {}
+                        try {
+                          io.to(room.id).emit("card:effect:removed", {
+                            roomId: room.id,
+                            effectId: e.id,
+                            type: e.type,
+                            playerId: e.playerId,
+                          });
+                        } catch (_) {}
+                        try {
+                          sendRoomUpdate(room);
+                        } catch (_) {}
+                      }
                     }
                   }
-                }
               }
             } catch (err) {
               console.error(

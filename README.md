@@ -189,7 +189,7 @@ Choisie une pièce qui sort du plateau pendant deux tours. Ce après quoi elle t
 ## a reflechir
 
 ### empathie
-On retourne le plateau' // pendant X tours ?
+On échange de place pendant 6 tours'
 
 ### effet domino'
 La pièce désigner peut rejouer tant qu'elle capture"

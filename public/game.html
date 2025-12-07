@@ -336,8 +336,8 @@ logs...</pre
 
           socket.on("room:update", (data) => {
             log("room:update", data);
-            if (playersEl) {
-              playersEl.innerHTML = "";
+            // Always update local player color mapping and orientation even if the players list UI is not present
+            try {
               (data.players || []).forEach((p) => {
                 try {
                   playerColors[p.id] = p.color;
@@ -346,8 +346,21 @@ logs...</pre
                   if (p.id === myPlayerId) {
                     myColor = p.color;
                     if (myColorEl) myColorEl.textContent = myColor;
+                    // ensure board orientation follows the (possibly changed) player color
+                    try {
+                      if (boardEl) {
+                        if (myColor === "black") boardEl.classList.add("flipped");
+                        else boardEl.classList.remove("flipped");
+                      }
+                    } catch (_) {}
                   }
                 } catch (_) {}
+              });
+            } catch (_) {}
+
+            if (playersEl) {
+              playersEl.innerHTML = "";
+              (data.players || []).forEach((p) => {
                 const li = document.createElement("li");
                 li.textContent =
                   (p.color || "Joueur") +
@@ -606,6 +619,22 @@ logs...</pre
                   }
                 }
               } catch (e) {}
+              // If empathie was applied, explicitly request a room refresh as a reliable fallback
+              try {
+                if (effect.type === "empathie") {
+                  log("recv empathie effect — requesting room refresh");
+                  try {
+                    socket.emit("room:refresh", { roomId }, (resp) => {
+                      log("room:refresh ack", resp);
+                    });
+                  } catch (_) {
+                    try {
+                      // last-resort: ask server for update via general event
+                      socket.emit("room:refresh", { roomId }, () => {});
+                    } catch (_) {}
+                  }
+                }
+              } catch (_) {}
             } catch (e) {
               console.warn("card:effect:applied handler error", e);
             }

@@ -566,7 +566,7 @@ function buildDefaultDeck() {
     // ['vacances','Choisie une pièce qui sort du plateau pendant deux tours. Ce après quoi elle tente de revenir: si la case est occupée, alors la pièce vacancière est capturée par la pièce occupant la case.'],
 
     // a reflechir
-    ["Empathie", "On retourne le plateau", "empathie"], // pendant X tours ?
+      ["Empathie", "Change la couleur associée à chaque joueur.", "empathie"],
     // ['effet domino', "La pièce désigner peut rejouer tant qu'elle capture"]
     // ['reversi','Si deux pions encadrent parfaitement une pièce adverse, cette dernière change de camp'],
     // ['plus on est de fous','Si le joueur possède deux fous dans la même diagonale, alors toutes les pièces adverses encadrées par ces deux fous sont capturés'],
@@ -3000,6 +3000,9 @@ io.on("connection", (socket) => {
               effect,
             });
           } catch (_) {}
+          try {
+            sendRoomUpdate(room);
+          } catch (_) {}
         } catch (e) {
           console.error("toucher effect error", e);
         }
@@ -3388,11 +3391,11 @@ io.on("connection", (socket) => {
         }
       }
 
-      // empathie
+      // empathie: minimal handler — swap the color associated to each player and nothing else
       else if (cardId === "empathie") {
         try {
           const board = room.boardState;
-          if (!board || !Array.isArray(board.pieces)) {
+          if (!board) {
             try {
               room.hands = room.hands || {};
               room.hands[senderId] = room.hands[senderId] || [];
@@ -3410,89 +3413,24 @@ io.on("connection", (socket) => {
             } catch (e) {}
             return (
               cb &&
-              cb({
-                error: "no board to flip",
-                message: "Aucun plateau à retourner.",
-              })
+              cb({ error: "no board to apply empathie", message: "Aucun plateau disponible." })
             );
           }
-          function squareToCoord(sq) {
-            if (!sq) return null;
-            const s = String(sq).trim().toLowerCase();
-            if (!/^[a-z][1-9][0-9]*$/.test(s)) return null;
-            const file = s.charCodeAt(0) - "a".charCodeAt(0);
-            const rank = parseInt(s.slice(1), 10) - 1;
-            return { x: file, y: rank };
-          }
-          function coordToSquare(x, y) {
-            if (x < 0 || y < 0 || !board.width || !board.height) return null;
-            if (x < 0 || y < 0 || x >= board.width || y >= board.height)
-              return null;
-            return String.fromCharCode("a".charCodeAt(0) + x) + (y + 1);
-          }
-          const w = board.width || 8;
-          const h = board.height || 8;
-          (board.pieces || []).forEach((p) => {
-            try {
-              const c = squareToCoord(p.square);
-              if (c) {
-                const nx = w - 1 - c.x;
-                const ny = h - 1 - c.y;
-                const ns = coordToSquare(nx, ny);
-                if (ns) p.square = ns;
-              }
-              p.color = p.color === "w" ? "b" : p.color === "b" ? "w" : p.color;
-            } catch (_) {}
-          });
+
+          // Swap only the players' color mapping (white <-> black). Do NOT move pieces or change board.turn.
           try {
-            room.activeCardEffects = room.activeCardEffects || [];
-            room.activeCardEffects.forEach((e) => {
-              if (!e) return;
-              try {
-                if (e.pieceSquare) {
-                  const c = squareToCoord(e.pieceSquare);
-                  if (c) {
-                    const nx = w - 1 - c.x;
-                    const ny = h - 1 - c.y;
-                    const ns = coordToSquare(nx, ny);
-                    if (ns) e.pieceSquare = ns;
-                  }
-                }
-                if (e.square) {
-                  const c2 = squareToCoord(e.square);
-                  if (c2) {
-                    const nx = w - 1 - c2.x;
-                    const ny = h - 1 - c2.y;
-                    const ns2 = coordToSquare(nx, ny);
-                    if (ns2) e.square = ns2;
-                  }
-                }
-                if (Array.isArray(e.allowedSquares)) {
-                  e.allowedSquares = e.allowedSquares.map((sq) => {
-                    const cc = squareToCoord(sq);
-                    if (!cc) return sq;
-                    const nx = w - 1 - cc.x;
-                    const ny = h - 1 - cc.y;
-                    return coordToSquare(nx, ny) || sq;
-                  });
-                }
-              } catch (_) {}
+            (room.players || []).forEach((pl) => {
+              if (!pl || !pl.color) return;
+              if (pl.color === "white") pl.color = "black";
+              else if (pl.color === "black") pl.color = "white";
             });
           } catch (_) {}
-          (room.players || []).forEach((pl) => {
-            try {
-              pl.color =
-                pl.color === "white"
-                  ? "black"
-                  : pl.color === "black"
-                    ? "white"
-                    : pl.color;
-            } catch (_) {}
-          });
-          if (board.turn)
-            board.turn =
-              board.turn === "w" ? "b" : board.turn === "b" ? "w" : board.turn;
-          board.version = (board.version || 0) + 1;
+
+          // bump version so clients pick up the change
+          try {
+            board.version = (board.version || 0) + 1;
+          } catch (_) {}
+
           const effect = {
             id: played.id,
             type: "empathie",
@@ -3503,16 +3441,18 @@ io.on("connection", (socket) => {
           room.activeCardEffects.push(effect);
           played.payload = Object.assign({}, payload, { applied: "empathie" });
           try {
-            io.to(room.id).emit("card:effect:applied", {
-              roomId: room.id,
-              effect,
-            });
+            io.to(room.id).emit("card:effect:applied", { roomId: room.id, effect });
           } catch (_) {}
+
           try {
             recordPlayerDrewPrev(room, senderId);
           } catch (_) {}
+
+          try {
+            sendRoomUpdate(room);
+          } catch (_) {}
         } catch (e) {
-          console.error("empathie / changement de camp error", e);
+          console.error("empathie minimal handler error", e);
         }
       }
 

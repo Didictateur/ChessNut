@@ -9,6 +9,18 @@
       .square {
         position: relative;
       }
+      /* médusa (petrified) visual */
+      .square.petrified::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(120, 120, 160, 0.35);
+        pointer-events: none;
+        z-index: 60;
+      }
       .square .veil {
         position: absolute;
         left: 0;
@@ -305,6 +317,7 @@ logs...</pre
           if (id.indexOf("sniper") !== -1) return "owned";
           if (id.indexOf("doppel") !== -1) return "owned";
           if (id.indexOf("toucher") !== -1) return "enemy";
+          if (id.indexOf("medusa") !== -1) return "enemy";
           if (id.indexOf("parrure") !== -1) return "enemy_queen";
           if (id.indexOf("tout") !== -1) return "piece";
           if (id.indexOf("kamikaz") !== -1) return "owned";
@@ -349,7 +362,8 @@ logs...</pre
                     // ensure board orientation follows the (possibly changed) player color
                     try {
                       if (boardEl) {
-                        if (myColor === "black") boardEl.classList.add("flipped");
+                        if (myColor === "black")
+                          boardEl.classList.add("flipped");
                         else boardEl.classList.remove("flipped");
                       }
                     } catch (_) {}
@@ -386,27 +400,41 @@ logs...</pre
               updateTurnBanner(data.boardState);
               // re-apply any active 'toucher' effects sent by the server (useful after refresh/reconnect)
               try {
-                if (Array.isArray(data.activeCardEffects) && data.activeCardEffects.length) {
+                if (
+                  Array.isArray(data.activeCardEffects) &&
+                  data.activeCardEffects.length
+                ) {
                   data.activeCardEffects.forEach((eff) => {
                     try {
-                      if (eff && eff.type === 'toucher') {
+                      if (eff && eff.type === "toucher") {
                         let targetSquare = eff.pieceSquare || null;
-                        if (!targetSquare && eff.pieceId && data.boardState && Array.isArray(data.boardState.pieces)) {
-                          const p = data.boardState.pieces.find((x) => x.id === eff.pieceId);
+                        if (
+                          !targetSquare &&
+                          eff.pieceId &&
+                          data.boardState &&
+                          Array.isArray(data.boardState.pieces)
+                        ) {
+                          const p = data.boardState.pieces.find(
+                            (x) => x.id === eff.pieceId,
+                          );
                           if (p && p.square) targetSquare = p.square;
                         }
                         if (targetSquare && boardEl) {
-                          const el = boardEl.querySelector(`.square[data-square="${targetSquare}"]`);
+                          const el = boardEl.querySelector(
+                            `.square[data-square="${targetSquare}"]`,
+                          );
                           if (el) {
-                            el.classList.add('targeted');
-                            try { el.dataset.toucherEffectId = eff.id || ''; } catch(_) {}
+                            el.classList.add("targeted");
+                            try {
+                              el.dataset.toucherEffectId = eff.id || "";
+                            } catch (_) {}
                           }
                         }
                       }
-                    } catch(_) {}
+                    } catch (_) {}
                   });
                 }
-              } catch(_) {}
+              } catch (_) {}
               // restore last-move highlight from localStorage (persist across refresh)
               try {
                 if (roomId) {
@@ -416,21 +444,35 @@ logs...</pre
                     const lm = JSON.parse(raw);
                     if (lm && lm.to && lm.from && lm.to !== lm.from) {
                       // apply visuals (renderBoardFromState cleared old highlights)
-                      const dest = boardEl.querySelector(`.square[data-square="${lm.to}"]`);
+                      const dest = boardEl.querySelector(
+                        `.square[data-square="${lm.to}"]`,
+                      );
                       try {
                         let showDest = false;
-                        if (currentBoardState && Array.isArray(currentBoardState.pieces)) {
-                          showDest = currentBoardState.pieces.some((x) => x && x.square === lm.to);
+                        if (
+                          currentBoardState &&
+                          Array.isArray(currentBoardState.pieces)
+                        ) {
+                          showDest = currentBoardState.pieces.some(
+                            (x) => x && x.square === lm.to,
+                          );
                         }
                         if (showDest && dest) {
                           dest.classList.add("last-move-dest");
                         }
                       } catch (_) {}
-                      const fromEl = boardEl.querySelector(`.square[data-square="${lm.from}"]`);
+                      const fromEl = boardEl.querySelector(
+                        `.square[data-square="${lm.from}"]`,
+                      );
                       try {
                         let showSource = false;
-                        if (currentBoardState && Array.isArray(currentBoardState.pieces)) {
-                          showSource = currentBoardState.pieces.some((x) => x && x.square === lm.from);
+                        if (
+                          currentBoardState &&
+                          Array.isArray(currentBoardState.pieces)
+                        ) {
+                          showSource = currentBoardState.pieces.some(
+                            (x) => x && x.square === lm.from,
+                          );
                         }
                         if (showSource && fromEl) {
                           fromEl.classList.add("last-move-source");
@@ -601,20 +643,60 @@ logs...</pre
                 // public notable effects
                 showEffectNotification(effect);
               }
-              // toucher
+              
+              // toucher + médusa
               try {
-                if (effect.type === "toucher") {
+                if (effect.type === "toucher" || effect.type === "medusa_target") {
                   const sq = effect.pieceSquare || null;
                   let targetSquare = sq;
-                  if (!targetSquare && effect.pieceId && currentBoardState && Array.isArray(currentBoardState.pieces)) {
-                    const p = currentBoardState.pieces.find((x) => x.id === effect.pieceId);
+                  if (
+                    !targetSquare &&
+                    effect.pieceId &&
+                    currentBoardState &&
+                    Array.isArray(currentBoardState.pieces)
+                  ) {
+                    const p = currentBoardState.pieces.find(
+                      (x) => x.id === effect.pieceId,
+                    );
                     if (p && p.square) targetSquare = p.square;
                   }
                   if (targetSquare && boardEl) {
-                    const el = boardEl.querySelector(`.square[data-square="${targetSquare}"]`);
+                    const el = boardEl.querySelector(
+                      `.square[data-square="${targetSquare}"]`,
+                    );
                     if (el) {
                       el.classList.add("targeted");
-                      try { el.dataset.toucherEffectId = effect.id || ""; } catch(_) {}
+                      try {
+                        el.dataset.toucherEffectId = effect.id || "";
+                      } catch (_) {}
+                    }
+                  }
+                }
+              } catch (e) {}
+              try {
+                if (effect.type === "medusa") {
+                  const sq = effect.pieceSquare || null;
+                  let targetSquare = sq;
+                  if (
+                    !targetSquare &&
+                    effect.pieceId &&
+                    currentBoardState &&
+                    Array.isArray(currentBoardState.pieces)
+                  ) {
+                    const p = currentBoardState.pieces.find(
+                      (x) => x.id === effect.pieceId,
+                    );
+                    if (p && p.square) targetSquare = p.square;
+                  }
+                  if (targetSquare && boardEl) {
+                    const el = boardEl.querySelector(
+                      `.square[data-square="${targetSquare}"]`,
+                    );
+                    if (el) {
+                      el.classList.add("petrified");
+                      try {
+                        el.dataset.medusaEffectId = effect.id || "";
+                      } catch (_) {}
                     }
                   }
                 }
@@ -640,37 +722,78 @@ logs...</pre
             }
           });
 
-          // toucher
+          // toucher / medusa removals
           socket.on("card:effect:removed", (data) => {
             try {
               const effId = data && (data.effectId || data.id);
               const type = data && data.type;
               if (!effId) return;
-              if (type === "toucher") {
+              if (type === "toucher" || type === "medusa_target") {
                 // find any square with matching dataset.toucherEffectId and remove the visual
                 try {
-                  const sq = boardEl && boardEl.querySelector && boardEl.querySelector(`.square[data-toucher-effect-id][data-toucher-effect-id="${effId}"]`);
+                  const sq =
+                    boardEl &&
+                    boardEl.querySelector &&
+                    boardEl.querySelector(
+                      `.square[data-toucher-effect-id][data-toucher-effect-id="${effId}"]`,
+                    );
                   if (sq) {
                     sq.classList.remove("last-move-source");
                     sq.classList.remove("targeted");
-                    try { delete sq.dataset.toucherEffectId; } catch(_) {}
+                    try {
+                      delete sq.dataset.toucherEffectId;
+                    } catch (_) {}
                   } else {
                     // fallback: remove any .last-move-source or .targeted if its dataset matches
-                    const all = boardEl.querySelectorAll('.square.last-move-source, .square.targeted');
+                    const all = boardEl.querySelectorAll(
+                      ".square.last-move-source, .square.targeted",
+                    );
                     all.forEach((s) => {
                       try {
-                        if (s.dataset && s.dataset.toucherEffectId === String(effId)) {
-                          s.classList.remove('last-move-source');
-                          s.classList.remove('targeted');
+                        if (
+                          s.dataset &&
+                          s.dataset.toucherEffectId === String(effId)
+                        ) {
+                          s.classList.remove("last-move-source");
+                          s.classList.remove("targeted");
                           delete s.dataset.toucherEffectId;
                         }
-                      } catch(_) {}
+                      } catch (_) {}
+                    });
+                  }
+                } catch (_) {}
+              }
+              if (type === "medusa") {
+                try {
+                  const sq =
+                    boardEl &&
+                    boardEl.querySelector &&
+                    boardEl.querySelector(
+                      `.square[data-medusa-effect-id][data-medusa-effect-id="${effId}"]`,
+                    );
+                  if (sq) {
+                    sq.classList.remove("petrified");
+                    try {
+                      delete sq.dataset.medusaEffectId;
+                    } catch (_) {}
+                  } else {
+                    const all = boardEl.querySelectorAll(".square.petrified");
+                    all.forEach((s) => {
+                      try {
+                        if (
+                          s.dataset &&
+                          s.dataset.medusaEffectId === String(effId)
+                        ) {
+                          s.classList.remove("petrified");
+                          delete s.dataset.medusaEffectId;
+                        }
+                      } catch (_) {}
                     });
                   }
                 } catch (_) {}
               }
             } catch (e) {
-              console.warn('card:effect:removed handler error', e);
+              console.warn("card:effect:removed handler error", e);
             }
           });
           // when the server sends the stolen card to the stealer (private)
@@ -781,42 +904,69 @@ logs...</pre
               let hasPieceToBefore = false;
               try {
                 const fromBeforeEl =
-                  boardEl && boardEl.querySelector &&
-                  boardEl.querySelector(`.square[data-square="${data && data.from}"]`);
-                if (fromBeforeEl && fromBeforeEl.querySelector && fromBeforeEl.querySelector('img.piece'))
+                  boardEl &&
+                  boardEl.querySelector &&
+                  boardEl.querySelector(
+                    `.square[data-square="${data && data.from}"]`,
+                  );
+                if (
+                  fromBeforeEl &&
+                  fromBeforeEl.querySelector &&
+                  fromBeforeEl.querySelector("img.piece")
+                )
                   hasPieceFromBefore = true;
               } catch (_) {}
               try {
                 const toBeforeEl =
-                  boardEl && boardEl.querySelector &&
-                  boardEl.querySelector(`.square[data-square="${data && data.to}"]`);
-                if (toBeforeEl && toBeforeEl.querySelector && toBeforeEl.querySelector('img.piece'))
+                  boardEl &&
+                  boardEl.querySelector &&
+                  boardEl.querySelector(
+                    `.square[data-square="${data && data.to}"]`,
+                  );
+                if (
+                  toBeforeEl &&
+                  toBeforeEl.querySelector &&
+                  toBeforeEl.querySelector("img.piece")
+                )
                   hasPieceToBefore = true;
               } catch (_) {}
               clearSelection(false);
               try {
-                const prevHighlights = boardEl.querySelectorAll(".last-move-dest, .last-move-source");
+                const prevHighlights = boardEl.querySelectorAll(
+                  ".last-move-dest, .last-move-source",
+                );
                 prevHighlights.forEach((el) => {
                   el.classList.remove("last-move-dest");
                   el.classList.remove("last-move-source");
                 });
               } catch (_) {}
               try {
-                const prevCircles = boardEl.querySelectorAll(".last-move-circle");
+                const prevCircles =
+                  boardEl.querySelectorAll(".last-move-circle");
                 prevCircles.forEach((c) => c.remove());
               } catch (_) {}
 
-              if (data && data.boardState) renderBoardFromState(data.boardState);
+              if (data && data.boardState)
+                renderBoardFromState(data.boardState);
               if (data && data.boardState) updateTurnBanner(data.boardState);
 
               try {
                 if (data && data.from && data.to && data.from !== data.to) {
-                  const dest = boardEl.querySelector(`.square[data-square="${data.to}"]`);
-                  const fromEl = boardEl.querySelector(`.square[data-square="${data.from}"]`);
+                  const dest = boardEl.querySelector(
+                    `.square[data-square="${data.to}"]`,
+                  );
+                  const fromEl = boardEl.querySelector(
+                    `.square[data-square="${data.from}"]`,
+                  );
                   let showSource = false;
                   try {
-                    if (currentBoardState && Array.isArray(currentBoardState.pieces)) {
-                      showSource = currentBoardState.pieces.some((x) => x && x.square === data.from);
+                    if (
+                      currentBoardState &&
+                      Array.isArray(currentBoardState.pieces)
+                    ) {
+                      showSource = currentBoardState.pieces.some(
+                        (x) => x && x.square === data.from,
+                      );
                     }
                   } catch (_) {
                     showSource = false;
@@ -825,8 +975,13 @@ logs...</pre
 
                   let showDest = false;
                   try {
-                    if (currentBoardState && Array.isArray(currentBoardState.pieces)) {
-                      showDest = currentBoardState.pieces.some((x) => x && x.square === data.to);
+                    if (
+                      currentBoardState &&
+                      Array.isArray(currentBoardState.pieces)
+                    ) {
+                      showDest = currentBoardState.pieces.some(
+                        (x) => x && x.square === data.to,
+                      );
                     }
                   } catch (_) {
                     showDest = false;
@@ -834,10 +989,22 @@ logs...</pre
                   if (!showDest) showDest = !!hasPieceToBefore;
 
                   try {
-                    if (!showDest && dest && dest.querySelector && dest.querySelector('img.piece')) showDest = true;
+                    if (
+                      !showDest &&
+                      dest &&
+                      dest.querySelector &&
+                      dest.querySelector("img.piece")
+                    )
+                      showDest = true;
                   } catch (_) {}
                   try {
-                    if (!showSource && dest && dest.querySelector && dest.querySelector('img.piece')) showSource = true;
+                    if (
+                      !showSource &&
+                      dest &&
+                      dest.querySelector &&
+                      dest.querySelector("img.piece")
+                    )
+                      showSource = true;
                   } catch (_) {}
 
                   try {
@@ -860,7 +1027,14 @@ logs...</pre
                   try {
                     if (roomId) {
                       const key = `cn:lastMove:${roomId}`;
-                      localStorage.setItem(key, JSON.stringify({ from: data.from, to: data.to, ts: Date.now() }));
+                      localStorage.setItem(
+                        key,
+                        JSON.stringify({
+                          from: data.from,
+                          to: data.to,
+                          ts: Date.now(),
+                        }),
+                      );
                     }
                   } catch (e) {}
                 }
@@ -1479,15 +1653,12 @@ logs...</pre
                       });
                     } else {
                       log("card played with target", resp);
-                      // after server applied the card effect, request legal moves for the selected piece so the client
-                      // will receive the updated legal moves (including teleport to empty squares)
                       try {
                         setSelection(square);
                       } catch (_) {}
                     }
                   },
                 );
-                // keep pendingCard until server response processed (client will call setSelection on success)
                 pendingCard = null;
                 clearTargetHighlights();
                 return;
@@ -1641,9 +1812,15 @@ logs...</pre
               s.classList.remove("last-move-dest");
               s.classList.remove("last-move-source");
             } catch (_) {}
+            try {
+              s.classList.remove("petrified");
+              try {
+                delete s.dataset.medusaEffectId;
+              } catch (_) {}
+            } catch (_) {}
             // remove any lingering circle markers
             try {
-              const prev = s.querySelectorAll('.last-move-circle');
+              const prev = s.querySelectorAll(".last-move-circle");
               prev.forEach((c) => c.remove());
             } catch (_) {}
             // clear square contents (pieces/markers)
@@ -2068,6 +2245,7 @@ logs...</pre
                 imgSrc = "/assets/img/cards/vole_piece.png";
               if (cid === "double") imgSrc = "/assets/img/cards/double.png";
               if (cid === "empathie") imgSrc = "/assets/img/cards/empathie.png";
+              if (cid === "medusa") imgSrc = "/assets/img/cards/medusa.png";
               if (cid === "parrure") imgSrc = "/assets/img/cards/parrure.png";
               if (cid === "revolution")
                 imgSrc = "/assets/img/cards/révolution.png";

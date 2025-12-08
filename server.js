@@ -440,6 +440,12 @@ function checkAndHandleVictory(room) {
 function buildDefaultDeck() {
   const cards = [
     [
+      'médusa',
+      'La pièce désignée ne peut plus bouger pendant 4 tours',
+      'medusa',
+    ],
+
+    [
       "Rebondir sur les bords",
       "Les déplacements en diagonales de la pièce sélectionnée peuvent rebondir une fois sur les bords",
       "rebond",
@@ -613,7 +619,6 @@ function buildDefaultDeck() {
     // ['tricherie','Choisis une carte de la pioche parmis trois'],
     // ['trêve','Aucun capture ne peut avoir lieu pendant 4 tours'],
     // ['traversti','La pièce désignée change aléatoirement de type à chaque tour']
-    // ['médusa','La pièce désignée ne peut plus bouger pendant 4 tours'],
     // ['pièce berserk','Une pièce choisie doit capturer dans les trois prochains tours, sinon elle est capturée'],
 
     // moyen facile mais intéressant
@@ -752,6 +757,12 @@ function computeLegalMoves(room, square) {
 
   const piece = getPieceAt(square);
   if (!piece) return [];
+  try {
+    const medusa = (room.activeCardEffects || []).find(
+      (e) => e && e.type === "medusa" && (e.pieceId === piece.id || e.pieceSquare === square),
+    );
+    if (medusa) return [];
+  } catch (_) {}
   const color = piece.color;
   const fromCoord = squareToCoord(square);
   if (!fromCoord) return [];
@@ -1483,6 +1494,24 @@ io.on("connection", (socket) => {
         }
       } catch (_) {}
 
+      // médusa
+      try {
+        const effects = room.activeCardEffects || [];
+        const medusa = effects.find(
+          (e) => e && e.type === "medusa" && e.pieceId === moving.id,
+        );
+        if (medusa) {
+          return (
+            cb &&
+            cb({
+              error: "medusa_immobilization",
+              message:
+                "Mouvement impossible : cette pièce est pétrifiée.",
+            })
+          );
+        }
+      } catch (_) {}
+
       // tout ou rien
       try {
         const effects2 = room.activeCardEffects || [];
@@ -1594,7 +1623,7 @@ io.on("connection", (socket) => {
                 const ev = room.activeCardEffects[ei];
                 if (!ev) continue;
                 if (
-                  ev.type === "invisible" &&
+                  (ev.type === "invisible" || ev.type === "medusa") &&
                   (ev.pieceId === capturedPiece.id ||
                     ev.pieceSquare === capturedPiece.square)
                 ) {
@@ -1654,7 +1683,7 @@ io.on("connection", (socket) => {
                 const ev = room.activeCardEffects[ei];
                 if (!ev) continue;
                 if (
-                  ev.type === "invisible" &&
+                  (ev.type === "invisible" || ev.type === "medusa") &&
                   (ev.pieceId === capturedPiece.id ||
                     ev.pieceSquare === capturedPiece.square)
                 ) {
@@ -3113,6 +3142,103 @@ io.on("connection", (socket) => {
           } catch (_) {}
         } catch (e) {
           console.error("toucher effect error", e);
+        }
+      }
+
+      // médusa
+      else if (cardId === "medusa") {
+        try {
+          const board = room.boardState;
+          let target = payload && payload.targetSquare;
+          if (!target) {
+            try {
+              target = socket.data && socket.data.lastSelectedSquare;
+            } catch (e) {
+              target = null;
+            }
+          }
+          const roomPlayer = room.players.find((p) => p.id === senderId);
+          const playerColorShort =
+            (roomPlayer && roomPlayer.color && roomPlayer.color[0]) || null;
+          const targetPiece = ((board && board.pieces) || []).find(
+            (p) => p.square === target,
+          );
+          if (
+            !board ||
+            !target ||
+            !targetPiece ||
+            targetPiece.color === playerColorShort ||
+            (targetPiece.type && String(targetPiece.type).toLowerCase() === "k")
+          ) {
+            try {
+              room.hands = room.hands || {};
+              room.hands[senderId] = room.hands[senderId] || [];
+              if (removed) room.hands[senderId].push(removed);
+              room.discard = room.discard || [];
+              for (let i = room.discard.length - 1; i >= 0; i--) {
+                if (
+                  room.discard[i] &&
+                  room.discard[i].id === (removed && removed.id)
+                ) {
+                  room.discard.splice(i, 1);
+                  break;
+                }
+              }
+            } catch (e) {}
+            return (
+              cb &&
+              cb({ error: "no valid target", message: "Aucune cible valide n'a été sélectionnée." })
+            );
+          }
+          room.activeCardEffects = room.activeCardEffects || [];
+          const effect = {
+            id: played.id,
+            type: "medusa",
+            playerId: senderId,
+            pieceId: targetPiece.id,
+            pieceSquare: targetPiece.square,
+            remainingTurns: 4,
+            decrementOn: "owner",
+            imposedBy: senderId,
+            ts: Date.now(),
+          };
+          room.activeCardEffects.push(effect);
+          // Also add a one-turn visual marker effect so clients show .targeted like 'toucher'
+          try {
+            const marker = {
+              id: uuidv4().slice(0, 8),
+              type: "medusa_target",
+              playerId: (room.players || []).find((p) => (p.color && p.color[0]) === targetPiece.color)?.id || null,
+              pieceId: targetPiece.id,
+              pieceSquare: targetPiece.square,
+              remainingTurns: 1,
+              decrementOn: "owner",
+              imposedBy: senderId,
+              ts: Date.now(),
+            };
+            room.activeCardEffects.push(marker);
+            try {
+              io.to(room.id).emit("card:effect:applied", {
+                roomId: room.id,
+                effect: marker,
+              });
+            } catch (_) {}
+          } catch (_) {}
+          played.payload = Object.assign({}, payload, {
+            applied: "medusa",
+            appliedTo: target,
+          });
+          try {
+            io.to(room.id).emit("card:effect:applied", {
+              roomId: room.id,
+              effect,
+            });
+          } catch (_) {}
+          try {
+            sendRoomUpdate(room);
+          } catch (_) {}
+        } catch (e) {
+          console.error("medusa effect error", e);
         }
       }
 

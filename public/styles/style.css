@@ -309,13 +309,10 @@ a:hover {
 }
 
 /* basic checkerboard coloring */
-.square.light {
+.square.dark {
   background: linear-gradient(180deg, #fff8f4, #fff1ec);
 }
-.quare.dark {
-  background: linear-gradient(180deg, #fdeee2, #f6d9c5);
-}
-.square.dark {
+.square.light {
   background: linear-gradient(180deg, #fdeee2, #f6d9c5);
 }
 .square {

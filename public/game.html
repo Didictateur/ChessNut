@@ -46,6 +46,20 @@
       #log {
         display: none;
       }
+      /* effects feed for user-facing logs (card plays) */
+      #effectsFeed {
+        max-height: 140px;
+        overflow: auto;
+        padding: 8px;
+        background: #fff;
+        border: 1px solid #eee;
+        border-radius: 6px;
+        font-size: 14px;
+        color: #222;
+      }
+      #log {
+        display: none;
+      }
     </style>
   </head>
   <body>
@@ -139,10 +153,14 @@
 logs...</pre
               >
             </div>
-            <div style="margin-top: 8px">
-              <div><strong>Activité</strong></div>
-              <div id="activityFeed" style="margin-top: 8px">
-                Aucune activité pour l'instant.
+            <div style="margin-top: 8px; display:flex; gap:8px; align-items:flex-start;">
+              <div style="flex:1; min-width:0">
+                <div><strong>Activité</strong></div>
+                <div id="activityFeed" style="margin-top: 8px">Aucune activité pour l'instant.</div>
+              </div>
+              <div style="width:200px; min-width:160px">
+                <div><strong>Effets actifs</strong></div>
+                <div id="effectsFeed" style="margin-top: 8px">Aucun effet actif pour l'instant.</div>
               </div>
             </div>
           </section>
@@ -183,6 +201,54 @@ logs...</pre
 
         const logEl = document.getElementById("log");
         const playersEl = document.getElementById("players");
+        const effectsFeedEl = document.getElementById("effectsFeed");
+        // simple client-side registry of active effects we know about (keyed by effect.id)
+        const activeEffects = {};
+
+        function refreshEffectsFeed() {
+          try {
+            const dest = document.getElementById("effectsFeed");
+            if (!dest) return;
+            const effects = Object.values(activeEffects).filter(
+              (e) => e && e.type === "brouillard",
+            );
+            if (!effects || !effects.length) {
+              dest.textContent = "Aucun effet actif pour l'instant.";
+              return;
+            }
+            dest.innerHTML = "";
+            effects.forEach((e) => {
+              try {
+                const row = document.createElement("div");
+                row.style.padding = "4px 6px";
+                row.style.borderBottom = "1px solid #f3f3f3";
+                const rem = typeof e.remainingTurns !== "undefined" ? e.remainingTurns : "?";
+                row.textContent = `${e.title} — ${rem+1} tour(s) restant(s)`;
+                dest.appendChild(row);
+              } catch (_) {}
+            });
+          } catch (_) {}
+        }
+        // Apply a local visual tick when any player plays a card or moves.
+        // This updates the displayed remainingTurns immediately for UX, but
+        // does not replace server authority — incoming card:effect:updated or
+        // room:update will resync the true values.
+        function applyLocalPlayTick() {
+          try {
+            let changed = false;
+            Object.keys(activeEffects).forEach((id) => {
+              try {
+                const e = activeEffects[id];
+                if (e && typeof e.remainingTurns === "number") {
+                  // decrement visually by one (but never below zero)
+                  e.remainingTurns = Math.max(0, (e.remainingTurns || 0) - 1);
+                  changed = true;
+                }
+              } catch (_) {}
+            });
+            if (changed) refreshEffectsFeed();
+          } catch (_) {}
+        }
         const boardEl = document.getElementById("board");
         const myColorEl = document.getElementById("myColor");
         let socket = null;
@@ -490,6 +556,29 @@ logs...</pre
                 removeSpectatorQuitButton();
               }
             } catch (_) {}
+              // sync activeEffects from server-provided activeCardEffects (update remainingTurns and remove expired)
+              try {
+                if (Array.isArray(data.activeCardEffects)) {
+                  const seen = new Set();
+                  data.activeCardEffects.forEach((eff) => {
+                    try {
+                      if (eff && eff.type === "brouillard" && eff.id) {
+                        activeEffects[eff.id] = eff;
+                        seen.add(eff.id);
+                      }
+                    } catch (_) {}
+                  });
+                  // remove stale brouillard entries not present in server list
+                  Object.keys(activeEffects).forEach((id) => {
+                    try {
+                      if (!seen.has(id) && activeEffects[id] && activeEffects[id].type === "brouillard") {
+                        delete activeEffects[id];
+                      }
+                    } catch (_) {}
+                  });
+                  refreshEffectsFeed();
+                }
+              } catch (_) {}
             try {
               myMines = data.minesOwn || [];
             } catch (e) {
@@ -564,10 +653,11 @@ logs...</pre
               const actor =
                 pid === myPlayerId
                   ? "Vous"
-                  : playerColors[pid]
-                    ? playerColors[pid]
                     : "Adversaire";
               appendActivity(`${actor} : a pioché une carte`);
+              try {
+                applyLocalPlayTick();
+              } catch (_) {}
             } catch (_) {}
           });
           socket.on("card:played", (data) => {
@@ -607,8 +697,6 @@ logs...</pre
                 const actor =
                   owner === myPlayerId
                     ? "Vous"
-                    : playerColors[owner]
-                      ? playerColors[owner]
                       : "Adversaire";
                 const isHidden =
                   (cardObj && cardObj.hidden) ||
@@ -618,6 +706,10 @@ logs...</pre
                 } else {
                   appendActivity(`${actor} : a joué la carte "${title}"`);
                 }
+                try {
+                  // Visual tick: decrement displayed counters immediately when any card is played
+                  applyLocalPlayTick();
+                } catch (_) {}
               } catch (_) {}
             } catch (e) {
               console.warn("card:played handler error", e);
@@ -701,6 +793,13 @@ logs...</pre
                   }
                 }
               } catch (e) {}
+                // track brouillard effects for the sidebar feed
+                try {
+                  if (effect.type === "brouillard") {
+                    activeEffects[effect.id] = effect;
+                    refreshEffectsFeed();
+                  }
+                } catch (_) {}
               // If empathie was applied, explicitly request a room refresh as a reliable fallback
               try {
                 if (effect.type === "empathie") {
@@ -719,6 +818,21 @@ logs...</pre
               } catch (_) {}
             } catch (e) {
               console.warn("card:effect:applied handler error", e);
+            }
+          });
+
+          socket.on("card:effect:updated", (data) => {
+            try {
+              const eff = data && (data.effect || data);
+              if (!eff || !eff.id) return;
+              try {
+                activeEffects[eff.id] = eff;
+              } catch (_) {}
+              try {
+                refreshEffectsFeed();
+              } catch (_) {}
+            } catch (e) {
+              console.warn("card:effect:updated handler error", e);
             }
           });
 
@@ -763,6 +877,17 @@ logs...</pre
                   }
                 } catch (_) {}
               }
+              // brouillard removal from sidebar feed
+              try {
+                if (type === "brouillard") {
+                  try {
+                    delete activeEffects[effId];
+                  } catch (_) {}
+                  try {
+                    refreshEffectsFeed();
+                  } catch (_) {}
+                }
+              } catch (_) {}
               if (type === "medusa") {
                 try {
                   const sq =
@@ -915,6 +1040,10 @@ logs...</pre
                   fromBeforeEl.querySelector("img.piece")
                 )
                   hasPieceFromBefore = true;
+              try {
+                // moving a piece is an in-game action — apply visual tick immediately
+                applyLocalPlayTick();
+              } catch (_) {}
               } catch (_) {}
               try {
                 const toBeforeEl =
@@ -2231,7 +2360,7 @@ logs...</pre
                 imgSrc = "/assets/img/cards/inversion.png";
               if (cid === "invisible")
                 imgSrc = "/assets/img/cards/invisible.png";
-              if (cid === "kamikaze") imgSrc = "/assets/img/cards/kamikaz.png";
+              if (cid === "kamikaze") imgSrc = "/assets/img/cards/kamikaze.png";
               if (cid === "melange") imgSrc = "/assets/img/cards/mélange.png";
               if (cid === "mine") imgSrc = "/assets/img/cards/mine.png";
               if (cid === "promotion")
@@ -2259,6 +2388,8 @@ logs...</pre
               if (cid === "tout") imgSrc = "/assets/img/cards/tout.png";
               if (cid === "vole_carte")
                 imgSrc = "/assets/img/cards/vole_carte.png";
+              if (cid === "medusa")
+                imgSrc = "/assets/img/cards/medusa.png";
 
               if (imgSrc) {
                 const img = document.createElement("img");

@@ -52,7 +52,6 @@ function sendRoomUpdate(room) {
     previousDraws: room._playerDrewPrev || {},
     playerDrew: room._playerDrew || {},
   };
-
   const handCounts = {};
   (room.players || []).forEach((p) => {
     handCounts[p.id] =
@@ -440,7 +439,7 @@ function checkAndHandleVictory(room) {
 function buildDefaultDeck() {
   const cards = [
     [
-      'médusa',
+      'Médusa',
       'La pièce désignée ne peut plus bouger pendant 4 tours',
       'medusa',
     ],
@@ -1841,11 +1840,12 @@ io.on("connection", (socket) => {
 
       // Update brouillard play counts
       try {
-        room.activeCardEffects = room.activeCardEffects || [];
         for (let ei = room.activeCardEffects.length - 1; ei >= 0; ei--) {
           const ev = room.activeCardEffects[ei];
           if (!ev || ev.type !== "brouillard") continue;
           try {
+            // only consider play-count based expiry if the effect explicitly enabled it
+            if (!ev.countByPlay) continue;
             ev.playCounts = ev.playCounts || {};
             ev.playCounts[senderId] = (ev.playCounts[senderId] || 0) + 1;
             try {
@@ -4403,20 +4403,18 @@ io.on("connection", (socket) => {
             }
           }
           room.activeCardEffects = room.activeCardEffects || [];
-          const playCounts = {};
-          try {
-            (room.players || []).forEach((pl) => {
-              if (pl && pl.id) playCounts[pl.id] = 0;
-            });
-          } catch (_) {}
+          // legacy: optionally expire brouillard by play-counts. Default: disabled.
+          const countByPlay = !!(payload && payload.countByPlay);
           const effect = {
             id: played.id,
+            title: "Brouillard de guerre",
             type: "brouillard",
             playerId: targetPlayer.id,
             ts: Date.now(),
             remainingTurns: (payload && payload.turns) || 6,
+            decrementOn: "both",
             veiledSquares: all,
-            playCounts,
+            countByPlay,
           };
           room.activeCardEffects.push(effect);
           try {

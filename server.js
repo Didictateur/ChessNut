@@ -5,6 +5,7 @@ const { v4: uuidv4 } = require("uuid");
 
 const app = express();
 const path = require("path");
+const { title } = require("process");
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
 
@@ -35,9 +36,54 @@ app.get("/cards", (req, res) => {
 // room = { id, boardState: object|null, players: [{id, socketId, color}], status, size }
 const rooms = new Map();
 
+// Remove any active effects whose remainingTurns <= 0 and notify clients.
+function purgeExpiredEffects(room) {
+  try {
+    if (!room || !Array.isArray(room.activeCardEffects)) return;
+    for (let i = room.activeCardEffects.length - 1; i >= 0; i--) {
+      const e = room.activeCardEffects[i];
+      if (!e) continue;
+      if (typeof e.remainingTurns === "number" && e.remainingTurns <= 0) {
+        try {
+          // handle special expiry side-effects (empathie etc.) if needed
+          if (e && e.type === "empathie") {
+            try {
+              (room.players || []).forEach((pl) => {
+                if (!pl || !pl.color) return;
+                if (pl.color === "white") pl.color = "black";
+                else if (pl.color === "black") pl.color = "white";
+              });
+              try {
+                if (room.boardState)
+                  room.boardState.version = (room.boardState.version || 0) + 1;
+              } catch (_) {}
+            } catch (_) {}
+          }
+        } catch (_) {}
+        try {
+          room.activeCardEffects.splice(i, 1);
+        } catch (_) {}
+        try {
+          io.to(room.id).emit("card:effect:removed", {
+            roomId: room.id,
+            effectId: e.id,
+            type: e.type,
+            playerId: e.playerId,
+          });
+        } catch (_) {}
+      }
+    }
+  } catch (err) {
+    console.error("purgeExpiredEffects error", err);
+  }
+}
+
 // Send a room:update payload to each player individually so hands remain private.
 function sendRoomUpdate(room) {
   if (!room) return;
+  try {
+    purgeExpiredEffects(room);
+  } catch (_) {}
   const base = {
     boardState: room.boardState || null,
     players: (room.players || []).map((p) => ({ id: p.id, color: p.color })),
@@ -3193,12 +3239,13 @@ io.on("connection", (socket) => {
           room.activeCardEffects = room.activeCardEffects || [];
           const effect = {
             id: played.id,
+            title: "Médusa",
             type: "medusa",
             playerId: senderId,
             pieceId: targetPiece.id,
             pieceSquare: targetPiece.square,
             remainingTurns: 4,
-            decrementOn: "owner",
+            decrementOn: "both",
             imposedBy: senderId,
             ts: Date.now(),
           };
@@ -3212,7 +3259,8 @@ io.on("connection", (socket) => {
               pieceId: targetPiece.id,
               pieceSquare: targetPiece.square,
               remainingTurns: 1,
-              decrementOn: "owner",
+              // remove the visual marker after any player's action
+              decrementOn: "both",
               imposedBy: senderId,
               ts: Date.now(),
             };
@@ -3667,6 +3715,7 @@ io.on("connection", (socket) => {
 
           const effect = {
             id: played.id,
+            title: "Empathie",
             type: "empathie",
             playerId: senderId,
             // lasts 6 turns (decrement on every end-of-turn)

@@ -210,7 +210,7 @@ logs...</pre
             const dest = document.getElementById("effectsFeed");
             if (!dest) return;
             const effects = Object.values(activeEffects).filter(
-              (e) => e && e.type === "brouillard",
+              (e) => e && (e.type === "brouillard" || e.type === "medusa" || e.type === "empathie"),
             );
             if (!effects || !effects.length) {
               dest.textContent = "Aucun effet actif pour l'instant.";
@@ -793,9 +793,13 @@ logs...</pre
                   }
                 }
               } catch (e) {}
-                // track brouillard effects for the sidebar feed
+                // track brouillard / medusa / empathie effects for the sidebar feed
                 try {
-                  if (effect.type === "brouillard") {
+                  if (
+                    effect.type === "brouillard" ||
+                    effect.type === "medusa" ||
+                    effect.type === "empathie"
+                  ) {
                     activeEffects[effect.id] = effect;
                     refreshEffectsFeed();
                   }
@@ -826,10 +830,47 @@ logs...</pre
               const eff = data && (data.effect || data);
               if (!eff || !eff.id) return;
               try {
-                activeEffects[eff.id] = eff;
-              } catch (_) {}
-              try {
-                refreshEffectsFeed();
+                // If the server reports remainingTurns <= 0, treat as expired and remove from feed
+                if (typeof eff.remainingTurns === "number" && eff.remainingTurns <= 0) {
+                  try {
+                    delete activeEffects[eff.id];
+                  } catch (_) {}
+                  try {
+                    // also remove medusa visuals if present
+                    if (eff.type === "medusa") {
+                      const sq =
+                        boardEl &&
+                        boardEl.querySelector &&
+                        boardEl.querySelector(
+                          `.square[data-medusa-effect-id][data-medusa-effect-id="${eff.id}"]`,
+                        );
+                      if (sq) {
+                        sq.classList.remove("petrified");
+                        try {
+                          delete sq.dataset.medusaEffectId;
+                        } catch (_) {}
+                      } else {
+                        const all = boardEl.querySelectorAll(".square.petrified");
+                        all.forEach((s) => {
+                          try {
+                            if (s.dataset && s.dataset.medusaEffectId === String(eff.id)) {
+                              s.classList.remove("petrified");
+                              delete s.dataset.medusaEffectId;
+                            }
+                          } catch (_) {}
+                        });
+                      }
+                    }
+                  } catch (_) {}
+                  try {
+                    refreshEffectsFeed();
+                  } catch (_) {}
+                } else {
+                  activeEffects[eff.id] = eff;
+                  try {
+                    refreshEffectsFeed();
+                  } catch (_) {}
+                }
               } catch (_) {}
             } catch (e) {
               console.warn("card:effect:updated handler error", e);
@@ -877,9 +918,13 @@ logs...</pre
                   }
                 } catch (_) {}
               }
-              // brouillard removal from sidebar feed
+              // remove any feed entry for effects that are removed
               try {
-                if (type === "brouillard") {
+                if (
+                  type === "brouillard" ||
+                  type === "medusa" ||
+                  type === "empathie"
+                ) {
                   try {
                     delete activeEffects[effId];
                   } catch (_) {}
